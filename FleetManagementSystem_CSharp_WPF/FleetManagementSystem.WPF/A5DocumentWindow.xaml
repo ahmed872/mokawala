@@ -1,0 +1,212 @@
+<Window x:Class="FleetManagementSystem.WPF.A5DocumentWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="نموذج A5"
+        Width="620"
+        Height="820"
+        MinWidth="560"
+        MinHeight="640"
+        WindowStartupLocation="CenterOwner"
+        ResizeMode="CanResize"
+        FlowDirection="RightToLeft"
+        Background="#EDF2EF">
+    <Window.Resources>
+        <SolidColorBrush x:Key="DocumentInkBrush" Color="#1F2A2E" />
+        <SolidColorBrush x:Key="DocumentMutedBrush" Color="#5E6B70" />
+        <SolidColorBrush x:Key="DocumentBorderBrush" Color="#1F2A2E" />
+        <SolidColorBrush x:Key="DocumentAccentBrush" Color="#53766A" />
+
+        <Style x:Key="DocumentButtonStyle" TargetType="Button">
+            <Setter Property="Height" Value="40" />
+            <Setter Property="MinWidth" Value="120" />
+            <Setter Property="Margin" Value="8,0,0,0" />
+            <Setter Property="Padding" Value="18,6" />
+            <Setter Property="FontSize" Value="14" />
+            <Setter Property="FontWeight" Value="Bold" />
+            <Setter Property="Foreground" Value="White" />
+            <Setter Property="Background" Value="{StaticResource DocumentAccentBrush}" />
+            <Setter Property="BorderBrush" Value="{StaticResource DocumentAccentBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="Cursor" Value="Hand" />
+        </Style>
+    </Window.Resources>
+
+    <Grid Margin="20">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <ScrollViewer VerticalScrollBarVisibility="Auto"
+                      HorizontalScrollBarVisibility="Disabled">
+            <Border x:Name="FormRoot"
+                    Width="559"
+                    Height="794"
+                    Background="White"
+                    BorderBrush="#B8C5BE"
+                    BorderThickness="1"
+                    Padding="24"
+                    HorizontalAlignment="Center"
+                    ClipToBounds="True">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel>
+                            <TextBlock x:Name="CompanyNameTextBlock"
+                                       FontSize="18"
+                                       FontWeight="Bold"
+                                       Foreground="{StaticResource DocumentInkBrush}" />
+                            <TextBlock x:Name="CompanyAddressTextBlock"
+                                       Margin="0,4,0,0"
+                                       FontSize="11"
+                                       Foreground="{StaticResource DocumentMutedBrush}"
+                                       TextWrapping="Wrap" />
+                        </StackPanel>
+                        <Border Grid.Column="1"
+                                Width="82"
+                                Height="50"
+                                BorderBrush="{StaticResource DocumentBorderBrush}"
+                                BorderThickness="1"
+                                Padding="6">
+                            <TextBlock Text="A5"
+                                       HorizontalAlignment="Center"
+                                       VerticalAlignment="Center"
+                                       FontSize="20"
+                                       FontWeight="Bold"
+                                       Foreground="{StaticResource DocumentAccentBrush}" />
+                        </Border>
+                    </Grid>
+
+                    <Border Grid.Row="1"
+                            Margin="0,18,0,14"
+                            BorderBrush="{StaticResource DocumentBorderBrush}"
+                            BorderThickness="0,2,0,2"
+                            Padding="0,10">
+                        <StackPanel>
+                            <TextBlock x:Name="DocumentTitleTextBlock"
+                                       HorizontalAlignment="Center"
+                                       TextAlignment="Center"
+                                       FontSize="23"
+                                       FontWeight="Bold"
+                                       Foreground="{StaticResource DocumentInkBrush}"
+                                       TextWrapping="Wrap" />
+                            <TextBlock x:Name="DocumentSubtitleTextBlock"
+                                       Margin="0,5,0,0"
+                                       HorizontalAlignment="Center"
+                                       TextAlignment="Center"
+                                       FontSize="12"
+                                       Foreground="{StaticResource DocumentMutedBrush}"
+                                       TextWrapping="Wrap" />
+                        </StackPanel>
+                    </Border>
+
+                    <ItemsControl x:Name="SectionsItemsControl"
+                                  Grid.Row="2">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <StackPanel Margin="0,0,0,12">
+                                    <Border Background="#EEF4F1"
+                                            BorderBrush="{StaticResource DocumentBorderBrush}"
+                                            BorderThickness="1"
+                                            Padding="8,6">
+                                        <TextBlock Text="{Binding Title}"
+                                                   FontSize="13"
+                                                   FontWeight="Bold"
+                                                   Foreground="{StaticResource DocumentInkBrush}" />
+                                    </Border>
+                                    <ItemsControl ItemsSource="{Binding Rows}">
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate>
+                                                <Grid>
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="155" />
+                                                        <ColumnDefinition Width="*" />
+                                                    </Grid.ColumnDefinitions>
+                                                    <Border Grid.Column="0"
+                                                            BorderBrush="{StaticResource DocumentBorderBrush}"
+                                                            BorderThickness="1,0,1,1"
+                                                            Background="#FAFBFA"
+                                                            Padding="8"
+                                                            MinHeight="32">
+                                                        <TextBlock Text="{Binding Label}"
+                                                                   FontSize="11"
+                                                                   FontWeight="SemiBold"
+                                                                   Foreground="{StaticResource DocumentMutedBrush}"
+                                                                   TextWrapping="Wrap" />
+                                                    </Border>
+                                                    <Border Grid.Column="1"
+                                                            BorderBrush="{StaticResource DocumentBorderBrush}"
+                                                            BorderThickness="0,0,1,1"
+                                                            Padding="8"
+                                                            MinHeight="32">
+                                                        <TextBlock Text="{Binding Value}"
+                                                                   FontSize="12"
+                                                                   FontWeight="Bold"
+                                                                   Foreground="{StaticResource DocumentInkBrush}"
+                                                                   TextWrapping="Wrap" />
+                                                    </Border>
+                                                </Grid>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                </StackPanel>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+
+                    <Grid Grid.Row="3"
+                          Margin="0,12,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel>
+                            <TextBlock Text="مسؤول التشغيل"
+                                       FontSize="11"
+                                       Foreground="{StaticResource DocumentMutedBrush}" />
+                            <Border Height="38"
+                                    Margin="0,8,18,0"
+                                    BorderBrush="{StaticResource DocumentBorderBrush}"
+                                    BorderThickness="0,0,0,1" />
+                        </StackPanel>
+                        <StackPanel Grid.Column="1">
+                            <TextBlock Text="اعتماد الإدارة"
+                                       FontSize="11"
+                                       Foreground="{StaticResource DocumentMutedBrush}" />
+                            <Border Height="38"
+                                    Margin="0,8,18,0"
+                                    BorderBrush="{StaticResource DocumentBorderBrush}"
+                                    BorderThickness="0,0,0,1" />
+                        </StackPanel>
+                    </Grid>
+                </Grid>
+            </Border>
+        </ScrollViewer>
+
+        <StackPanel Grid.Row="1"
+                    Orientation="Horizontal"
+                    HorizontalAlignment="Center"
+                    Margin="0,16,0,0">
+            <Button Style="{StaticResource DocumentButtonStyle}"
+                    Click="PrintButton_Click">
+                طباعة
+            </Button>
+            <Button Style="{StaticResource DocumentButtonStyle}"
+                    Background="#5E6B70"
+                    BorderBrush="#5E6B70"
+                    Click="CloseButton_Click">
+                إغلاق
+            </Button>
+        </StackPanel>
+    </Grid>
+</Window>

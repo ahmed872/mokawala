@@ -1,0 +1,173 @@
+<Window x:Class="FleetManagementSystem.WPF.LoginWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="تسجيل الدخول"
+        Width="560"
+        Height="640"
+        MinWidth="560"
+        MinHeight="640"
+        WindowStartupLocation="CenterScreen"
+        ResizeMode="NoResize"
+        FlowDirection="RightToLeft"
+        Background="{StaticResource PageBackgroundBrush}">
+    <Window.Resources>
+        <DropShadowEffect x:Key="LoginShadow"
+                          BlurRadius="30"
+                          ShadowDepth="0"
+                          Opacity="0.16"
+                          Color="#17384F" />
+
+        <Style x:Key="FieldLabelStyle" TargetType="TextBlock">
+            <Setter Property="Margin" Value="0,0,0,8" />
+            <Setter Property="FontSize" Value="14" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
+        </Style>
+
+        <Style x:Key="InputTextBoxStyle" TargetType="TextBox">
+            <Setter Property="Height" Value="48" />
+            <Setter Property="Padding" Value="14,8" />
+            <Setter Property="FontSize" Value="15" />
+            <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
+            <Setter Property="Background" Value="#F8FBFD" />
+            <Setter Property="BorderBrush" Value="#D7E2EA" />
+            <Setter Property="BorderThickness" Value="1" />
+        </Style>
+
+        <Style x:Key="InputPasswordStyle" TargetType="PasswordBox">
+            <Setter Property="Height" Value="48" />
+            <Setter Property="Padding" Value="14,8" />
+            <Setter Property="FontSize" Value="15" />
+            <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
+            <Setter Property="Background" Value="#F8FBFD" />
+            <Setter Property="BorderBrush" Value="#D7E2EA" />
+            <Setter Property="BorderThickness" Value="1" />
+        </Style>
+
+        <Style x:Key="PrimaryLoginButtonStyle" TargetType="Button">
+            <Setter Property="Height" Value="50" />
+            <Setter Property="FontSize" Value="15" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Foreground" Value="White" />
+            <Setter Property="Background" Value="{StaticResource AccentBrush}" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Cursor" Value="Hand" />
+        </Style>
+    </Window.Resources>
+
+    <Grid>
+        <Grid.Background>
+            <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                <GradientStop Color="#F4F7FB" Offset="0" />
+                <GradientStop Color="#EEF4F8" Offset="0.55" />
+                <GradientStop Color="#F9FBFD" Offset="1" />
+            </LinearGradientBrush>
+        </Grid.Background>
+
+        <Border Width="430"
+                Padding="34"
+                Background="{StaticResource SurfaceBrush}"
+                BorderBrush="#D8E2E9"
+                BorderThickness="1"
+                CornerRadius="28"
+                Effect="{StaticResource LoginShadow}">
+            <Grid VerticalAlignment="Center">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                </Grid.RowDefinitions>
+
+                <StackPanel>
+                    <Border Width="68"
+                            Height="68"
+                            HorizontalAlignment="Right"
+                            Background="#EAF2F7"
+                            CornerRadius="20">
+                        <Grid>
+                            <Border Width="34"
+                                    Height="34"
+                                    Background="{StaticResource AccentBrush}"
+                                    CornerRadius="12" />
+                        </Grid>
+                    </Border>
+
+                    <TextBlock x:Name="CompanyNameTextBlock"
+                               Margin="0,18,0,0"
+                               FontSize="29"
+                               FontWeight="Bold"
+                               Foreground="{StaticResource AccentBrush}"
+                               Text="نظام إدارة الأسطول" />
+
+                    <TextBlock x:Name="SystemNameTextBlock"
+                               Margin="0,8,0,0"
+                               FontSize="17"
+                               Foreground="{StaticResource TextBrush}"
+                               Text="تسجيل الدخول إلى النظام" />
+
+                    <TextBlock Margin="0,12,0,0"
+                               Foreground="{StaticResource MutedBrush}"
+                               TextWrapping="Wrap">
+                        أدخل اسم المستخدم وكلمة المرور للمتابعة إلى شاشة التشغيل والإدارة.
+                    </TextBlock>
+                </StackPanel>
+
+                <TextBlock Grid.Row="1"
+                           Margin="0,24,0,0"
+                           Style="{StaticResource FieldLabelStyle}"
+                           Text="اسم المستخدم" />
+                <TextBox x:Name="UsernameTextBox"
+                         Grid.Row="2"
+                         Style="{StaticResource InputTextBoxStyle}" />
+
+                <TextBlock Grid.Row="3"
+                           Margin="0,18,0,0"
+                           Style="{StaticResource FieldLabelStyle}"
+                           Text="كلمة المرور" />
+                <PasswordBox x:Name="PasswordBox"
+                             Grid.Row="4"
+                             Style="{StaticResource InputPasswordStyle}" />
+
+                <TextBlock x:Name="ErrorTextBlock"
+                           Grid.Row="5"
+                           Margin="0,14,0,0"
+                           Foreground="#B42318"
+                           TextWrapping="Wrap" />
+
+                <Button Grid.Row="6"
+                        Margin="0,22,0,0"
+                        Style="{StaticResource PrimaryLoginButtonStyle}"
+                        IsDefault="True"
+                        Click="LoginButton_Click">
+                    دخول
+                </Button>
+
+                <Button Grid.Row="7"
+                        Margin="0,14,0,0"
+                        HorizontalAlignment="Left"
+                        Background="Transparent"
+                        BorderThickness="0"
+                        Foreground="{StaticResource AccentSoftBrush}"
+                        Cursor="Hand"
+                        Click="ConnectionSettingsButton_Click">
+                    إعدادات الاتصال
+                </Button>
+
+                <TextBlock Grid.Row="8"
+                           Margin="0,24,0,0"
+                           VerticalAlignment="Bottom"
+                           HorizontalAlignment="Center"
+                           Foreground="{StaticResource MutedBrush}">
+                    Fleet Management System
+                </TextBlock>
+            </Grid>
+        </Border>
+    </Grid>
+</Window>

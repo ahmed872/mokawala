@@ -1,0 +1,636 @@
+<!-- ============================================================================
+     XAML VIEWS - PART 2: Drivers, Employees, Trips, Fuel, Expenses
+     ============================================================================ -->
+
+<!-- ============================================================================
+     FILE: DriverListView.xaml
+     LOCATION: FleetManagementSystem.WPF/Views/Drivers/DriverListView.xaml
+     VIEWMODEL: DriverViewModel
+     ============================================================================ -->
+<UserControl x:Class="FleetManagementSystem.WPF.Views.Drivers.DriverListView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             Background="{StaticResource BackgroundBrush}"
+             FlowDirection="RightToLeft">
+    <Grid Margin="20">
+        <StackPanel Spacing="15">
+            <!-- Header -->
+            <Grid ColumnSpacing="10">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                
+                <TextBlock Grid.Column="0" Text="السائقون" FontSize="24" FontWeight="Bold" 
+                           Foreground="{StaticResource PrimaryBrush}"/>
+                
+                <Button Grid.Column="1" Content="إضافة سائق جديد" 
+                        Command="{Binding AddDriverCommand}"
+                        Style="{StaticResource PrimaryButtonStyle}" Padding="20,10"/>
+                
+                <Button Grid.Column="2" Content="تحديث" 
+                        Command="{Binding RefreshCommand}"
+                        Style="{StaticResource SecondaryButtonStyle}" Padding="15,10"/>
+            </Grid>
+            
+            <!-- Search and Filter -->
+            <Grid ColumnSpacing="10">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="150"/>
+                </Grid.ColumnDefinitions>
+                
+                <TextBox Grid.Column="0" Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}"
+                         Padding="10" FontSize="12" 
+                         Background="{StaticResource InputBackgroundBrush}"
+                         Foreground="{StaticResource PrimaryTextBrush}"
+                         Watermark="ابحث عن الاسم أو رقم الرخصة..."/>
+                
+                <ComboBox Grid.Column="1" ItemsSource="{Binding Statuses}" 
+                          SelectedItem="{Binding SelectedStatus}"
+                          Padding="10" FontSize="12"
+                          Background="{StaticResource InputBackgroundBrush}"/>
+            </Grid>
+            
+            <!-- Drivers DataGrid -->
+            <Border Background="{StaticResource CardBrush}" CornerRadius="8" 
+                    BorderThickness="1" BorderBrush="{StaticResource BorderBrush}">
+                <DataGrid ItemsSource="{Binding Drivers}" AutoGenerateColumns="False" 
+                          IsReadOnly="True" RowHeight="50" BorderThickness="0"
+                          SelectedItem="{Binding SelectedDriver}">
+                    <DataGrid.Columns>
+                        <DataGridTextColumn Header="الاسم الكامل" Binding="{Binding FullName}" Width="150"/>
+                        <DataGridTextColumn Header="رقم الرخصة" Binding="{Binding LicenseNumber}" Width="120"/>
+                        <DataGridTextColumn Header="انتهاء الرخصة" Binding="{Binding LicenseExpiryDate, StringFormat='yyyy-MM-dd'}" Width="120"/>
+                        <DataGridTextColumn Header="رقم الهاتف" Binding="{Binding PhoneNumber}" Width="120"/>
+                        <DataGridTextColumn Header="البريد الإلكتروني" Binding="{Binding Email}" Width="150"/>
+                        <DataGridTextColumn Header="الحالة" Binding="{Binding Status}" Width="80"/>
+                        <DataGridTemplateColumn Header="الإجراءات" Width="150">
+                            <DataGridTemplateColumn.CellTemplate>
+                                <DataTemplate>
+                                    <StackPanel Orientation="Horizontal" Spacing="5">
+                                        <Button Content="تعديل" Command="{Binding DataContext.EditDriverCommand, RelativeSource={RelativeSource AncestorType=DataGrid}}" 
+                                                CommandParameter="{Binding}" Style="{StaticResource SmallButtonStyle}"/>
+                                        <Button Content="حذف" Command="{Binding DataContext.DeleteDriverCommand, RelativeSource={RelativeSource AncestorType=DataGrid}}" 
+                                                CommandParameter="{Binding}" Style="{StaticResource DangerButtonStyle}"/>
+                                    </StackPanel>
+                                </DataTemplate>
+                            </DataGridTemplateColumn.CellTemplate>
+                        </DataGridTemplateColumn>
+                    </DataGrid.Columns>
+                </DataGrid>
+            </Border>
+        </StackPanel>
+    </Grid>
+</UserControl>
+
+<!-- ============================================================================
+     FILE: DriverFormDialog.xaml
+     LOCATION: FleetManagementSystem.WPF/Views/Drivers/DriverFormDialog.xaml
+     VIEWMODEL: DriverViewModel
+     ============================================================================ -->
+<Window x:Class="FleetManagementSystem.WPF.Views.Drivers.DriverFormDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="نموذج السائق" Height="600" Width="600"
+        WindowStartupLocation="CenterOwner" ResizeMode="NoResize"
+        Background="{StaticResource BackgroundBrush}"
+        FlowDirection="RightToLeft">
+    <Grid Margin="20">
+        <ScrollViewer VerticalScrollBarVisibility="Auto">
+            <StackPanel Spacing="15">
+                <!-- Full Name -->
+                <StackPanel>
+                    <TextBlock Text="الاسم الكامل" FontWeight="Bold" Margin="0,0,0,5"/>
+                    <TextBox Text="{Binding Driver.FullName, UpdateSourceTrigger=PropertyChanged}"
+                             Padding="10" FontSize="12" 
+                             Background="{StaticResource InputBackgroundBrush}"/>
+                    <TextBlock Text="{Binding Errors[FullName]}" Foreground="{StaticResource DangerBrush}" 
+                               FontSize="11" Margin="0,3,0,0"/>
+                </StackPanel>
+                
+                <!-- License Number -->
+                <StackPanel>
+                    <TextBlock Text="رقم الرخصة" FontWeight="Bold" Margin="0,0,0,5"/>
+                    <TextBox Text="{Binding Driver.LicenseNumber, UpdateSourceTrigger=PropertyChanged}"
+                             Padding="10" FontSize="12" 
+                             Background="{StaticResource InputBackgroundBrush}"/>
+                </StackPanel>
+                
+                <!-- License Expiry Date -->
+                <StackPanel>
+                    <TextBlock Text="تاريخ انتهاء الرخصة" FontWeight="Bold" Margin="0,0,0,5"/>
+                    <DatePicker SelectedDate="{Binding Driver.LicenseExpiryDate}"
+                                Padding="10" FontSize="12"
+                                Background="{StaticResource InputBackgroundBrush}"/>
+                </StackPanel>
+                
+                <!-- Phone Number -->
+                <StackPanel>
+                    <TextBlock Text="رقم الهاتف" FontWeight="Bold" Margin="0,0,0,5"/>
+                    <TextBox Text="{Binding Driver.PhoneNumber, UpdateSourceTrigger=PropertyChanged}"
+                             Padding="10" FontSize="12" 
+                             Background="{StaticResource InputBackgroundBrush}"/>
+                </StackPanel>
+                
+                <!-- Email -->
+                <StackPanel>
+                    <TextBlock Text="البريد الإلكتروني" FontWeight="Bold" Margin="0,0,0,5"/>
+                    <TextBox Text="{Binding Driver.Email, UpdateSourceTrigger=PropertyChanged}"
+                             Padding="10" FontSize="12" 
+                             Background="{StaticResource InputBackgroundBrush}"/>
+                </StackPanel>
+                
+                <!-- National ID -->
+                <StackPanel>
+                    <TextBlock Text="رقم الهوية الوطنية" FontWeight="Bold" Margin="0,0,0,5"/>
+                    <TextBox Text="{Binding Driver.NationalId, UpdateSourceTrigger=PropertyChanged}"
+                             Padding="10" FontSize="12" 
+                             Background="{StaticResource InputBackgroundBrush}"/>
+                </StackPanel>
+                
+                <!-- Date of Birth -->
+                <StackPanel>
+                    <TextBlock Text="تاريخ الميلاد" FontWeight="Bold" Margin="0,0,0,5"/>
+                    <DatePicker SelectedDate="{Binding Driver.DateOfBirth}"
+                                Padding="10" FontSize="12"
+                                Background="{StaticResource InputBackgroundBrush}"/>
+                </StackPanel>
+                
+                <!-- Status -->
+                <StackPanel>
+                    <TextBlock Text="الحالة" FontWeight="Bold" Margin="0,0,0,5"/>
+                    <ComboBox ItemsSource="{Binding Statuses}" 
+                              SelectedItem="{Binding Driver.Status}"
+                              Padding="10" FontSize="12"
+                              Background="{StaticResource InputBackgroundBrush}"/>
+                </StackPanel>
+                
+                <!-- Buttons -->
+                <Grid ColumnSpacing="10" Margin="0,20,0,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    
+                    <Button Grid.Column="0" Content="حفظ" 
+                            Command="{Binding SaveCommand}"
+                            Style="{StaticResource PrimaryButtonStyle}" Padding="20,12"/>
+                    
+                    <Button Grid.Column="1" Content="إلغاء" 
+                            Command="{Binding CancelCommand}"
+                            Style="{StaticResource SecondaryButtonStyle}" Padding="20,12"/>
+                </Grid>
+            </StackPanel>
+        </ScrollViewer>
+    </Grid>
+</Window>
+
+<!-- ============================================================================
+     FILE: EmployeeListView.xaml
+     LOCATION: FleetManagementSystem.WPF/Views/Employees/EmployeeListView.xaml
+     VIEWMODEL: EmployeeViewModel
+     ============================================================================ -->
+<UserControl x:Class="FleetManagementSystem.WPF.Views.Employees.EmployeeListView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             Background="{StaticResource BackgroundBrush}"
+             FlowDirection="RightToLeft">
+    <Grid Margin="20">
+        <StackPanel Spacing="15">
+            <!-- Header -->
+            <Grid ColumnSpacing="10">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                
+                <TextBlock Grid.Column="0" Text="الموظفون" FontSize="24" FontWeight="Bold" 
+                           Foreground="{StaticResource PrimaryBrush}"/>
+                
+                <Button Grid.Column="1" Content="إضافة موظف جديد" 
+                        Command="{Binding AddEmployeeCommand}"
+                        Style="{StaticResource PrimaryButtonStyle}" Padding="20,10"/>
+                
+                <Button Grid.Column="2" Content="تحديث" 
+                        Command="{Binding RefreshCommand}"
+                        Style="{StaticResource SecondaryButtonStyle}" Padding="15,10"/>
+            </Grid>
+            
+            <!-- Search and Filter -->
+            <Grid ColumnSpacing="10">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="150"/>
+                </Grid.ColumnDefinitions>
+                
+                <TextBox Grid.Column="0" Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}"
+                         Padding="10" FontSize="12" 
+                         Background="{StaticResource InputBackgroundBrush}"
+                         Foreground="{StaticResource PrimaryTextBrush}"
+                         Watermark="ابحث عن الاسم أو البريد الإلكتروني..."/>
+                
+                <ComboBox Grid.Column="1" ItemsSource="{Binding Roles}" 
+                          SelectedItem="{Binding SelectedRole}"
+                          Padding="10" FontSize="12"
+                          Background="{StaticResource InputBackgroundBrush}"/>
+            </Grid>
+            
+            <!-- Employees DataGrid -->
+            <Border Background="{StaticResource CardBrush}" CornerRadius="8" 
+                    BorderThickness="1" BorderBrush="{StaticResource BorderBrush}">
+                <DataGrid ItemsSource="{Binding Employees}" AutoGenerateColumns="False" 
+                          IsReadOnly="True" RowHeight="50" BorderThickness="0"
+                          SelectedItem="{Binding SelectedEmployee}">
+                    <DataGrid.Columns>
+                        <DataGridTextColumn Header="الاسم الكامل" Binding="{Binding FullName}" Width="150"/>
+                        <DataGridTextColumn Header="البريد الإلكتروني" Binding="{Binding Email}" Width="150"/>
+                        <DataGridTextColumn Header="رقم الهاتف" Binding="{Binding PhoneNumber}" Width="120"/>
+                        <DataGridTextColumn Header="الدور" Binding="{Binding Role}" Width="100"/>
+                        <DataGridTextColumn Header="القسم" Binding="{Binding Department}" Width="100"/>
+                        <DataGridTextColumn Header="تاريخ التوظيف" Binding="{Binding HireDate, StringFormat='yyyy-MM-dd'}" Width="120"/>
+                        <DataGridTemplateColumn Header="الإجراءات" Width="150">
+                            <DataGridTemplateColumn.CellTemplate>
+                                <DataTemplate>
+                                    <StackPanel Orientation="Horizontal" Spacing="5">
+                                        <Button Content="تعديل" Command="{Binding DataContext.EditEmployeeCommand, RelativeSource={RelativeSource AncestorType=DataGrid}}" 
+                                                CommandParameter="{Binding}" Style="{StaticResource SmallButtonStyle}"/>
+                                        <Button Content="حذف" Command="{Binding DataContext.DeleteEmployeeCommand, RelativeSource={RelativeSource AncestorType=DataGrid}}" 
+                                                CommandParameter="{Binding}" Style="{StaticResource DangerButtonStyle}"/>
+                                    </StackPanel>
+                                </DataTemplate>
+                            </DataGridTemplateColumn.CellTemplate>
+                        </DataGridTemplateColumn>
+                    </DataGrid.Columns>
+                </DataGrid>
+            </Border>
+        </StackPanel>
+    </Grid>
+</UserControl>
+
+<!-- ============================================================================
+     FILE: EmployeeFormDialog.xaml
+     LOCATION: FleetManagementSystem.WPF/Views/Employees/EmployeeFormDialog.xaml
+     VIEWMODEL: EmployeeViewModel
+     ============================================================================ -->
+<Window x:Class="FleetManagementSystem.WPF.Views.Employees.EmployeeFormDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="نموذج الموظف" Height="500" Width="600"
+        WindowStartupLocation="CenterOwner" ResizeMode="NoResize"
+        Background="{StaticResource BackgroundBrush}"
+        FlowDirection="RightToLeft">
+    <Grid Margin="20">
+        <StackPanel Spacing="15">
+            <!-- Full Name -->
+            <StackPanel>
+                <TextBlock Text="الاسم الكامل" FontWeight="Bold" Margin="0,0,0,5"/>
+                <TextBox Text="{Binding Employee.FullName, UpdateSourceTrigger=PropertyChanged}"
+                         Padding="10" FontSize="12" 
+                         Background="{StaticResource InputBackgroundBrush}"/>
+            </StackPanel>
+            
+            <!-- Email -->
+            <StackPanel>
+                <TextBlock Text="البريد الإلكتروني" FontWeight="Bold" Margin="0,0,0,5"/>
+                <TextBox Text="{Binding Employee.Email, UpdateSourceTrigger=PropertyChanged}"
+                         Padding="10" FontSize="12" 
+                         Background="{StaticResource InputBackgroundBrush}"/>
+            </StackPanel>
+            
+            <!-- Phone Number -->
+            <StackPanel>
+                <TextBlock Text="رقم الهاتف" FontWeight="Bold" Margin="0,0,0,5"/>
+                <TextBox Text="{Binding Employee.PhoneNumber, UpdateSourceTrigger=PropertyChanged}"
+                         Padding="10" FontSize="12" 
+                         Background="{StaticResource InputBackgroundBrush}"/>
+            </StackPanel>
+            
+            <!-- Role -->
+            <StackPanel>
+                <TextBlock Text="الدور" FontWeight="Bold" Margin="0,0,0,5"/>
+                <ComboBox ItemsSource="{Binding Roles}" 
+                          SelectedItem="{Binding Employee.Role}"
+                          Padding="10" FontSize="12"
+                          Background="{StaticResource InputBackgroundBrush}"/>
+            </StackPanel>
+            
+            <!-- Department -->
+            <StackPanel>
+                <TextBlock Text="القسم" FontWeight="Bold" Margin="0,0,0,5"/>
+                <TextBox Text="{Binding Employee.Department, UpdateSourceTrigger=PropertyChanged}"
+                         Padding="10" FontSize="12" 
+                         Background="{StaticResource InputBackgroundBrush}"/>
+            </StackPanel>
+            
+            <!-- Hire Date -->
+            <StackPanel>
+                <TextBlock Text="تاريخ التوظيف" FontWeight="Bold" Margin="0,0,0,5"/>
+                <DatePicker SelectedDate="{Binding Employee.HireDate}"
+                            Padding="10" FontSize="12"
+                            Background="{StaticResource InputBackgroundBrush}"/>
+            </StackPanel>
+            
+            <!-- Buttons -->
+            <Grid ColumnSpacing="10" Margin="0,20,0,0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+                
+                <Button Grid.Column="0" Content="حفظ" 
+                        Command="{Binding SaveCommand}"
+                        Style="{StaticResource PrimaryButtonStyle}" Padding="20,12"/>
+                
+                <Button Grid.Column="1" Content="إلغاء" 
+                        Command="{Binding CancelCommand}"
+                        Style="{StaticResource SecondaryButtonStyle}" Padding="20,12"/>
+            </Grid>
+        </StackPanel>
+    </Grid>
+</Window>
+
+<!-- ============================================================================
+     FILE: TripListView.xaml
+     LOCATION: FleetManagementSystem.WPF/Views/Trips/TripListView.xaml
+     VIEWMODEL: TripViewModel
+     ============================================================================ -->
+<UserControl x:Class="FleetManagementSystem.WPF.Views.Trips.TripListView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             Background="{StaticResource BackgroundBrush}"
+             FlowDirection="RightToLeft">
+    <Grid Margin="20">
+        <StackPanel Spacing="15">
+            <!-- Header -->
+            <Grid ColumnSpacing="10">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                
+                <TextBlock Grid.Column="0" Text="الرحلات والعمليات" FontSize="24" FontWeight="Bold" 
+                           Foreground="{StaticResource PrimaryBrush}"/>
+                
+                <Button Grid.Column="1" Content="رحلة جديدة" 
+                        Command="{Binding AddTripCommand}"
+                        Style="{StaticResource PrimaryButtonStyle}" Padding="20,10"/>
+                
+                <Button Grid.Column="2" Content="تحديث" 
+                        Command="{Binding RefreshCommand}"
+                        Style="{StaticResource SecondaryButtonStyle}" Padding="15,10"/>
+            </Grid>
+            
+            <!-- Search and Filter -->
+            <Grid ColumnSpacing="10">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="150"/>
+                </Grid.ColumnDefinitions>
+                
+                <TextBox Grid.Column="0" Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}"
+                         Padding="10" FontSize="12" 
+                         Background="{StaticResource InputBackgroundBrush}"
+                         Foreground="{StaticResource PrimaryTextBrush}"
+                         Watermark="ابحث عن المركبة أو السائق..."/>
+                
+                <ComboBox Grid.Column="1" ItemsSource="{Binding TripStatuses}" 
+                          SelectedItem="{Binding SelectedStatus}"
+                          Padding="10" FontSize="12"
+                          Background="{StaticResource InputBackgroundBrush}"/>
+            </Grid>
+            
+            <!-- Trips DataGrid -->
+            <Border Background="{StaticResource CardBrush}" CornerRadius="8" 
+                    BorderThickness="1" BorderBrush="{StaticResource BorderBrush}">
+                <DataGrid ItemsSource="{Binding Trips}" AutoGenerateColumns="False" 
+                          IsReadOnly="True" RowHeight="50" BorderThickness="0"
+                          SelectedItem="{Binding SelectedTrip}">
+                    <DataGrid.Columns>
+                        <DataGridTextColumn Header="المركبة" Binding="{Binding VehiclePlateNumber}" Width="120"/>
+                        <DataGridTextColumn Header="السائق" Binding="{Binding DriverName}" Width="120"/>
+                        <DataGridTextColumn Header="تاريخ الرحلة" Binding="{Binding TripDate, StringFormat='yyyy-MM-dd'}" Width="120"/>
+                        <DataGridTextColumn Header="من" Binding="{Binding StartLocation}" Width="120"/>
+                        <DataGridTextColumn Header="إلى" Binding="{Binding EndLocation}" Width="120"/>
+                        <DataGridTextColumn Header="المسافة المخطط" Binding="{Binding PlannedDistance, StringFormat='{0:N0} km'}" Width="120"/>
+                        <DataGridTextColumn Header="المسافة الفعلية" Binding="{Binding ActualDistance, StringFormat='{0:N0} km'}" Width="120"/>
+                        <DataGridTextColumn Header="الحالة" Binding="{Binding Status}" Width="100"/>
+                        <DataGridTemplateColumn Header="الإجراءات" Width="150">
+                            <DataGridTemplateColumn.CellTemplate>
+                                <DataTemplate>
+                                    <StackPanel Orientation="Horizontal" Spacing="5">
+                                        <Button Content="تعديل" Command="{Binding DataContext.EditTripCommand, RelativeSource={RelativeSource AncestorType=DataGrid}}" 
+                                                CommandParameter="{Binding}" Style="{StaticResource SmallButtonStyle}"/>
+                                        <Button Content="إكمال" Command="{Binding DataContext.CompleteTripCommand, RelativeSource={RelativeSource AncestorType=DataGrid}}" 
+                                                CommandParameter="{Binding}" Style="{StaticResource SuccessButtonStyle}"/>
+                                    </StackPanel>
+                                </DataTemplate>
+                            </DataGridTemplateColumn.CellTemplate>
+                        </DataGridTemplateColumn>
+                    </DataGrid.Columns>
+                </DataGrid>
+            </Border>
+        </StackPanel>
+    </Grid>
+</UserControl>
+
+<!-- ============================================================================
+     FILE: FuelListView.xaml
+     LOCATION: FleetManagementSystem.WPF/Views/Fuel/FuelListView.xaml
+     VIEWMODEL: FuelViewModel
+     ============================================================================ -->
+<UserControl x:Class="FleetManagementSystem.WPF.Views.Fuel.FuelListView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             Background="{StaticResource BackgroundBrush}"
+             FlowDirection="RightToLeft">
+    <Grid Margin="20">
+        <StackPanel Spacing="15">
+            <!-- Header -->
+            <Grid ColumnSpacing="10">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                
+                <TextBlock Grid.Column="0" Text="معاملات الوقود" FontSize="24" FontWeight="Bold" 
+                           Foreground="{StaticResource PrimaryBrush}"/>
+                
+                <Button Grid.Column="1" Content="إضافة معاملة وقود" 
+                        Command="{Binding AddFuelCommand}"
+                        Style="{StaticResource PrimaryButtonStyle}" Padding="20,10"/>
+                
+                <Button Grid.Column="2" Content="تحديث" 
+                        Command="{Binding RefreshCommand}"
+                        Style="{StaticResource SecondaryButtonStyle}" Padding="15,10"/>
+            </Grid>
+            
+            <!-- Search and Filter -->
+            <Grid ColumnSpacing="10">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="150"/>
+                </Grid.ColumnDefinitions>
+                
+                <TextBox Grid.Column="0" Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}"
+                         Padding="10" FontSize="12" 
+                         Background="{StaticResource InputBackgroundBrush}"
+                         Foreground="{StaticResource PrimaryTextBrush}"
+                         Watermark="ابحث عن المركبة أو المحطة..."/>
+                
+                <ComboBox Grid.Column="1" ItemsSource="{Binding FuelTypes}" 
+                          SelectedItem="{Binding SelectedFuelType}"
+                          Padding="10" FontSize="12"
+                          Background="{StaticResource InputBackgroundBrush}"/>
+            </Grid>
+            
+            <!-- Fuel DataGrid -->
+            <Border Background="{StaticResource CardBrush}" CornerRadius="8" 
+                    BorderThickness="1" BorderBrush="{StaticResource BorderBrush}">
+                <DataGrid ItemsSource="{Binding FuelTransactions}" AutoGenerateColumns="False" 
+                          IsReadOnly="True" RowHeight="50" BorderThickness="0"
+                          SelectedItem="{Binding SelectedFuel}">
+                    <DataGrid.Columns>
+                        <DataGridTextColumn Header="المركبة" Binding="{Binding VehiclePlateNumber}" Width="120"/>
+                        <DataGridTextColumn Header="التاريخ" Binding="{Binding TransactionDate, StringFormat='yyyy-MM-dd'}" Width="120"/>
+                        <DataGridTextColumn Header="الكمية" Binding="{Binding Quantity, StringFormat='{0:N2} L'}" Width="100"/>
+                        <DataGridTextColumn Header="السعر" Binding="{Binding UnitPrice, StringFormat='SAR {0:N2}'}" Width="100"/>
+                        <DataGridTextColumn Header="الإجمالي" Binding="{Binding TotalCost, StringFormat='SAR {0:N2}'}" Width="100"/>
+                        <DataGridTextColumn Header="المسافة" Binding="{Binding Mileage, StringFormat='{0:N0} km'}" Width="100"/>
+                        <DataGridTextColumn Header="نوع الوقود" Binding="{Binding FuelType}" Width="100"/>
+                        <DataGridTextColumn Header="المحطة" Binding="{Binding Station}" Width="100"/>
+                        <DataGridTemplateColumn Header="الإجراءات" Width="150">
+                            <DataGridTemplateColumn.CellTemplate>
+                                <DataTemplate>
+                                    <StackPanel Orientation="Horizontal" Spacing="5">
+                                        <Button Content="تعديل" Command="{Binding DataContext.EditFuelCommand, RelativeSource={RelativeSource AncestorType=DataGrid}}" 
+                                                CommandParameter="{Binding}" Style="{StaticResource SmallButtonStyle}"/>
+                                        <Button Content="حذف" Command="{Binding DataContext.DeleteFuelCommand, RelativeSource={RelativeSource AncestorType=DataGrid}}" 
+                                                CommandParameter="{Binding}" Style="{StaticResource DangerButtonStyle}"/>
+                                    </StackPanel>
+                                </DataTemplate>
+                            </DataGridTemplateColumn.CellTemplate>
+                        </DataGridTemplateColumn>
+                    </DataGrid.Columns>
+                </DataGrid>
+            </Border>
+            
+            <!-- Summary Cards -->
+            <Grid ColumnSpacing="20">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+                
+                <Border Grid.Column="0" Background="{StaticResource CardBrush}" 
+                        CornerRadius="8" Padding="20" BorderThickness="1" 
+                        BorderBrush="{StaticResource BorderBrush}">
+                    <StackPanel>
+                        <TextBlock Text="إجمالي تكاليف الوقود" FontSize="14" Foreground="{StaticResource SecondaryTextBrush}"/>
+                        <TextBlock Text="{Binding TotalFuelCost, StringFormat='SAR {0:N2}'}" 
+                                   FontSize="24" FontWeight="Bold" Foreground="{StaticResource PrimaryBrush}" Margin="0,10,0,0"/>
+                    </StackPanel>
+                </Border>
+                
+                <Border Grid.Column="1" Background="{StaticResource CardBrush}" 
+                        CornerRadius="8" Padding="20" BorderThickness="1" 
+                        BorderBrush="{StaticResource BorderBrush}">
+                    <StackPanel>
+                        <TextBlock Text="متوسط الاستهلاك" FontSize="14" Foreground="{StaticResource SecondaryTextBrush}"/>
+                        <TextBlock Text="{Binding AverageFuelConsumption, StringFormat='{0:N2} L/100km'}" 
+                                   FontSize="24" FontWeight="Bold" Foreground="{StaticResource PrimaryBrush}" Margin="0,10,0,0"/>
+                    </StackPanel>
+                </Border>
+            </Grid>
+        </StackPanel>
+    </Grid>
+</UserControl>
+
+<!-- ============================================================================
+     FILE: ExpenseListView.xaml
+     LOCATION: FleetManagementSystem.WPF/Views/Expenses/ExpenseListView.xaml
+     VIEWMODEL: ExpenseViewModel
+     ============================================================================ -->
+<UserControl x:Class="FleetManagementSystem.WPF.Views.Expenses.ExpenseListView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             Background="{StaticResource BackgroundBrush}"
+             FlowDirection="RightToLeft">
+    <Grid Margin="20">
+        <StackPanel Spacing="15">
+            <!-- Header -->
+            <Grid ColumnSpacing="10">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                
+                <TextBlock Grid.Column="0" Text="المصروفات" FontSize="24" FontWeight="Bold" 
+                           Foreground="{StaticResource PrimaryBrush}"/>
+                
+                <Button Grid.Column="1" Content="إضافة مصروف جديد" 
+                        Command="{Binding AddExpenseCommand}"
+                        Style="{StaticResource PrimaryButtonStyle}" Padding="20,10"/>
+                
+                <Button Grid.Column="2" Content="تحديث" 
+                        Command="{Binding RefreshCommand}"
+                        Style="{StaticResource SecondaryButtonStyle}" Padding="15,10"/>
+            </Grid>
+            
+            <!-- Search and Filter -->
+            <Grid ColumnSpacing="10">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="150"/>
+                </Grid.ColumnDefinitions>
+                
+                <TextBox Grid.Column="0" Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}"
+                         Padding="10" FontSize="12" 
+                         Background="{StaticResource InputBackgroundBrush}"
+                         Foreground="{StaticResource PrimaryTextBrush}"
+                         Watermark="ابحث عن المركبة أو الموردين..."/>
+                
+                <ComboBox Grid.Column="1" ItemsSource="{Binding ExpenseTypes}" 
+                          SelectedItem="{Binding SelectedExpenseType}"
+                          Padding="10" FontSize="12"
+                          Background="{StaticResource InputBackgroundBrush}"/>
+            </Grid>
+            
+            <!-- Expenses DataGrid -->
+            <Border Background="{StaticResource CardBrush}" CornerRadius="8" 
+                    BorderThickness="1" BorderBrush="{StaticResource BorderBrush}">
+                <DataGrid ItemsSource="{Binding Expenses}" AutoGenerateColumns="False" 
+                          IsReadOnly="True" RowHeight="50" BorderThickness="0"
+                          SelectedItem="{Binding SelectedExpense}">
+                    <DataGrid.Columns>
+                        <DataGridTextColumn Header="المركبة" Binding="{Binding VehiclePlateNumber}" Width="120"/>
+                        <DataGridTextColumn Header="التاريخ" Binding="{Binding ExpenseDate, StringFormat='yyyy-MM-dd'}" Width="120"/>
+                        <DataGridTextColumn Header="النوع" Binding="{Binding ExpenseType}" Width="120"/>
+                        <DataGridTextColumn Header="المبلغ" Binding="{Binding Amount, StringFormat='SAR {0:N2}'}" Width="100"/>
+                        <DataGridTextColumn Header="الوصف" Binding="{Binding Description}" Width="150"/>
+                        <DataGridTextColumn Header="المورد" Binding="{Binding Vendor}" Width="120"/>
+                        <DataGridTextColumn Header="رقم الفاتورة" Binding="{Binding InvoiceNumber}" Width="120"/>
+                        <DataGridTemplateColumn Header="الإجراءات" Width="150">
+                            <DataGridTemplateColumn.CellTemplate>
+                                <DataTemplate>
+                                    <StackPanel Orientation="Horizontal" Spacing="5">
+                                        <Button Content="تعديل" Command="{Binding DataContext.EditExpenseCommand, RelativeSource={RelativeSource AncestorType=DataGrid}}" 
+                                                CommandParameter="{Binding}" Style="{StaticResource SmallButtonStyle}"/>
+                                        <Button Content="حذف" Command="{Binding DataContext.DeleteExpenseCommand, RelativeSource={RelativeSource AncestorType=DataGrid}}" 
+                                                CommandParameter="{Binding}" Style="{StaticResource DangerButtonStyle}"/>
+                                    </StackPanel>
+                                </DataTemplate>
+                            </DataGridTemplateColumn.CellTemplate>
+                        </DataGridTemplateColumn>
+                    </DataGrid.Columns>
+                </DataGrid>
+            </Border>
+        </StackPanel>
+    </Grid>
+</UserControl>
+
