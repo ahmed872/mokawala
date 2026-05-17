@@ -314,6 +314,64 @@ public class SmokeTests
     }
 
     [Fact]
+    public async Task TripService_SaveAsync_ComputesDistanceFromOdometer_WhenManualDistanceConflicts()
+    {
+        await using var harness = await TestHarness.CreateAsync();
+        var vehicleTypeId = await harness.Context.VehicleTypes.Select(x => x.Id).FirstAsync();
+
+        var vehicle = await harness.VehicleService.SaveAsync(new VehicleFormDto
+        {
+            PlateNumber = "DIST-001",
+            VehicleTypeId = vehicleTypeId,
+            Model = "Toyota Corolla",
+            Year = 2024,
+            Manufacturer = "Toyota",
+            Status = "Available",
+            CurrentMileage = 1000,
+            RegistrationStartDate = DateTime.Today.AddMonths(-1),
+            RegistrationExpiryDate = DateTime.Today.AddMonths(11),
+            AccidentInsuranceDetails = "وثيقة حوادث سارية",
+            SocialInsuranceDetails = "تأمين اجتماعي ساري",
+            OilChangeIntervalKm = 10000,
+            MaintenanceIntervalKm = 15000
+        });
+
+        var driver = await harness.DriverService.SaveAsync(new DriverFormDto
+        {
+            FullName = "سائق المسافة",
+            LicenseNumber = "DRV-DIST",
+            LicenseExpiryDate = DateTime.Today.AddYears(1),
+            IsActive = true
+        });
+
+        var supervisor = await harness.EmployeeService.SaveAsync(new EmployeeFormDto
+        {
+            FullName = "مشرف المسافة",
+            EmployeeId = "EMP-DIST",
+            Status = "Active"
+        });
+
+        var trip = await harness.TripService.SaveAsync(new TripFormDto
+        {
+            VehicleId = vehicle.Id,
+            DriverId = driver.Id,
+            RequesterNameText = "طالب تشغيل",
+            SupervisorEmployeeId = supervisor.Id,
+            StartDate = DateTime.Today.AddHours(9),
+            EndDate = DateTime.Today.AddHours(11),
+            StartLocation = "المقر",
+            EndLocation = "الفرع",
+            Purpose = "اختبار حساب المسافة",
+            StartMileage = 1000,
+            EndMileage = 1080,
+            Distance = 999,
+            Status = "Closed"
+        });
+
+        Assert.Equal(80, trip.Distance);
+    }
+
+    [Fact]
     public async Task FuelService_SaveAsync_CreatesTreasuryTransaction_WhenPaidFromTreasury()
     {
         await using var harness = await TestHarness.CreateAsync();

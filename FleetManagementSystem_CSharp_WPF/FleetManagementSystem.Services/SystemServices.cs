@@ -835,6 +835,7 @@ public sealed class ReportingService(FleetDbContext context) : IReportingService
             Message = $"العقد {c.ContractNumber} للمركبة {c.Vehicle?.PlateNumber} ينتهي بتاريخ {c.EndDate:yyyy-MM-dd}.",
             RelatedEntityType = "Contract",
             RelatedEntityId = c.Id,
+            DueDate = c.EndDate,
             CreatedAt = c.UpdatedAt
         }));
 
@@ -853,6 +854,7 @@ public sealed class ReportingService(FleetDbContext context) : IReportingService
             Message = $"رخصة السائق {l.Driver?.FullName} تنتهي بتاريخ {l.ExpiryDate:yyyy-MM-dd}.",
             RelatedEntityType = "License",
             RelatedEntityId = l.Id,
+            DueDate = l.ExpiryDate,
             CreatedAt = l.UpdatedAt
         }));
 
@@ -872,6 +874,7 @@ public sealed class ReportingService(FleetDbContext context) : IReportingService
                 : $"العربية {v.PlateNumber} محتاجة تجديد ترخيص قبل {v.RegistrationExpiryDate:yyyy-MM-dd}.",
             RelatedEntityType = "Vehicle",
             RelatedEntityId = v.Id,
+            DueDate = v.RegistrationExpiryDate,
             CreatedAt = v.UpdatedAt
         }));
 
@@ -892,6 +895,7 @@ public sealed class ReportingService(FleetDbContext context) : IReportingService
                 : $"العربية {i.Vehicle?.PlateNumber} محتاجة تجديد تأمين قبل {i.ExpiryDate:yyyy-MM-dd}.",
             RelatedEntityType = "Insurance",
             RelatedEntityId = i.Id,
+            DueDate = i.ExpiryDate,
             CreatedAt = i.UpdatedAt
         }));
 
@@ -952,7 +956,28 @@ public sealed class ReportingService(FleetDbContext context) : IReportingService
             CreatedAt = t.UpdatedAt
         }));
 
-        return alerts.OrderByDescending(a => a.CreatedAt).Take(20).ToList();
+        return alerts
+            .OrderBy(a => GetAlertPriority(a, now))
+            .ThenBy(a => a.DueDate.HasValue ? Math.Abs((a.DueDate.Value.Date - now).Days) : int.MaxValue)
+            .ThenByDescending(a => a.CreatedAt)
+            .Take(20)
+            .ToList();
+    }
+
+    private static int GetAlertPriority(AlertDto alert, DateTime today)
+    {
+        if (!alert.DueDate.HasValue)
+        {
+            return 3;
+        }
+
+        var days = (alert.DueDate.Value.Date - today).Days;
+        return days switch
+        {
+            < 0 => 0,
+            <= 7 => 1,
+            _ => 2
+        };
     }
 
     public async Task<List<RecentActivityDto>> GetRecentActivityAsync(int count = 10) =>

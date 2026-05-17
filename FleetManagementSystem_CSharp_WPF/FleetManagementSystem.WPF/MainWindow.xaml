@@ -5,6 +5,8 @@
         Width="1500"
         Height="920"
         WindowStartupLocation="CenterScreen"
+        WindowState="Maximized"
+        ResizeMode="CanMinimize"
         FlowDirection="RightToLeft"
         Background="{StaticResource PageBackgroundBrush}">
     <Window.Resources>
@@ -68,7 +70,55 @@
             <Setter Property="BorderBrush" Value="{StaticResource AccentPaleBrush}" />
         </Style>
 
-        <Style x:Key="GridA5ButtonStyle" TargetType="Button" BasedOn="{StaticResource BaseButtonStyle}">
+        <Style x:Key="DocumentIconPathStyle" TargetType="Path">
+            <Setter Property="Width" Value="24" />
+            <Setter Property="Height" Value="24" />
+            <Setter Property="Stretch" Value="Uniform" />
+            <Setter Property="Fill" Value="Transparent" />
+            <Setter Property="Stroke" Value="{StaticResource AccentBrush}" />
+            <Setter Property="StrokeThickness" Value="2.2" />
+            <Setter Property="StrokeStartLineCap" Value="Round" />
+            <Setter Property="StrokeEndLineCap" Value="Round" />
+            <Setter Property="StrokeLineJoin" Value="Round" />
+            <Setter Property="FlowDirection" Value="LeftToRight" />
+            <Setter Property="Data" Value="M14,2 H6 A2,2 0 0 0 4,4 V20 A2,2 0 0 0 6,22 H18 A2,2 0 0 0 20,20 V8 Z M14,2 V8 H20 M16,13 H8 M16,17 H8 M10,9 H8" />
+        </Style>
+
+        <Style x:Key="CheckIconPathStyle" TargetType="Path">
+            <Setter Property="Width" Value="24" />
+            <Setter Property="Height" Value="24" />
+            <Setter Property="Stretch" Value="Uniform" />
+            <Setter Property="Fill" Value="Transparent" />
+            <Setter Property="Stroke" Value="{StaticResource SuccessBrush}" />
+            <Setter Property="StrokeThickness" Value="2.8" />
+            <Setter Property="StrokeStartLineCap" Value="Round" />
+            <Setter Property="StrokeEndLineCap" Value="Round" />
+            <Setter Property="StrokeLineJoin" Value="Round" />
+            <Setter Property="FlowDirection" Value="LeftToRight" />
+            <Setter Property="Data" Value="M20,6 L9,17 L4,12" />
+        </Style>
+
+        <DataTemplate x:Key="DocumentColumnHeaderTemplate">
+            <Viewbox Width="20"
+                     Height="20"
+                     FlowDirection="LeftToRight"
+                     SnapsToDevicePixels="True"
+                     ToolTip="مستند">
+                <Path Style="{StaticResource DocumentIconPathStyle}" />
+            </Viewbox>
+        </DataTemplate>
+
+        <DataTemplate x:Key="DocumentButtonIconTemplate">
+            <Viewbox Width="19"
+                     Height="19"
+                     FlowDirection="LeftToRight"
+                     SnapsToDevicePixels="True">
+                <Path Style="{StaticResource DocumentIconPathStyle}"
+                      Stroke="White" />
+            </Viewbox>
+        </DataTemplate>
+
+        <Style x:Key="GridDocumentButtonStyle" TargetType="Button" BasedOn="{StaticResource BaseButtonStyle}">
             <Setter Property="Width" Value="46" />
             <Setter Property="Height" Value="30" />
             <Setter Property="MinWidth" Value="46" />
@@ -78,6 +128,8 @@
             <Setter Property="Foreground" Value="White" />
             <Setter Property="Background" Value="{StaticResource AccentBrush}" />
             <Setter Property="BorderBrush" Value="{StaticResource AccentBrush}" />
+            <Setter Property="Content" Value="مستند" />
+            <Setter Property="ContentTemplate" Value="{StaticResource DocumentButtonIconTemplate}" />
         </Style>
 
         <Style x:Key="SurfaceCardStyle" TargetType="Border">
@@ -229,6 +281,32 @@
                                 Padding="14,12">
                             <ContentPresenter />
                         </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="DashboardAlertListBoxItemStyle" TargetType="ListBoxItem">
+            <Setter Property="Margin" Value="0,0,0,10" />
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+            <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ListBoxItem">
+                        <Border x:Name="AlertItemRoot"
+                                Background="Transparent"
+                                Padding="0">
+                            <ContentPresenter />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="AlertItemRoot" Property="Opacity" Value="0.94" />
+                            </Trigger>
+                            <Trigger Property="IsSelected" Value="True">
+                                <Setter TargetName="AlertItemRoot" Property="Opacity" Value="1" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
                     </ControlTemplate>
                 </Setter.Value>
             </Setter>
@@ -513,65 +591,186 @@
                                     <RowDefinition Height="Auto" />
                                 </Grid.RowDefinitions>
 
-                                <DockPanel LastChildFill="True">
-                                    <Border DockPanel.Dock="Left"
-                                            Background="#FFF4E5"
-                                            BorderBrush="#F2B15C"
-                                            BorderThickness="1"
-                                            CornerRadius="8"
-                                            Padding="14,8"
-                                            Margin="16,0,0,0">
-                                        <TextBlock x:Name="DashboardAlertCountTextBlock"
-                                                   FontSize="15"
-                                                   FontWeight="Bold"
-                                                   Foreground="#8A4B0F" />
-                                    </Border>
-                                    <StackPanel>
-                                        <TextBlock Text="إنذارات التجديد والمتابعة"
-                                                   FontSize="20"
-                                                   FontWeight="Bold"
-                                                   Foreground="{StaticResource TextBrush}" />
-                                        <TextBlock Text="التراخيص والتأمينات القريبة من الانتهاء تظهر هنا فور فتح النظام."
-                                                   Margin="0,6,0,0"
-                                                   FontSize="13"
-                                                   Foreground="{StaticResource MutedBrush}"
-                                                   TextWrapping="Wrap" />
-                                    </StackPanel>
-                                </DockPanel>
+                                <Border Background="#F8FBFD"
+                                        BorderBrush="#D9E5EC"
+                                        BorderThickness="1"
+                                        CornerRadius="14"
+                                        Padding="16">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+
+                                        <StackPanel>
+                                            <TextBlock Text="إنذارات التجديد والمتابعة"
+                                                       FontSize="20"
+                                                       FontWeight="Bold"
+                                                       Foreground="{StaticResource TextBrush}" />
+                                            <TextBlock x:Name="DashboardAlertSummaryTextBlock"
+                                                       Margin="0,6,0,0"
+                                                       FontSize="13"
+                                                       Foreground="{StaticResource MutedBrush}"
+                                                       TextWrapping="Wrap" />
+                                        </StackPanel>
+
+                                        <Border Grid.Column="1"
+                                                Background="{StaticResource AccentPaleBrush}"
+                                                BorderBrush="#C9DAE4"
+                                                BorderThickness="1"
+                                                CornerRadius="10"
+                                                Padding="14,9"
+                                                Margin="18,0,0,0"
+                                                VerticalAlignment="Center">
+                                            <TextBlock x:Name="DashboardAlertCountTextBlock"
+                                                       FontSize="14"
+                                                       FontWeight="Bold"
+                                                       Foreground="{StaticResource AccentBrush}" />
+                                        </Border>
+                                    </Grid>
+                                </Border>
 
                                 <Grid Grid.Row="1"
                                       Margin="0,18,0,0">
-                                    <TextBlock x:Name="DashboardNoAlertsTextBlock"
-                                               Text="لا توجد إنذارات حالية."
-                                               Margin="16"
-                                               FontSize="14"
-                                               Foreground="{StaticResource MutedBrush}"
-                                               HorizontalAlignment="Stretch" />
+                                    <Border x:Name="DashboardNoAlertsPanel"
+                                            Background="#F7FAFC"
+                                            BorderBrush="{StaticResource BorderBrush}"
+                                            BorderThickness="1"
+                                            CornerRadius="12"
+                                            Padding="18">
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto" />
+                                                <ColumnDefinition Width="*" />
+                                            </Grid.ColumnDefinitions>
+                                            <Border Width="40"
+                                                    Height="40"
+                                                    Background="#EAF6EF"
+                                                    CornerRadius="20"
+                                                    Margin="0,0,12,0">
+                                                <Viewbox Width="20"
+                                                         Height="20"
+                                                         FlowDirection="LeftToRight"
+                                                         HorizontalAlignment="Center"
+                                                         VerticalAlignment="Center">
+                                                    <Path Style="{StaticResource CheckIconPathStyle}" />
+                                                </Viewbox>
+                                            </Border>
+                                            <StackPanel Grid.Column="1"
+                                                        VerticalAlignment="Center">
+                                                <TextBlock Text="لا توجد إنذارات حالية"
+                                                           FontSize="15"
+                                                           FontWeight="Bold"
+                                                           Foreground="{StaticResource TextBrush}" />
+                                                <TextBlock Text="كل التراخيص والتأمينات المسجلة سليمة في نطاق المتابعة الحالي."
+                                                           Margin="0,4,0,0"
+                                                           FontSize="12"
+                                                           Foreground="{StaticResource MutedBrush}"
+                                                           TextWrapping="Wrap" />
+                                            </StackPanel>
+                                        </Grid>
+                                    </Border>
                                     <ListBox x:Name="DashboardAlertsListBox"
                                              BorderThickness="0"
                                              Background="Transparent"
-                                             MaxHeight="260"
+                                             MaxHeight="320"
+                                             ItemContainerStyle="{StaticResource DashboardAlertListBoxItemStyle}"
                                              Visibility="Collapsed"
                                              ScrollViewer.HorizontalScrollBarVisibility="Disabled">
                                         <ListBox.ItemTemplate>
                                             <DataTemplate>
-                                                <Border Margin="0,0,0,10"
-                                                        Padding="14"
-                                                        Background="#FFF8ED"
-                                                        BorderBrush="#F1B45D"
+                                                <Border Background="{Binding BackgroundBrush}"
+                                                        BorderBrush="{Binding BorderBrush}"
                                                         BorderThickness="1"
-                                                        CornerRadius="8">
-                                                    <StackPanel>
-                                                        <TextBlock Text="{Binding Title}"
-                                                                   FontSize="14"
-                                                                   FontWeight="Bold"
-                                                                   Foreground="#78350F" />
-                                                        <TextBlock Text="{Binding Message}"
-                                                                   Margin="0,5,0,0"
-                                                                   FontSize="13"
-                                                                   Foreground="{StaticResource TextBrush}"
-                                                                   TextWrapping="Wrap" />
-                                                    </StackPanel>
+                                                        CornerRadius="12"
+                                                        ClipToBounds="True">
+                                                    <Grid>
+                                                        <Grid.ColumnDefinitions>
+                                                            <ColumnDefinition Width="6" />
+                                                            <ColumnDefinition Width="Auto" />
+                                                            <ColumnDefinition Width="*" />
+                                                            <ColumnDefinition Width="Auto" />
+                                                        </Grid.ColumnDefinitions>
+
+                                                        <Border Grid.Column="0"
+                                                                Background="{Binding AccentBrush}" />
+
+                                                        <Border Grid.Column="1"
+                                                                Width="42"
+                                                                Height="42"
+                                                                Margin="14,14,0,14"
+                                                                Background="{Binding ChipBrush}"
+                                                                BorderBrush="{Binding BorderBrush}"
+                                                                BorderThickness="1"
+                                                                CornerRadius="21"
+                                                                VerticalAlignment="Top">
+                                                            <TextBlock Text="{Binding CategoryInitial}"
+                                                                       FontSize="16"
+                                                                       FontWeight="Bold"
+                                                                       Foreground="{Binding AccentBrush}"
+                                                                       HorizontalAlignment="Center"
+                                                                       VerticalAlignment="Center" />
+                                                        </Border>
+
+                                                        <StackPanel Grid.Column="2"
+                                                                    Margin="14"
+                                                                    VerticalAlignment="Center">
+                                                            <WrapPanel>
+                                                                <TextBlock Text="{Binding Title}"
+                                                                           FontSize="15"
+                                                                           FontWeight="Bold"
+                                                                           Foreground="{Binding TextBrush}"
+                                                                           TextWrapping="Wrap" />
+                                                                <Border Background="{Binding ChipBrush}"
+                                                                        BorderBrush="{Binding BorderBrush}"
+                                                                        BorderThickness="1"
+                                                                        CornerRadius="8"
+                                                                        Padding="9,4"
+                                                                        Margin="10,0,0,0">
+                                                                    <TextBlock Text="{Binding CategoryText}"
+                                                                               FontSize="11"
+                                                                               FontWeight="Bold"
+                                                                               Foreground="{Binding AccentBrush}" />
+                                                                </Border>
+                                                            </WrapPanel>
+                                                            <TextBlock Text="{Binding Message}"
+                                                                       Margin="0,7,0,0"
+                                                                       FontSize="13"
+                                                                       Foreground="{StaticResource TextBrush}"
+                                                                       TextWrapping="Wrap"
+                                                                       LineHeight="21" />
+                                                            <TextBlock Text="{Binding DueDateText}"
+                                                                       Margin="0,6,0,0"
+                                                                       FontSize="12"
+                                                                       Foreground="{StaticResource MutedBrush}" />
+                                                        </StackPanel>
+
+                                                        <StackPanel Grid.Column="3"
+                                                                    Margin="14"
+                                                                    MinWidth="118"
+                                                                    HorizontalAlignment="Left"
+                                                                    VerticalAlignment="Center">
+                                                            <Border Background="{Binding ChipBrush}"
+                                                                    BorderBrush="{Binding BorderBrush}"
+                                                                    BorderThickness="1"
+                                                                    CornerRadius="9"
+                                                                    Padding="10,5"
+                                                                    HorizontalAlignment="Stretch">
+                                                                <TextBlock Text="{Binding StatusText}"
+                                                                           FontSize="12"
+                                                                           FontWeight="Bold"
+                                                                           Foreground="{Binding AccentBrush}"
+                                                                           HorizontalAlignment="Center" />
+                                                            </Border>
+                                                            <TextBlock Text="{Binding TimingText}"
+                                                                       Margin="0,8,0,0"
+                                                                       FontSize="13"
+                                                                       FontWeight="SemiBold"
+                                                                       Foreground="{Binding AccentBrush}"
+                                                                       TextAlignment="Center"
+                                                                       TextWrapping="Wrap" />
+                                                        </StackPanel>
+                                                    </Grid>
                                                 </Border>
                                             </DataTemplate>
                                         </ListBox.ItemTemplate>
@@ -742,14 +941,14 @@
                                       IsReadOnly="True"
                                       ColumnWidth="*">
                                 <DataGrid.Columns>
-                                    <DataGridTemplateColumn Header="نموذج"
+                                    <DataGridTemplateColumn Header="مستند"
+                                                            HeaderTemplate="{StaticResource DocumentColumnHeaderTemplate}"
                                                             Width="72"
                                                             IsReadOnly="True">
                                         <DataGridTemplateColumn.CellTemplate>
                                             <DataTemplate>
-                                                <Button Style="{StaticResource GridA5ButtonStyle}"
-                                                        Content="A5"
-                                                        ToolTip="عرض نموذج التشغيل A5"
+                                                <Button Style="{StaticResource GridDocumentButtonStyle}"
+                                                        ToolTip="عرض نموذج التشغيل"
                                                         Click="ShowTripFormButton_Click" />
                                             </DataTemplate>
                                         </DataGridTemplateColumn.CellTemplate>
@@ -895,13 +1094,14 @@
                               AutoGenerateColumns="False"
                               ColumnWidth="*">
                         <DataGrid.Columns>
-                            <DataGridTemplateColumn Header="A5" Width="0.55*">
+                            <DataGridTemplateColumn Header="مستند"
+                                                    HeaderTemplate="{StaticResource DocumentColumnHeaderTemplate}"
+                                                    Width="0.55*">
                                 <DataGridTemplateColumn.CellTemplate>
                                     <DataTemplate>
-                                        <Button Style="{StaticResource GridA5ButtonStyle}"
-                                                Click="ShowVehicleLicenseFormButton_Click">
-                                            A5
-                                        </Button>
+                                        <Button Style="{StaticResource GridDocumentButtonStyle}"
+                                                ToolTip="عرض مستند الترخيص"
+                                                Click="ShowVehicleLicenseFormButton_Click" />
                                     </DataTemplate>
                                 </DataGridTemplateColumn.CellTemplate>
                             </DataGridTemplateColumn>
@@ -961,13 +1161,14 @@
                               AutoGenerateColumns="False"
                               ColumnWidth="*">
                         <DataGrid.Columns>
-                            <DataGridTemplateColumn Header="A5" Width="0.55*">
+                            <DataGridTemplateColumn Header="مستند"
+                                                    HeaderTemplate="{StaticResource DocumentColumnHeaderTemplate}"
+                                                    Width="0.55*">
                                 <DataGridTemplateColumn.CellTemplate>
                                     <DataTemplate>
-                                        <Button Style="{StaticResource GridA5ButtonStyle}"
-                                                Click="ShowInsuranceFormButton_Click">
-                                            A5
-                                        </Button>
+                                        <Button Style="{StaticResource GridDocumentButtonStyle}"
+                                                ToolTip="عرض مستند التأمين"
+                                                Click="ShowInsuranceFormButton_Click" />
                                     </DataTemplate>
                                 </DataGridTemplateColumn.CellTemplate>
                             </DataGridTemplateColumn>
@@ -1153,7 +1354,20 @@
                                     Width="130"
                                     Height="40" />
                         <Button Style="{StaticResource SecondaryButtonStyle}" Margin="12,0,0,0" Click="GenerateReportButton_Click">توليد التقرير</Button>
-                        <Button Style="{StaticResource SecondaryButtonStyle}" Margin="8,0,0,0" Click="ShowReportA5Button_Click">A5 التقرير</Button>
+                        <Button Style="{StaticResource SecondaryButtonStyle}"
+                                Margin="8,0,0,0"
+                                ToolTip="عرض مستند التقرير"
+                                Click="ShowReportA5Button_Click">
+                            <StackPanel Orientation="Horizontal">
+                                <Viewbox Width="18"
+                                         Height="18"
+                                         Margin="0,0,8,0"
+                                         FlowDirection="LeftToRight">
+                                    <Path Style="{StaticResource DocumentIconPathStyle}" />
+                                </Viewbox>
+                                <TextBlock Text="التقرير" />
+                            </StackPanel>
+                        </Button>
                         <Button Style="{StaticResource SecondaryButtonStyle}" Margin="8,0,0,0" Click="ExportReportCsvButton_Click">CSV</Button>
                         <Button Style="{StaticResource SecondaryButtonStyle}" Margin="8,0,0,0" Click="ExportReportExcelButton_Click">Excel</Button>
                         <Button Style="{StaticResource SecondaryButtonStyle}" Margin="8,0,0,0" Click="PrintReportPdfButton_Click">PDF/طباعة</Button>
@@ -1168,13 +1382,14 @@
                               VerticalAlignment="Stretch"
                               Margin="0,12,0,0">
                         <DataGrid.Columns>
-                            <DataGridTemplateColumn Header="A5" Width="70">
+                            <DataGridTemplateColumn Header="مستند"
+                                                    HeaderTemplate="{StaticResource DocumentColumnHeaderTemplate}"
+                                                    Width="70">
                                 <DataGridTemplateColumn.CellTemplate>
                                     <DataTemplate>
-                                        <Button Style="{StaticResource GridA5ButtonStyle}"
-                                                Click="ShowReportRowA5Button_Click">
-                                            A5
-                                        </Button>
+                                        <Button Style="{StaticResource GridDocumentButtonStyle}"
+                                                ToolTip="عرض مستند التقرير"
+                                                Click="ShowReportRowA5Button_Click" />
                                     </DataTemplate>
                                 </DataGridTemplateColumn.CellTemplate>
                             </DataGridTemplateColumn>

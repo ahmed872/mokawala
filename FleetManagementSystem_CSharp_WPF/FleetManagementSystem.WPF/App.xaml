@@ -20,8 +20,11 @@
 
         <Style TargetType="Window">
             <Setter Property="FontFamily" Value="{StaticResource AppFontFamily}" />
-            <Setter Property="TextOptions.TextFormattingMode" Value="Display" />
+            <Setter Property="UseLayoutRounding" Value="True" />
+            <Setter Property="SnapsToDevicePixels" Value="True" />
+            <Setter Property="TextOptions.TextFormattingMode" Value="Ideal" />
             <Setter Property="TextOptions.TextRenderingMode" Value="ClearType" />
+            <Setter Property="RenderOptions.BitmapScalingMode" Value="HighQuality" />
         </Style>
 
         <Style x:Key="AppTextBoxStyle" TargetType="TextBox">
@@ -60,25 +63,56 @@
             <Setter Property="AutoGenerateColumns" Value="True" />
             <Setter Property="CanUserAddRows" Value="False" />
             <Setter Property="CanUserDeleteRows" Value="False" />
+            <Setter Property="CanUserResizeColumns" Value="True" />
             <Setter Property="SelectionMode" Value="Single" />
             <Setter Property="AlternatingRowBackground" Value="#F9FBFD" />
             <Setter Property="HeadersVisibility" Value="Column" />
             <Setter Property="GridLinesVisibility" Value="Horizontal" />
+            <Setter Property="MinColumnWidth" Value="130" />
+            <Setter Property="ColumnWidth" Value="190" />
             <Setter Property="RowHeight" Value="38" />
             <Setter Property="ColumnHeaderHeight" Value="42" />
             <Setter Property="BorderThickness" Value="0" />
             <Setter Property="Background" Value="White" />
             <Setter Property="HorizontalGridLinesBrush" Value="#E8EEF3" />
             <Setter Property="VerticalGridLinesBrush" Value="#E8EEF3" />
+            <Setter Property="ScrollViewer.HorizontalScrollBarVisibility" Value="Auto" />
+            <Setter Property="ScrollViewer.VerticalScrollBarVisibility" Value="Auto" />
         </Style>
 
         <Style TargetType="DataGridColumnHeader">
             <Setter Property="Background" Value="#F1F5F8" />
             <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
-            <Setter Property="BorderBrush" Value="#E1E9EF" />
-            <Setter Property="BorderThickness" Value="0,0,0,1" />
+            <Setter Property="BorderBrush" Value="#CBD8E2" />
+            <Setter Property="BorderThickness" Value="0,0,2,1" />
             <Setter Property="FontWeight" Value="SemiBold" />
-            <Setter Property="Padding" Value="10,8" />
+            <Setter Property="Padding" Value="14,8" />
+        </Style>
+
+        <Style TargetType="DataGridCell">
+            <Setter Property="BorderBrush" Value="#CBD8E2" />
+            <Setter Property="BorderThickness" Value="0,0,2,0" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
+            <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="DataGridCell">
+                        <Border Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}">
+                            <ContentPresenter Margin="14,0"
+                                              VerticalAlignment="Center" />
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+            <Style.Triggers>
+                <Trigger Property="IsSelected" Value="True">
+                    <Setter Property="Background" Value="#EAF2F7" />
+                    <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
+                </Trigger>
+            </Style.Triggers>
         </Style>
 
         <Style TargetType="DataGridRow">

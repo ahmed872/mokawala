@@ -1131,6 +1131,7 @@ namespace FleetManagementSystem.Core.DTOs
         public string Message { get; set; } = string.Empty;
         public string RelatedEntityType { get; set; } = string.Empty;
         public int? RelatedEntityId { get; set; }
+        public DateTime? DueDate { get; set; }
         public DateTime CreatedAt { get; set; }
     }
 

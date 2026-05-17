@@ -24,7 +24,7 @@ public partial class TripCloseWindow : Window
         EndDatePicker.SelectedDate = endDate.Date;
         EndTimeTextBox.Text = endDate.ToString("HH:mm");
         EndMileageTextBox.Text = trip.EndMileage?.ToString("0.##") ?? trip.StartMileage.ToString("0.##");
-        DistanceTextBox.Text = trip.Distance.ToString("0.##");
+        UpdateDistanceFromMileage();
         TripCostTextBox.Text = trip.TripCost.ToString("0.##");
         FuelConsumedTextBox.Text = trip.FuelConsumed.ToString("0.##");
         NotesTextBox.Text = trip.Notes;
@@ -59,12 +59,6 @@ public partial class TripCloseWindow : Window
             return;
         }
 
-        if (!TryParseDecimal(DistanceTextBox.Text, out var distance))
-        {
-            ShowValidation("المسافة يجب أن تكون رقمًا.");
-            return;
-        }
-
         if (!TryParseDecimal(TripCostTextBox.Text, out var tripCost))
         {
             ShowValidation("تكلفة التشغيلة يجب أن تكون رقمًا.");
@@ -77,14 +71,15 @@ public partial class TripCloseWindow : Window
             return;
         }
 
-        if (tripCost < 0 || fuelConsumed < 0 || distance < 0)
+        if (tripCost < 0 || fuelConsumed < 0)
         {
-            ShowValidation("المسافة والتكلفة والوقود لا يمكن أن تكون قيمًا سالبة.");
+            ShowValidation("التكلفة والوقود لا يمكن أن تكون قيمًا سالبة.");
             return;
         }
 
         var status = (StatusComboBox.SelectedItem as ComboBoxItem)?.Tag?.ToString() ?? "Closed";
         var endDate = status == "Closed" ? selectedDate.Date.Add(selectedTime) : (DateTime?)null;
+        var distance = status == "Closed" ? endMileage - _trip.StartMileage : 0;
         if (endDate.HasValue && endDate.Value < _trip.StartDate)
         {
             ShowValidation("تاريخ الإغلاق لا يمكن أن يكون قبل بداية التشغيلة.");
@@ -114,6 +109,20 @@ public partial class TripCloseWindow : Window
         };
 
         DialogResult = true;
+    }
+
+    private void EndMileageTextBox_TextChanged(object sender, TextChangedEventArgs e) => UpdateDistanceFromMileage();
+
+    private void UpdateDistanceFromMileage()
+    {
+        if (DistanceTextBox is null)
+        {
+            return;
+        }
+
+        DistanceTextBox.Text = TryParseDecimal(EndMileageTextBox.Text, out var endMileage) && endMileage >= _trip.StartMileage
+            ? (endMileage - _trip.StartMileage).ToString("0.##")
+            : "0";
     }
 
     private void CancelButton_Click(object sender, RoutedEventArgs e) => DialogResult = false;

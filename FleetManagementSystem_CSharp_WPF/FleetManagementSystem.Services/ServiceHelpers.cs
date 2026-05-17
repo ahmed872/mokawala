@@ -17,17 +17,12 @@ internal static class ServiceHelpers
 
     public static decimal Distance(decimal startMileage, decimal? endMileage, decimal distance)
     {
-        if (distance > 0)
-        {
-            return distance;
-        }
-
         if (endMileage.HasValue && endMileage.Value >= startMileage)
         {
             return endMileage.Value - startMileage;
         }
 
-        return 0;
+        return distance > 0 ? distance : 0;
     }
 
     public static string LicenseStatus(DateTime expiryDate)

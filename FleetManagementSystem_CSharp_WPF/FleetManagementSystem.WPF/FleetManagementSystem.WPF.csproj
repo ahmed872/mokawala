@@ -87,6 +87,7 @@
     <Compile Include="MainWindow.xaml.cs">
       <DependentUpon>MainWindow.xaml</DependentUpon>
     </Compile>
+    <Compile Include="Printing\DirectPrintHelper.cs" />
     <Compile Include="Infrastructure\ClientConnectionProfile.cs" />
     <Compile Include="Infrastructure\ConnectionSettingsStore.cs" />
   </ItemGroup>

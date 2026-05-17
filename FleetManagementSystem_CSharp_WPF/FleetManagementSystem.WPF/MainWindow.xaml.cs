@@ -14,6 +14,7 @@ using System.Windows.Controls;
 using System.Windows.Data;
 using System.Windows.Documents;
 using System.Windows.Input;
+using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Threading;
 
@@ -21,6 +22,13 @@ namespace FleetManagementSystem.WPF;
 
 public partial class MainWindow : Window
 {
+    private const double DefaultGridColumnWidth = 190;
+    private const double NarrowGridColumnWidth = 95;
+    private const double CompactGridColumnWidth = 140;
+    private const double DateGridColumnWidth = 170;
+    private const double WideGridColumnWidth = 260;
+    private const double ExtraWideGridColumnWidth = 320;
+
     private static readonly HashSet<string> HiddenColumns = new(StringComparer.OrdinalIgnoreCase)
     {
         "VehicleType",
@@ -203,9 +211,136 @@ public partial class MainWindow : Window
         };
     }
 
+    public sealed class DashboardAlertItem
+    {
+        private static readonly Brush CriticalAccentBrush = CreateBrush("#B64153");
+        private static readonly Brush CriticalBackgroundBrush = CreateBrush("#FFF5F7");
+        private static readonly Brush CriticalBorderBrush = CreateBrush("#F0C4CB");
+        private static readonly Brush CriticalChipBrush = CreateBrush("#F8DEE3");
+
+        private static readonly Brush UrgentAccentBrush = CreateBrush("#A66A16");
+        private static readonly Brush UrgentBackgroundBrush = CreateBrush("#FFF8ED");
+        private static readonly Brush UrgentBorderBrush = CreateBrush("#F0D1A2");
+        private static readonly Brush UrgentChipBrush = CreateBrush("#FCE8C8");
+
+        private static readonly Brush SoonAccentBrush = CreateBrush("#123B53");
+        private static readonly Brush SoonBackgroundBrush = CreateBrush("#F4F8FB");
+        private static readonly Brush SoonBorderBrush = CreateBrush("#C9DAE4");
+        private static readonly Brush SoonChipBrush = CreateBrush("#EAF2F7");
+
+        private static readonly Brush TextBrushValue = CreateBrush("#1F2D3A");
+
+        public string Title { get; private init; } = string.Empty;
+        public string Message { get; private init; } = string.Empty;
+        public string CategoryText { get; private init; } = string.Empty;
+        public string CategoryInitial { get; private init; } = string.Empty;
+        public string StatusText { get; private init; } = string.Empty;
+        public string TimingText { get; private init; } = string.Empty;
+        public string DueDateText { get; private init; } = string.Empty;
+        public DateTime? DueDate { get; private init; }
+        public int SortPriority { get; private init; }
+        public int SortDistance { get; private init; }
+        public Brush AccentBrush { get; private init; } = SoonAccentBrush;
+        public Brush BackgroundBrush { get; private init; } = SoonBackgroundBrush;
+        public Brush BorderBrush { get; private init; } = SoonBorderBrush;
+        public Brush ChipBrush { get; private init; } = SoonChipBrush;
+        public Brush TextBrush { get; private init; } = TextBrushValue;
+
+        public static DashboardAlertItem FromAlert(AlertDto alert)
+        {
+            var dueDate = alert.DueDate?.Date;
+            var days = dueDate.HasValue ? (dueDate.Value - DateTime.Today).Days : (int?)null;
+            var priority = days switch
+            {
+                null => 3,
+                < 0 => 0,
+                <= 7 => 1,
+                _ => 2
+            };
+
+            var (accent, background, border, chip) = priority switch
+            {
+                0 => (CriticalAccentBrush, CriticalBackgroundBrush, CriticalBorderBrush, CriticalChipBrush),
+                1 => (UrgentAccentBrush, UrgentBackgroundBrush, UrgentBorderBrush, UrgentChipBrush),
+                _ => (SoonAccentBrush, SoonBackgroundBrush, SoonBorderBrush, SoonChipBrush)
+            };
+
+            return new DashboardAlertItem
+            {
+                Title = alert.Title,
+                Message = alert.Message,
+                CategoryText = GetCategoryText(alert.RelatedEntityType),
+                CategoryInitial = GetCategoryInitial(alert.RelatedEntityType),
+                StatusText = GetStatusText(days),
+                TimingText = GetTimingText(days),
+                DueDateText = dueDate.HasValue ? $"تاريخ الانتهاء {dueDate:yyyy-MM-dd}" : "لا يوجد تاريخ انتهاء",
+                DueDate = dueDate,
+                SortPriority = priority,
+                SortDistance = days.HasValue ? Math.Abs(days.Value) : int.MaxValue,
+                AccentBrush = accent,
+                BackgroundBrush = background,
+                BorderBrush = border,
+                ChipBrush = chip,
+                TextBrush = TextBrushValue
+            };
+        }
+
+        private static string GetCategoryText(string relatedEntityType) =>
+            relatedEntityType switch
+            {
+                "Vehicle" => "ترخيص",
+                "Insurance" => "تأمين",
+                _ => "متابعة"
+            };
+
+        private static string GetCategoryInitial(string relatedEntityType) =>
+            relatedEntityType switch
+            {
+                "Vehicle" => "ر",
+                "Insurance" => "ت",
+                _ => "!"
+            };
+
+        private static string GetStatusText(int? days) =>
+            days switch
+            {
+                null => "متابعة",
+                < 0 => "منتهي",
+                0 => "اليوم",
+                <= 7 => "عاجل",
+                _ => "قريب"
+            };
+
+        private static string GetTimingText(int? days) =>
+            days switch
+            {
+                null => "بدون تاريخ محدد",
+                < 0 => $"متأخر {FormatDayCount(Math.Abs(days.Value))}",
+                0 => "ينتهي اليوم",
+                _ => $"متبقي {FormatDayCount(days.Value)}"
+            };
+
+        private static string FormatDayCount(int days) =>
+            days switch
+            {
+                1 => "يوم واحد",
+                2 => "يومان",
+                >= 3 and <= 10 => $"{days} أيام",
+                _ => $"{days} يوم"
+            };
+
+        private static Brush CreateBrush(string color)
+        {
+            var brush = (SolidColorBrush)new BrushConverter().ConvertFromString(color)!;
+            brush.Freeze();
+            return brush;
+        }
+    }
+
     public MainWindow(IServiceProvider serviceProvider)
     {
         InitializeComponent();
+        StateChanged += MainWindow_StateChanged;
 
         _serviceProvider = serviceProvider;
         _vehicleService = serviceProvider.GetRequiredService<IVehicleService>();
@@ -249,6 +384,7 @@ public partial class MainWindow : Window
         UsersGrid.ItemsSource = _users;
         ReportVehicleComboBox.ItemsSource = _vehicles;
         UpdateReportVehicleFilterVisibility();
+        ApplyReadableGridColumnWidths();
 
         _clockTimer = new DispatcherTimer
         {
@@ -260,6 +396,14 @@ public partial class MainWindow : Window
         UpdateTripsSummary();
 
         Loaded += MainWindow_Loaded;
+    }
+
+    private void MainWindow_StateChanged(object? sender, EventArgs e)
+    {
+        if (WindowState == WindowState.Normal)
+        {
+            WindowState = WindowState.Maximized;
+        }
     }
 
     public void SetCurrentUser(UserDto user)
@@ -280,6 +424,7 @@ public partial class MainWindow : Window
     private async void MainWindow_Loaded(object sender, RoutedEventArgs e)
     {
         await RunSafeAsync(RefreshAllAsync);
+        await Dispatcher.InvokeAsync(ApplyReadableGridColumnWidths, DispatcherPriority.Loaded);
     }
 
     private async Task RefreshAllAsync()
@@ -322,17 +467,55 @@ public partial class MainWindow : Window
         var alerts = (metrics.Alerts ?? new List<AlertDto>())
             .Where(IsDashboardRenewalAlert)
             .ToList();
+        var dashboardAlerts = alerts
+            .Select(DashboardAlertItem.FromAlert)
+            .OrderBy(alert => alert.SortPriority)
+            .ThenBy(alert => alert.SortDistance)
+            .ThenBy(alert => alert.DueDate ?? DateTime.MaxValue)
+            .ToList();
         AlertsListBox.ItemsSource = alerts;
-        DashboardAlertsListBox.ItemsSource = alerts;
-        DashboardAlertCountTextBlock.Text = $"عدد الإنذارات: {alerts.Count}";
-        DashboardAlertsListBox.Visibility = alerts.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
-        DashboardNoAlertsTextBlock.Visibility = alerts.Count > 0 ? Visibility.Collapsed : Visibility.Visible;
+        DashboardAlertsListBox.ItemsSource = dashboardAlerts;
+        DashboardAlertCountTextBlock.Text = BuildDashboardAlertCountText(dashboardAlerts.Count);
+        DashboardAlertSummaryTextBlock.Text = BuildDashboardAlertSummaryText(dashboardAlerts);
+        DashboardAlertsListBox.Visibility = dashboardAlerts.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
+        DashboardNoAlertsPanel.Visibility = dashboardAlerts.Count > 0 ? Visibility.Collapsed : Visibility.Visible;
         ActivityListBox.ItemsSource = metrics.RecentActivities;
     }
 
     private static bool IsDashboardRenewalAlert(AlertDto alert) =>
         string.Equals(alert.RelatedEntityType, "Vehicle", StringComparison.OrdinalIgnoreCase) ||
         string.Equals(alert.RelatedEntityType, "Insurance", StringComparison.OrdinalIgnoreCase);
+
+    private static string BuildDashboardAlertCountText(int count) =>
+        count switch
+        {
+            0 => "لا توجد إنذارات",
+            1 => "إنذار واحد",
+            2 => "إنذاران",
+            _ => $"{count} إنذارات"
+        };
+
+    private static string BuildDashboardAlertSummaryText(IReadOnlyCollection<DashboardAlertItem> alerts)
+    {
+        if (alerts.Count == 0)
+        {
+            return "كل التراخيص والتأمينات المسجلة خارج نطاق الخطر الحالي.";
+        }
+
+        var expiredCount = alerts.Count(alert => alert.SortPriority == 0);
+        var urgentCount = alerts.Count(alert => alert.SortPriority == 1);
+
+        if (expiredCount > 0)
+        {
+            return urgentCount > 0
+                ? $"{expiredCount} منتهي و{urgentCount} يحتاج متابعة عاجلة خلال أسبوع."
+                : $"{expiredCount} منتهي ويحتاج إجراء تجديد مباشر.";
+        }
+
+        return urgentCount > 0
+            ? $"{urgentCount} يحتاج متابعة عاجلة خلال أسبوع."
+            : "إنذارات قريبة من موعد التجديد خلال 30 يوم.";
+    }
 
     private async Task LoadVehiclesAsync()
     {
@@ -552,6 +735,138 @@ public partial class MainWindow : Window
         {
             target.Add(item);
         }
+    }
+
+    private void ApplyReadableGridColumnWidths()
+    {
+        foreach (var grid in GetMainDataGrids())
+        {
+            grid.ColumnWidth = new DataGridLength(DefaultGridColumnWidth);
+            grid.MinColumnWidth = 130;
+            grid.CanUserResizeColumns = true;
+            ScrollViewer.SetHorizontalScrollBarVisibility(grid, ScrollBarVisibility.Auto);
+            ScrollViewer.SetVerticalScrollBarVisibility(grid, ScrollBarVisibility.Auto);
+
+            foreach (var column in grid.Columns)
+            {
+                ApplyReadableColumnWidth(column, GetColumnWidthKey(column));
+            }
+        }
+    }
+
+    private IEnumerable<DataGrid> GetMainDataGrids()
+    {
+        yield return VehiclesGrid;
+        yield return ContractsGrid;
+        yield return MaintenanceGrid;
+        yield return DriversGrid;
+        yield return EmployeesGrid;
+        yield return TripsGrid;
+        yield return FuelGrid;
+        yield return ExpensesGrid;
+        yield return OilChangesGrid;
+        yield return TreasuryGrid;
+        yield return LicensesGrid;
+        yield return InsuranceGrid;
+        yield return CustodyGrid;
+        yield return VehicleTypesGrid;
+        yield return ContractStatusesGrid;
+        yield return MaintenanceTypesGrid;
+        yield return ServiceProvidersGrid;
+        yield return ReportsGrid;
+        yield return UsersGrid;
+    }
+
+    private static string GetColumnWidthKey(DataGridColumn column)
+    {
+        if (column.Header is TextBlock headerTextBlock)
+        {
+            return headerTextBlock.ToolTip?.ToString() ?? headerTextBlock.Text;
+        }
+
+        if (column is DataGridBoundColumn boundColumn &&
+            boundColumn.Binding is Binding binding &&
+            !string.IsNullOrWhiteSpace(binding.Path?.Path))
+        {
+            return binding.Path.Path;
+        }
+
+        return column.Header?.ToString() ?? string.Empty;
+    }
+
+    private static void ApplyReadableColumnWidth(DataGridColumn column, string key)
+    {
+        var width = GetReadableColumnWidth(key);
+        column.Width = new DataGridLength(width);
+        column.MinWidth = Math.Min(width, 130);
+    }
+
+    private static double GetReadableColumnWidth(string key)
+    {
+        if (string.IsNullOrWhiteSpace(key))
+        {
+            return DefaultGridColumnWidth;
+        }
+
+        var normalizedKey = key.Trim();
+
+        if (normalizedKey.Equals("Id", StringComparison.OrdinalIgnoreCase) ||
+            normalizedKey.Equals("رقم", StringComparison.OrdinalIgnoreCase) ||
+            normalizedKey.Equals("A5", StringComparison.OrdinalIgnoreCase) ||
+            normalizedKey.Equals("نموذج", StringComparison.OrdinalIgnoreCase) ||
+            normalizedKey.Equals("مستند", StringComparison.OrdinalIgnoreCase))
+        {
+            return NarrowGridColumnWidth;
+        }
+
+        if (normalizedKey.Contains("Date", StringComparison.OrdinalIgnoreCase) ||
+            normalizedKey.Contains("تاريخ", StringComparison.OrdinalIgnoreCase) ||
+            normalizedKey.Contains("بداية", StringComparison.OrdinalIgnoreCase) ||
+            normalizedKey.Contains("نهاية", StringComparison.OrdinalIgnoreCase) ||
+            normalizedKey.Contains("Expiry", StringComparison.OrdinalIgnoreCase))
+        {
+            return DateGridColumnWidth;
+        }
+
+        if (normalizedKey.Contains("Notes", StringComparison.OrdinalIgnoreCase) ||
+            normalizedKey.Contains("Description", StringComparison.OrdinalIgnoreCase) ||
+            normalizedKey.Contains("Details", StringComparison.OrdinalIgnoreCase) ||
+            normalizedKey.Contains("ملاحظات", StringComparison.OrdinalIgnoreCase) ||
+            normalizedKey.Contains("الوصف", StringComparison.OrdinalIgnoreCase) ||
+            normalizedKey.Contains("تفاصيل", StringComparison.OrdinalIgnoreCase) ||
+            normalizedKey.Contains("العنوان", StringComparison.OrdinalIgnoreCase) ||
+            normalizedKey.Contains("الشروط", StringComparison.OrdinalIgnoreCase))
+        {
+            return ExtraWideGridColumnWidth;
+        }
+
+        if (normalizedKey.Contains("Name", StringComparison.OrdinalIgnoreCase) ||
+            normalizedKey.Contains("Email", StringComparison.OrdinalIgnoreCase) ||
+            normalizedKey.Contains("Phone", StringComparison.OrdinalIgnoreCase) ||
+            normalizedKey.Contains("اسم", StringComparison.OrdinalIgnoreCase) ||
+            normalizedKey.Contains("المستلم", StringComparison.OrdinalIgnoreCase) ||
+            normalizedKey.Contains("البريد", StringComparison.OrdinalIgnoreCase) ||
+            normalizedKey.Contains("هاتف", StringComparison.OrdinalIgnoreCase))
+        {
+            return WideGridColumnWidth;
+        }
+
+        if (normalizedKey.Contains("Status", StringComparison.OrdinalIgnoreCase) ||
+            normalizedKey.Contains("Type", StringComparison.OrdinalIgnoreCase) ||
+            normalizedKey.Contains("Amount", StringComparison.OrdinalIgnoreCase) ||
+            normalizedKey.Contains("Mileage", StringComparison.OrdinalIgnoreCase) ||
+            normalizedKey.Contains("الحالة", StringComparison.OrdinalIgnoreCase) ||
+            normalizedKey.Contains("نوع", StringComparison.OrdinalIgnoreCase) ||
+            normalizedKey.Contains("المبلغ", StringComparison.OrdinalIgnoreCase) ||
+            normalizedKey.Contains("التكلفة", StringComparison.OrdinalIgnoreCase) ||
+            normalizedKey.Contains("القسط", StringComparison.OrdinalIgnoreCase) ||
+            normalizedKey.Contains("العداد", StringComparison.OrdinalIgnoreCase) ||
+            normalizedKey.Contains("المسافة", StringComparison.OrdinalIgnoreCase))
+        {
+            return CompactGridColumnWidth;
+        }
+
+        return DefaultGridColumnWidth;
     }
 
     private void UpdateTripsSummary()
@@ -1201,6 +1516,7 @@ public partial class MainWindow : Window
         if (TryCreateLookupColumn(e.PropertyName, out var lookupColumn))
         {
             e.Column = lookupColumn;
+            ApplyReadableColumnWidth(e.Column, e.PropertyName);
             return;
         }
 
@@ -1225,6 +1541,8 @@ public partial class MainWindow : Window
                 binding.StringFormat = "0.##";
             }
         }
+
+        ApplyReadableColumnWidth(e.Column, e.PropertyName);
     }
 
     private async void RefreshAllButton_Click(object sender, RoutedEventArgs e) => await RunSafeAsync(RefreshAllAsync);

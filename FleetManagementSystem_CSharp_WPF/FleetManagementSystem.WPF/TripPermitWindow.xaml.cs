@@ -38,10 +38,17 @@ public partial class TripPermitWindow : Window
 
     private void PrintButton_Click(object sender, RoutedEventArgs e)
     {
-        var printDialog = new PrintDialog();
-        if (printDialog.ShowDialog() == true)
+        try
         {
-            printDialog.PrintVisual(FormRoot, "Trip A5 Permit");
+            DirectPrintHelper.PrintVisualToDefaultPrinter(FormRoot, "Trip A5 Permit");
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(
+                DirectPrintHelper.BuildDirectPrintErrorMessage(ex),
+                "تعذر الطباعة",
+                MessageBoxButton.OK,
+                MessageBoxImage.Error);
         }
     }
 

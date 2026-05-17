@@ -50,10 +50,17 @@ public partial class A5DocumentWindow : Window
 
     private void PrintButton_Click(object sender, RoutedEventArgs e)
     {
-        var printDialog = new PrintDialog();
-        if (printDialog.ShowDialog() == true)
+        try
         {
-            printDialog.PrintVisual(FormRoot, DocumentTitleTextBlock.Text);
+            DirectPrintHelper.PrintVisualToDefaultPrinter(FormRoot, DocumentTitleTextBlock.Text);
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(
+                DirectPrintHelper.BuildDirectPrintErrorMessage(ex),
+                "تعذر الطباعة",
+                MessageBoxButton.OK,
+                MessageBoxImage.Error);
         }
     }
 

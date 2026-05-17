@@ -130,6 +130,7 @@
                     <StackPanel Grid.Row="1" Grid.Column="1" Margin="0,0,0,14">
                         <TextBlock Text="عداد النهاية" Style="{StaticResource TripCloseLabelStyle}" />
                         <TextBox x:Name="EndMileageTextBox"
+                                 TextChanged="EndMileageTextBox_TextChanged"
                                  Style="{StaticResource TripCloseInputStyle}" />
                     </StackPanel>
 
@@ -137,7 +138,8 @@
                         <TextBlock Text="المسافة" Style="{StaticResource TripCloseLabelStyle}" />
                         <TextBox x:Name="DistanceTextBox"
                                  Style="{StaticResource TripCloseInputStyle}"
-                                 ToolTip="تُحسب تلقائيًا من العداد إذا تُركت صفر" />
+                                 IsReadOnly="True"
+                                 ToolTip="تُحسب تلقائيًا من عداد النهاية ناقص عداد البداية" />
                     </StackPanel>
 
                     <StackPanel Grid.Row="2" Grid.Column="1" Margin="0,0,0,14">
