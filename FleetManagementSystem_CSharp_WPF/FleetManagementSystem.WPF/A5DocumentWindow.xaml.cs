@@ -21,7 +21,9 @@ public partial class A5DocumentWindow : Window
         CompanyAddressTextBlock.Text = settings?.Address ?? string.Empty;
         DocumentTitleTextBlock.Text = title;
         DocumentSubtitleTextBlock.Text = subtitle;
-        SectionsItemsControl.ItemsSource = new ObservableCollection<A5DocumentSection>(sections);
+
+        var documentSections = sections.ToList();
+        SectionsItemsControl.ItemsSource = new ObservableCollection<A5DocumentSection>(documentSections);
     }
 
     public sealed class A5DocumentSection

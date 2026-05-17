@@ -40,7 +40,7 @@ public partial class TripPermitWindow : Window
     {
         try
         {
-            DirectPrintHelper.PrintVisualToDefaultPrinter(FormRoot, "Trip A5 Permit");
+            DirectPrintHelper.PrintVisualToDefaultPrinter(FormRoot, "نموذج تشغيل مركبة");
         }
         catch (Exception ex)
         {

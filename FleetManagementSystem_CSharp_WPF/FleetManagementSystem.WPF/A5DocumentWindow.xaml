@@ -79,6 +79,7 @@
                                 BorderThickness="1"
                                 Padding="6">
                             <TextBlock Text="A5"
+                                       FlowDirection="LeftToRight"
                                        HorizontalAlignment="Center"
                                        VerticalAlignment="Center"
                                        FontSize="20"
