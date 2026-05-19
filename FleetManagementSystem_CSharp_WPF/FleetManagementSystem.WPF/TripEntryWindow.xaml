@@ -1,0 +1,306 @@
+<Window x:Class="FleetManagementSystem.WPF.TripEntryWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="إضافة تشغيل جديد"
+        Width="920"
+        Height="760"
+        WindowStartupLocation="CenterOwner"
+        ResizeMode="NoResize"
+        FlowDirection="RightToLeft"
+        Background="#F6F8F4">
+    <Window.Resources>
+        <SolidColorBrush x:Key="TripPopupSurfaceBrush" Color="#FFFFFF" />
+        <SolidColorBrush x:Key="TripPopupAltBrush" Color="#EFF4EF" />
+        <SolidColorBrush x:Key="TripPopupAccentBrush" Color="#53766A" />
+        <SolidColorBrush x:Key="TripPopupAccentPaleBrush" Color="#E6F0EB" />
+        <SolidColorBrush x:Key="TripPopupTextBrush" Color="#24333A" />
+        <SolidColorBrush x:Key="TripPopupMutedBrush" Color="#6A7880" />
+        <SolidColorBrush x:Key="TripPopupBorderBrush" Color="#D7E2DB" />
+
+        <Style x:Key="TripPopupCardStyle" TargetType="Border">
+            <Setter Property="Background" Value="{StaticResource TripPopupSurfaceBrush}" />
+            <Setter Property="BorderBrush" Value="{StaticResource TripPopupBorderBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="24" />
+            <Setter Property="Padding" Value="22" />
+        </Style>
+
+        <Style x:Key="TripPopupLabelStyle" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="{StaticResource TripPopupTextBrush}" />
+            <Setter Property="FontSize" Value="13" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+        </Style>
+
+        <Style x:Key="TripPopupValueStyle" TargetType="TextBlock">
+            <Setter Property="Margin" Value="0,8,0,0" />
+            <Setter Property="Foreground" Value="{StaticResource TripPopupTextBrush}" />
+            <Setter Property="FontSize" Value="16" />
+            <Setter Property="FontWeight" Value="Bold" />
+            <Setter Property="TextWrapping" Value="Wrap" />
+        </Style>
+
+        <Style x:Key="TripPopupPrimaryButtonStyle" TargetType="Button">
+            <Setter Property="Height" Value="46" />
+            <Setter Property="MinWidth" Value="130" />
+            <Setter Property="Margin" Value="0,0,10,0" />
+            <Setter Property="Padding" Value="20,8" />
+            <Setter Property="FontSize" Value="15" />
+            <Setter Property="FontWeight" Value="Bold" />
+            <Setter Property="Foreground" Value="White" />
+            <Setter Property="Background" Value="{StaticResource TripPopupAccentBrush}" />
+            <Setter Property="BorderBrush" Value="{StaticResource TripPopupAccentBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="ButtonBorder"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="14">
+                            <ContentPresenter HorizontalAlignment="Center"
+                                              VerticalAlignment="Center"
+                                              Margin="{TemplateBinding Padding}" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="ButtonBorder" Property="Opacity" Value="0.92" />
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="ButtonBorder" Property="Opacity" Value="0.82" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="TripPopupSecondaryButtonStyle" TargetType="Button" BasedOn="{StaticResource TripPopupPrimaryButtonStyle}">
+            <Setter Property="Foreground" Value="{StaticResource TripPopupTextBrush}" />
+            <Setter Property="Background" Value="{StaticResource TripPopupAltBrush}" />
+            <Setter Property="BorderBrush" Value="{StaticResource TripPopupBorderBrush}" />
+        </Style>
+    </Window.Resources>
+
+    <Grid Margin="20">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <Border Style="{StaticResource TripPopupCardStyle}"
+                Background="{StaticResource TripPopupAccentPaleBrush}">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+
+                <StackPanel>
+                    <TextBlock Text="إضافة تشغيل جديد"
+                               FontSize="28"
+                               FontWeight="Bold"
+                               Foreground="{StaticResource TripPopupTextBrush}" />
+                    <TextBlock Margin="0,8,0,0"
+                               FontSize="14"
+                               Foreground="{StaticResource TripPopupMutedBrush}"
+                               Text="املأ بيانات التشغيل الأساسية فقط، وسيتم حفظها مباشرة داخل سجل التشغيلات."
+                               TextWrapping="Wrap" />
+                </StackPanel>
+
+                <Border Grid.Column="1"
+                        Width="62"
+                        Height="62"
+                        Background="{StaticResource TripPopupSurfaceBrush}"
+                        BorderBrush="{StaticResource TripPopupBorderBrush}"
+                        BorderThickness="1"
+                        CornerRadius="18">
+                    <TextBlock Text="+"
+                               FontSize="30"
+                               FontWeight="Bold"
+                               Foreground="{StaticResource TripPopupAccentBrush}"
+                               HorizontalAlignment="Center"
+                               VerticalAlignment="Center" />
+                </Border>
+            </Grid>
+        </Border>
+
+        <ScrollViewer Grid.Row="1"
+                      Margin="0,18,0,18"
+                      VerticalScrollBarVisibility="Auto"
+                      HorizontalScrollBarVisibility="Disabled">
+            <StackPanel>
+                <Border Style="{StaticResource TripPopupCardStyle}"
+                        Margin="0,0,0,18">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+
+                        <StackPanel Margin="0,0,12,12">
+                            <TextBlock Text="رقم السيارة" Style="{StaticResource TripPopupLabelStyle}" />
+                            <TextBlock x:Name="VehiclePlateTextBlock" Style="{StaticResource TripPopupValueStyle}" Text="اختر سيارة" />
+                        </StackPanel>
+
+                        <StackPanel Grid.Column="1" Margin="0,0,12,12">
+                            <TextBlock Text="نوع السيارة" Style="{StaticResource TripPopupLabelStyle}" />
+                            <TextBlock x:Name="VehicleTypeTextBlock" Style="{StaticResource TripPopupValueStyle}" Text="—" />
+                        </StackPanel>
+
+                        <StackPanel Grid.Column="2" Margin="0,0,12,12">
+                            <TextBlock Text="الموديل" Style="{StaticResource TripPopupLabelStyle}" />
+                            <TextBlock x:Name="VehicleModelTextBlock" Style="{StaticResource TripPopupValueStyle}" Text="—" />
+                        </StackPanel>
+
+                        <StackPanel Grid.Column="3" Margin="0,0,0,12">
+                            <TextBlock Text="رقم الشاسيه" Style="{StaticResource TripPopupLabelStyle}" />
+                            <TextBlock x:Name="VehicleChassisTextBlock" Style="{StaticResource TripPopupValueStyle}" Text="—" />
+                        </StackPanel>
+
+                        <StackPanel Grid.Row="1" Margin="0,0,12,0">
+                            <TextBlock Text="رقم الموتور" Style="{StaticResource TripPopupLabelStyle}" />
+                            <TextBlock x:Name="VehicleEngineTextBlock" Style="{StaticResource TripPopupValueStyle}" Text="—" />
+                        </StackPanel>
+
+                        <StackPanel Grid.Row="1" Grid.Column="1" Margin="0,0,12,0">
+                            <TextBlock Text="بداية الترخيص" Style="{StaticResource TripPopupLabelStyle}" />
+                            <TextBlock x:Name="VehicleRegistrationStartTextBlock" Style="{StaticResource TripPopupValueStyle}" Text="—" />
+                        </StackPanel>
+
+                        <StackPanel Grid.Row="1" Grid.Column="2" Margin="0,0,12,0">
+                            <TextBlock Text="انتهاء الترخيص" Style="{StaticResource TripPopupLabelStyle}" />
+                            <TextBlock x:Name="VehicleRegistrationExpiryTextBlock" Style="{StaticResource TripPopupValueStyle}" Text="—" />
+                        </StackPanel>
+
+                        <StackPanel Grid.Row="1" Grid.Column="3">
+                            <TextBlock Text="بيانات التأمين" Style="{StaticResource TripPopupLabelStyle}" />
+                            <TextBlock x:Name="VehicleInsuranceTextBlock" Style="{StaticResource TripPopupValueStyle}" Text="—" />
+                        </StackPanel>
+                    </Grid>
+                </Border>
+
+                <Border Style="{StaticResource TripPopupCardStyle}">
+                    <Grid Margin="0,4,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+
+                        <StackPanel Margin="0,0,12,14">
+                            <TextBlock Text="رقم السيارة" Style="{StaticResource TripPopupLabelStyle}" />
+                            <ComboBox x:Name="VehicleComboBox"
+                                      Margin="0,8,0,0"
+                                      Style="{StaticResource AppComboBoxStyle}"
+                                      DisplayMemberPath="PlateNumber"
+                                      SelectedValuePath="Id"
+                                      SelectionChanged="VehicleComboBox_SelectionChanged" />
+                        </StackPanel>
+
+                        <StackPanel Grid.Column="1" Margin="0,0,0,14">
+                            <TextBlock Text="التاريخ والوقت" Style="{StaticResource TripPopupLabelStyle}" />
+                            <Grid Margin="0,8,0,0">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="96" />
+                                </Grid.ColumnDefinitions>
+                                <DatePicker x:Name="TripDatePicker"
+                                            SelectedDateFormat="Short" />
+                                <TextBox x:Name="TripTimeTextBox"
+                                         Grid.Column="1"
+                                         Margin="8,0,0,0"
+                                         Style="{StaticResource AppTextBoxStyle}"
+                                         ToolTip="الوقت بصيغة 24 ساعة مثل 14:30" />
+                            </Grid>
+                        </StackPanel>
+
+                        <StackPanel Grid.Row="1" Margin="0,0,12,14">
+                            <TextBlock Text="اسم السائق" Style="{StaticResource TripPopupLabelStyle}" />
+                            <ComboBox x:Name="DriverComboBox"
+                                      Margin="0,8,0,0"
+                                      Style="{StaticResource AppComboBoxStyle}"
+                                      DisplayMemberPath="FullName"
+                                      SelectedValuePath="Id" />
+                        </StackPanel>
+
+                        <StackPanel Grid.Row="1" Grid.Column="1" Margin="0,0,0,14">
+                            <TextBlock Text="طالب التشغيل (الموصي)" Style="{StaticResource TripPopupLabelStyle}" />
+                            <TextBox x:Name="RequesterNameTextBox"
+                                     Margin="0,8,0,0"
+                                     Style="{StaticResource AppTextBoxStyle}"
+                                     ToolTip="اكتب اسم طالب التشغيل" />
+                        </StackPanel>
+
+                        <StackPanel Grid.Row="2" Margin="0,0,12,14">
+                            <TextBlock Text="المعني بالدرج (المشرف)" Style="{StaticResource TripPopupLabelStyle}" />
+                            <ComboBox x:Name="SupervisorComboBox"
+                                      Margin="0,8,0,0"
+                                      Style="{StaticResource AppComboBoxStyle}"
+                                      DisplayMemberPath="FullName"
+                                      SelectedValuePath="Id" />
+                        </StackPanel>
+
+                        <StackPanel Grid.Row="2" Grid.Column="1" Margin="0,0,0,14">
+                            <TextBlock Text="الغرض" Style="{StaticResource TripPopupLabelStyle}" />
+                            <TextBox x:Name="PurposeTextBox"
+                                     Margin="0,8,0,0"
+                                     Style="{StaticResource AppTextBoxStyle}" />
+                        </StackPanel>
+
+                        <TextBlock Grid.Row="3"
+                                   Grid.ColumnSpan="2"
+                                   Margin="0,2,0,12"
+                                   FontSize="14"
+                                   FontWeight="Bold"
+                                   Foreground="{StaticResource TripPopupAccentBrush}"
+                                   Text="مسار التشغيل" />
+
+                        <StackPanel Grid.Row="4" Margin="0,0,12,0">
+                            <TextBlock Text="منطقة التحرك" Style="{StaticResource TripPopupLabelStyle}" />
+                            <TextBox x:Name="StartLocationTextBox"
+                                     Margin="0,8,0,0"
+                                     Style="{StaticResource AppTextBoxStyle}"
+                                     ToolTip="اكتب منطقة التحرك" />
+                        </StackPanel>
+
+                        <StackPanel Grid.Row="4" Grid.Column="1">
+                            <TextBlock Text="منطقة الوصول" Style="{StaticResource TripPopupLabelStyle}" />
+                            <TextBox x:Name="EndLocationTextBox"
+                                     Margin="0,8,0,0"
+                                     Style="{StaticResource AppTextBoxStyle}"
+                                     ToolTip="اكتب منطقة الوصول" />
+                        </StackPanel>
+                    </Grid>
+                </Border>
+            </StackPanel>
+        </ScrollViewer>
+
+        <WrapPanel Grid.Row="2"
+                   Margin="0,18,0,0"
+                   HorizontalAlignment="Left">
+            <Button Style="{StaticResource TripPopupPrimaryButtonStyle}"
+                    Click="SaveButton_Click">
+                حفظ التشغيل
+            </Button>
+            <Button Style="{StaticResource TripPopupSecondaryButtonStyle}"
+                    Click="CancelButton_Click">
+                إلغاء
+            </Button>
+        </WrapPanel>
+    </Grid>
+</Window>

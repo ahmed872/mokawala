@@ -1,0 +1,1393 @@
+using BCrypt.Net;
+using FleetManagementSystem.Core.DTOs;
+using FleetManagementSystem.Core.Enums;
+using FleetManagementSystem.Data;
+using FleetManagementSystem.Data.Entities;
+using Microsoft.EntityFrameworkCore;
+using System.Collections.Concurrent;
+using System.Data;
+
+namespace FleetManagementSystem.Services;
+
+public sealed class DataBootstrapService(FleetDbContext context) : IDataBootstrapService
+{
+    private readonly FleetDbContext _context = context;
+
+    public async Task InitializeAsync()
+    {
+        await _context.Database.EnsureCreatedAsync();
+        await EnsureOperationalSchemaAsync();
+
+        if (!await _context.VehicleTypes.AnyAsync())
+        {
+            _context.VehicleTypes.AddRange(
+                new VehicleType { Name = "سيارة ركاب", NameEn = "Sedan", Description = "سيارات التشغيل اليومية" },
+                new VehicleType { Name = "شاحنة", NameEn = "Truck", Description = "شاحنات النقل الثقيل" },
+                new VehicleType { Name = "حافلة", NameEn = "Bus", Description = "حافلات نقل الموظفين" });
+        }
+
+        if (!await _context.ContractStatuses.AnyAsync())
+        {
+            _context.ContractStatuses.AddRange(
+                new ContractStatus { Name = "مسودة", NameEn = "Draft", Color = "#6B7280" },
+                new ContractStatus { Name = "نشط", NameEn = "Active", Color = "#10B981" },
+                new ContractStatus { Name = "منتهي", NameEn = "Expired", Color = "#EF4444" },
+                new ContractStatus { Name = "ملغي", NameEn = "Cancelled", Color = "#F59E0B" });
+        }
+
+        if (!await _context.MaintenanceTypes.AnyAsync())
+        {
+            _context.MaintenanceTypes.AddRange(
+                new MaintenanceType { Name = "صيانة دورية", NameEn = "Routine", EstimatedCost = 1500, EstimatedDurationDays = 1 },
+                new MaintenanceType { Name = "إصلاح", NameEn = "Repair", EstimatedCost = 3000, EstimatedDurationDays = 3 },
+                new MaintenanceType { Name = "فحص شامل", NameEn = "Inspection", EstimatedCost = 800, EstimatedDurationDays = 1 });
+        }
+
+        if (!await _context.ServiceProviders.AnyAsync())
+        {
+            _context.ServiceProviders.AddRange(
+                new FleetManagementSystem.Data.Entities.ServiceProvider
+                {
+                    Name = "مركز الصيانة المتكامل",
+                    NameEn = "Integrated Service Center",
+                    ContactPerson = "قسم الاستقبال",
+                    PhoneNumber = "01000000001",
+                    Email = "service1@example.com",
+                    Address = "القاهرة",
+                    Specialization = "ميكانيكا وكهرباء",
+                    AverageRating = 4.5m
+                },
+                new FleetManagementSystem.Data.Entities.ServiceProvider
+                {
+                    Name = "ورشة الأسطول الحديثة",
+                    NameEn = "Modern Fleet Garage",
+                    ContactPerson = "مدير الورشة",
+                    PhoneNumber = "01000000002",
+                    Email = "service2@example.com",
+                    Address = "الجيزة",
+                    Specialization = "سمكرة ودهان",
+                    AverageRating = 4.2m
+                });
+        }
+
+        if (!await _context.CompanySettings.AnyAsync())
+        {
+            _context.CompanySettings.Add(new CompanySettings
+            {
+                CompanyName = "نظام إدارة الأسطول",
+                CompanyNameEn = "Fleet Management System",
+                Address = "القاهرة",
+                PhoneNumber = "0220000000",
+                Email = "info@fleet.local",
+                Website = "https://fleet.local",
+                TaxId = "000000000",
+                CommercialRegistration = "000000",
+                CurrencySymbol = "EGP",
+                DefaultLanguage = "ar",
+                DefaultTheme = "Light"
+            });
+        }
+
+        if (!await _context.Users.AnyAsync())
+        {
+            _context.Users.Add(new User
+            {
+                Username = "admin",
+                Email = "admin@fleet.local",
+                PhoneNumber = "01000000000",
+                FullName = "مدير النظام",
+                PasswordHash = BCrypt.Net.BCrypt.HashPassword("Admin@123"),
+                Role = UserRole.Admin,
+                IsActive = true
+            });
+        }
+
+        await _context.SaveChangesAsync();
+        await SeedDemoOperationsAsync();
+    }
+
+    private async Task EnsureOperationalSchemaAsync()
+    {
+        await EnsureColumnAsync("Vehicles", "RegistrationStartDate", GetNullableDateColumnDefinition());
+        await EnsureColumnAsync("Vehicles", "AccidentInsuranceDetails", GetInsuranceDetailsColumnDefinition());
+        await EnsureColumnAsync("Vehicles", "SocialInsuranceDetails", GetInsuranceDetailsColumnDefinition());
+        await EnsureColumnAsync("Trips", "RequesterEmployeeId", GetNullableIntColumnDefinition());
+        await EnsureColumnAsync("Trips", "RequesterNameText", GetRequesterNameColumnDefinition());
+        await EnsureColumnAsync("Trips", "SupervisorEmployeeId", GetNullableIntColumnDefinition());
+
+        if (await HasColumnAsync("Trips", "EmployeeId") && await HasColumnAsync("Trips", "RequesterEmployeeId"))
+        {
+            await _context.Database.ExecuteSqlRawAsync(
+                "UPDATE Trips SET RequesterEmployeeId = COALESCE(RequesterEmployeeId, EmployeeId) WHERE EmployeeId IS NOT NULL");
+        }
+
+        var requestersToBackfill = await _context.Trips
+            .Include(t => t.RequesterEmployee)
+            .Where(t => string.IsNullOrWhiteSpace(t.RequesterNameText) && t.RequesterEmployeeId.HasValue)
+            .ToListAsync();
+
+        foreach (var trip in requestersToBackfill)
+        {
+            trip.RequesterNameText = trip.RequesterEmployee?.FullName ?? string.Empty;
+        }
+
+        if (requestersToBackfill.Count > 0)
+        {
+            await _context.SaveChangesAsync();
+        }
+    }
+
+    private async Task EnsureColumnAsync(string tableName, string columnName, string columnDefinition)
+    {
+        if (await HasColumnAsync(tableName, columnName))
+        {
+            return;
+        }
+
+#pragma warning disable EF1002
+        await _context.Database.ExecuteSqlRawAsync(
+            $"ALTER TABLE {tableName} ADD COLUMN {columnName} {columnDefinition}");
+#pragma warning restore EF1002
+    }
+
+    private async Task<bool> HasColumnAsync(string tableName, string columnName)
+    {
+        var connection = _context.Database.GetDbConnection();
+        var closeWhenDone = connection.State != ConnectionState.Open;
+        if (closeWhenDone)
+        {
+            await connection.OpenAsync();
+        }
+
+        try
+        {
+            if (_context.Database.IsSqlite())
+            {
+                await using var command = connection.CreateCommand();
+                command.CommandText = $"PRAGMA table_info('{tableName}')";
+                await using var reader = await command.ExecuteReaderAsync();
+                while (await reader.ReadAsync())
+                {
+                    if (string.Equals(reader["name"]?.ToString(), columnName, StringComparison.OrdinalIgnoreCase))
+                    {
+                        return true;
+                    }
+                }
+
+                return false;
+            }
+
+            if (_context.Database.IsMySql())
+            {
+                await using var command = connection.CreateCommand();
+                command.CommandText = "SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = @tableName AND COLUMN_NAME = @columnName";
+
+                var tableParameter = command.CreateParameter();
+                tableParameter.ParameterName = "@tableName";
+                tableParameter.Value = tableName;
+                command.Parameters.Add(tableParameter);
+
+                var columnParameter = command.CreateParameter();
+                columnParameter.ParameterName = "@columnName";
+                columnParameter.Value = columnName;
+                command.Parameters.Add(columnParameter);
+
+                var result = await command.ExecuteScalarAsync();
+                return Convert.ToInt32(result) > 0;
+            }
+
+            await using var fallbackCommand = connection.CreateCommand();
+            fallbackCommand.CommandText = $"SELECT * FROM {tableName} WHERE 1 = 0";
+            await using var fallbackReader = await fallbackCommand.ExecuteReaderAsync(CommandBehavior.SchemaOnly);
+            var schemaTable = fallbackReader.GetSchemaTable();
+            if (schemaTable is null)
+            {
+                return false;
+            }
+
+            foreach (DataRow row in schemaTable.Rows)
+            {
+                if (string.Equals(row["ColumnName"]?.ToString(), columnName, StringComparison.OrdinalIgnoreCase))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+        finally
+        {
+            if (closeWhenDone)
+            {
+                await connection.CloseAsync();
+            }
+        }
+    }
+
+    private string GetNullableDateColumnDefinition() =>
+        _context.Database.IsSqlite() ? "TEXT NULL" : "DATETIME NULL";
+
+    private string GetInsuranceDetailsColumnDefinition() =>
+        _context.Database.IsSqlite() ? "TEXT NOT NULL DEFAULT ''" : "VARCHAR(500) NOT NULL DEFAULT ''";
+
+    private string GetNullableIntColumnDefinition() =>
+        _context.Database.IsSqlite() ? "INTEGER NULL" : "INT NULL";
+
+    private string GetRequesterNameColumnDefinition() =>
+        _context.Database.IsSqlite() ? "TEXT NOT NULL DEFAULT ''" : "VARCHAR(255) NOT NULL DEFAULT ''";
+
+    private async Task SeedDemoOperationsAsync()
+    {
+        if (!await _context.Vehicles.AnyAsync())
+        {
+            var vehicleTypes = await _context.VehicleTypes
+                .OrderBy(v => v.Id)
+                .ToListAsync();
+
+            var defaultVehicleTypeId = vehicleTypes.FirstOrDefault()?.Id ?? 1;
+
+            _context.Vehicles.AddRange(
+                new Vehicle
+                {
+                    PlateNumber = "س ي 2415",
+                    VehicleTypeId = defaultVehicleTypeId,
+                    Model = "Toyota Corolla",
+                    Year = 2023,
+                    Manufacturer = "Toyota",
+                    Color = "أبيض",
+                    ChassisNumber = "CHS-OPS-1001",
+                    EngineNumber = "ENG-OPS-1001",
+                    Status = "Available",
+                    Mileage = 24500,
+                    RegistrationStartDate = DateTime.Today.AddMonths(-8),
+                    RegistrationExpiryDate = DateTime.Today.AddMonths(4),
+                    AccidentInsuranceDetails = "وثيقة حوادث رقم AH-1001",
+                    SocialInsuranceDetails = "تأمين اجتماعي ساري حتى نهاية العام",
+                    OilChangeIntervalKm = 10000,
+                    MaintenanceIntervalKm = 15000,
+                    Notes = "سيارة تشغيل داخلية"
+                },
+                new Vehicle
+                {
+                    PlateNumber = "س ف 7782",
+                    VehicleTypeId = defaultVehicleTypeId,
+                    Model = "Hyundai Elantra",
+                    Year = 2022,
+                    Manufacturer = "Hyundai",
+                    Color = "فضي",
+                    ChassisNumber = "CHS-OPS-1002",
+                    EngineNumber = "ENG-OPS-1002",
+                    Status = "Available",
+                    Mileage = 31800,
+                    RegistrationStartDate = DateTime.Today.AddMonths(-10),
+                    RegistrationExpiryDate = DateTime.Today.AddMonths(2),
+                    AccidentInsuranceDetails = "وثيقة حوادث رقم AH-1002",
+                    SocialInsuranceDetails = "تأمين اجتماعي مجدد",
+                    OilChangeIntervalKm = 10000,
+                    MaintenanceIntervalKm = 15000,
+                    Notes = "تخدم تنقلات الإدارة"
+                },
+                new Vehicle
+                {
+                    PlateNumber = "ب ر 9051",
+                    VehicleTypeId = defaultVehicleTypeId,
+                    Model = "Nissan Sunny",
+                    Year = 2024,
+                    Manufacturer = "Nissan",
+                    Color = "أسود",
+                    ChassisNumber = "CHS-OPS-1003",
+                    EngineNumber = "ENG-OPS-1003",
+                    Status = "Available",
+                    Mileage = 12400,
+                    RegistrationStartDate = DateTime.Today.AddMonths(-5),
+                    RegistrationExpiryDate = DateTime.Today.AddMonths(7),
+                    AccidentInsuranceDetails = "وثيقة حوادث رقم AH-1003",
+                    SocialInsuranceDetails = "تأمين اجتماعي ساري",
+                    OilChangeIntervalKm = 10000,
+                    MaintenanceIntervalKm = 15000,
+                    Notes = "سيارة مخصصة للمأموريات"
+                });
+        }
+
+        if (!await _context.Drivers.AnyAsync())
+        {
+            _context.Drivers.AddRange(
+                new Driver
+                {
+                    FullName = "أحمد محمود علي",
+                    NationalId = "29801011234567",
+                    LicenseNumber = "DRV-DEMO-001",
+                    LicenseExpiryDate = DateTime.Today.AddYears(1),
+                    LicenseType = "مهنية",
+                    PhoneNumber = "01000000011",
+                    IsActive = true,
+                    Address = "مدينة نصر"
+                },
+                new Driver
+                {
+                    FullName = "محمد السيد حسن",
+                    NationalId = "29605021234567",
+                    LicenseNumber = "DRV-DEMO-002",
+                    LicenseExpiryDate = DateTime.Today.AddYears(2),
+                    LicenseType = "مهنية",
+                    PhoneNumber = "01000000012",
+                    IsActive = true,
+                    Address = "المعادى"
+                },
+                new Driver
+                {
+                    FullName = "خالد إبراهيم سعد",
+                    NationalId = "29507151234567",
+                    LicenseNumber = "DRV-DEMO-003",
+                    LicenseExpiryDate = DateTime.Today.AddMonths(18),
+                    LicenseType = "خاصة",
+                    PhoneNumber = "01000000013",
+                    IsActive = true,
+                    Address = "الهرم"
+                });
+        }
+
+        if (!await _context.Employees.AnyAsync())
+        {
+            _context.Employees.AddRange(
+                new Employee
+                {
+                    FullName = "سارة أحمد",
+                    EmployeeId = "EMP-DEMO-001",
+                    Department = "التشغيل",
+                    Position = "موصي",
+                    PhoneNumber = "01000000021",
+                    Status = "Active"
+                },
+                new Employee
+                {
+                    FullName = "محمود فتحي",
+                    EmployeeId = "EMP-DEMO-002",
+                    Department = "الإدارة",
+                    Position = "مشرف",
+                    PhoneNumber = "01000000022",
+                    Status = "Active"
+                },
+                new Employee
+                {
+                    FullName = "ندى سمير",
+                    EmployeeId = "EMP-DEMO-003",
+                    Department = "المشروعات",
+                    Position = "موصي",
+                    PhoneNumber = "01000000023",
+                    Status = "Active"
+                },
+                new Employee
+                {
+                    FullName = "هاني عبد الله",
+                    EmployeeId = "EMP-DEMO-004",
+                    Department = "التشغيل",
+                    Position = "مشرف",
+                    PhoneNumber = "01000000024",
+                    Status = "Active"
+                });
+        }
+
+        await _context.SaveChangesAsync();
+
+        if (await _context.Trips.AnyAsync())
+        {
+            return;
+        }
+
+        var vehicles = await _context.Vehicles
+            .OrderBy(v => v.Id)
+            .Take(3)
+            .ToListAsync();
+        var drivers = await _context.Drivers
+            .OrderBy(d => d.Id)
+            .Take(3)
+            .ToListAsync();
+        var employees = await _context.Employees
+            .OrderBy(e => e.Id)
+            .Take(4)
+            .ToListAsync();
+
+        if (vehicles.Count < 3 || drivers.Count < 2 || employees.Count < 4)
+        {
+            return;
+        }
+
+        _context.Trips.AddRange(
+            new Trip
+            {
+                VehicleId = vehicles[0].Id,
+                DriverId = drivers[0].Id,
+                RequesterEmployeeId = employees[0].Id,
+                RequesterNameText = employees[0].FullName,
+                SupervisorEmployeeId = employees[1].Id,
+                StartDate = DateTime.Today.AddDays(-2).AddHours(9),
+                EndDate = DateTime.Today.AddDays(-2).AddHours(13),
+                StartLocation = "المقر الرئيسي",
+                EndLocation = "فرع مدينة نصر",
+                StartMileage = 24420,
+                EndMileage = 24500,
+                Distance = 80,
+                Purpose = "توصيل مستندات وتشغيل يومي",
+                Status = "Closed",
+                Notes = "بيانات تجريبية"
+            },
+            new Trip
+            {
+                VehicleId = vehicles[1].Id,
+                DriverId = drivers[1].Id,
+                RequesterEmployeeId = employees[2].Id,
+                RequesterNameText = employees[2].FullName,
+                SupervisorEmployeeId = employees[3].Id,
+                StartDate = DateTime.Today.AddDays(-1).AddHours(8),
+                EndDate = DateTime.Today.AddDays(-1).AddHours(12),
+                StartLocation = "الجيزة",
+                EndLocation = "6 أكتوبر",
+                StartMileage = 31720,
+                EndMileage = 31800,
+                Distance = 80,
+                Purpose = "مأمورية متابعة موقع",
+                Status = "Closed",
+                Notes = "بيانات تجريبية"
+            });
+
+        await _context.SaveChangesAsync();
+    }
+}
+
+public sealed class AuthenticationService(FleetDbContext context, IAuditService auditService) : IAuthenticationService
+{
+    private const int MaxFailedLoginAttempts = 5;
+    private static readonly TimeSpan LoginLockoutDuration = TimeSpan.FromMinutes(15);
+    private static readonly ConcurrentDictionary<string, LoginFailureState> LoginFailures = new(StringComparer.OrdinalIgnoreCase);
+
+    private readonly FleetDbContext _context = context;
+    private readonly IAuditService _auditService = auditService;
+
+    public async Task<UserDto?> AuthenticateAsync(UserLoginDto dto)
+    {
+        var username = ServiceHelpers.Clean(dto.Username);
+        if (string.IsNullOrWhiteSpace(username) || string.IsNullOrWhiteSpace(dto.Password))
+        {
+            return null;
+        }
+
+        ThrowIfLoginLocked(username);
+
+        var user = await _context.Users.FirstOrDefaultAsync(u => u.IsActive && (u.Username == username || u.Email == username));
+        if (user is null)
+        {
+            RegisterFailedLogin(username);
+            return null;
+        }
+
+        if (!BCrypt.Net.BCrypt.Verify(dto.Password, user.PasswordHash))
+        {
+            RegisterFailedLogin(username);
+            ThrowIfLoginLocked(username);
+            return null;
+        }
+
+        LoginFailures.TryRemove(username, out _);
+
+        user.LastLogin = DateTime.UtcNow;
+        user.UpdatedAt = DateTime.UtcNow;
+        await _context.SaveChangesAsync();
+
+        await _auditService.LogActionAsync("Login", "User", user.Id, null, user.Username, user.Id, user.Username);
+        return user.ToDto();
+    }
+
+    public async Task<List<UserListItemDto>> GetUsersAsync() =>
+        (await _context.Users
+            .OrderBy(u => u.Username)
+            .ToListAsync())
+        .Select(u => u.ToListItemDto())
+        .ToList();
+
+    public async Task<UserDto> SaveUserAsync(UserFormDto dto)
+    {
+        var username = ServiceHelpers.Clean(dto.Username);
+        var email = ServiceHelpers.Clean(dto.Email);
+        if (string.IsNullOrWhiteSpace(username))
+        {
+            throw new InvalidOperationException("اسم المستخدم مطلوب.");
+        }
+
+        var duplicate = await _context.Users.FirstOrDefaultAsync(u =>
+            u.Id != dto.Id &&
+            (u.Username == username || u.Email == email));
+
+        if (duplicate is not null)
+        {
+            throw new InvalidOperationException("اسم المستخدم أو البريد الإلكتروني مستخدم بالفعل.");
+        }
+
+        User entity;
+        var action = dto.Id == 0 ? "Create" : "Update";
+        if (dto.Id == 0)
+        {
+            if (string.IsNullOrWhiteSpace(dto.Password))
+            {
+                throw new InvalidOperationException("كلمة المرور مطلوبة عند إنشاء مستخدم جديد.");
+            }
+
+            entity = new User();
+            _context.Users.Add(entity);
+        }
+        else
+        {
+            entity = await _context.Users.FirstOrDefaultAsync(u => u.Id == dto.Id)
+                ?? throw new InvalidOperationException("المستخدم غير موجود.");
+        }
+
+        if (!string.IsNullOrWhiteSpace(dto.Password))
+        {
+            ValidatePasswordPolicy(dto.Password, dto.ConfirmPassword, username);
+        }
+
+        entity.Username = username;
+        entity.Email = email;
+        entity.FullName = ServiceHelpers.Clean(dto.FullName);
+        entity.PhoneNumber = ServiceHelpers.Clean(dto.PhoneNumber);
+        entity.Role = Enum.TryParse<UserRole>(dto.Role, true, out var role) ? role : UserRole.Staff;
+        entity.IsActive = dto.IsActive;
+        entity.UpdatedAt = DateTime.UtcNow;
+        if (dto.Id == 0)
+        {
+            entity.CreatedAt = DateTime.UtcNow;
+        }
+
+        if (!string.IsNullOrWhiteSpace(dto.Password))
+        {
+            entity.PasswordHash = BCrypt.Net.BCrypt.HashPassword(dto.Password);
+        }
+
+        await _context.SaveChangesAsync();
+        await _auditService.LogActionAsync(action, "User", entity.Id, null, entity.Username, entity.Id, entity.Username);
+        return entity.ToDto();
+    }
+
+    public async Task ToggleUserStatusAsync(int id, bool isActive)
+    {
+        var entity = await _context.Users.FirstOrDefaultAsync(u => u.Id == id)
+            ?? throw new InvalidOperationException("المستخدم غير موجود.");
+
+        entity.IsActive = isActive;
+        entity.UpdatedAt = DateTime.UtcNow;
+        await _context.SaveChangesAsync();
+        await _auditService.LogActionAsync("Status", "User", entity.Id, null, isActive.ToString(), entity.Id, entity.Username);
+    }
+
+    private static void ThrowIfLoginLocked(string username)
+    {
+        if (!LoginFailures.TryGetValue(username, out var state) || state.LockedUntilUtc is null)
+        {
+            return;
+        }
+
+        var now = DateTime.UtcNow;
+        if (state.LockedUntilUtc <= now)
+        {
+            LoginFailures.TryRemove(username, out _);
+            return;
+        }
+
+        var remainingMinutes = Math.Max(1, (int)Math.Ceiling((state.LockedUntilUtc.Value - now).TotalMinutes));
+        throw new InvalidOperationException($"تم إيقاف محاولات الدخول لهذا المستخدم مؤقتًا بسبب تكرار كلمة مرور خاطئة. حاول بعد {remainingMinutes} دقيقة.");
+    }
+
+    private static void RegisterFailedLogin(string username)
+    {
+        var now = DateTime.UtcNow;
+        LoginFailures.AddOrUpdate(
+            username,
+            _ => new LoginFailureState(1, null),
+            (_, state) =>
+            {
+                if (state.LockedUntilUtc.HasValue && state.LockedUntilUtc.Value > now)
+                {
+                    return state;
+                }
+
+                var nextCount = state.LockedUntilUtc.HasValue && state.LockedUntilUtc.Value <= now
+                    ? 1
+                    : state.Count + 1;
+
+                return nextCount >= MaxFailedLoginAttempts
+                    ? new LoginFailureState(nextCount, now.Add(LoginLockoutDuration))
+                    : new LoginFailureState(nextCount, null);
+            });
+    }
+
+    private static void ValidatePasswordPolicy(string password, string confirmPassword, string username)
+    {
+        if (!string.Equals(password, confirmPassword, StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException("تأكيد كلمة المرور غير مطابق.");
+        }
+
+        if (password.Length < 8 ||
+            !password.Any(char.IsLetter) ||
+            !password.Any(char.IsDigit) ||
+            !password.Any(ch => !char.IsLetterOrDigit(ch)))
+        {
+            throw new InvalidOperationException("كلمة المرور يجب ألا تقل عن 8 أحرف وتحتوي على حرف ورقم ورمز.");
+        }
+
+        if (string.Equals(password, username, StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException("كلمة المرور لا يمكن أن تكون نفس اسم المستخدم.");
+        }
+    }
+
+    private sealed record LoginFailureState(int Count, DateTime? LockedUntilUtc);
+}
+
+public sealed class AuditService(FleetDbContext context) : IAuditService
+{
+    private readonly FleetDbContext _context = context;
+
+    public async Task LogActionAsync(string action, string entityType, int entityId, string? oldValues = null, string? newValues = null, int? userId = null, string? userName = null, string? ipAddress = null)
+    {
+        _context.AuditLogs.Add(new AuditLog
+        {
+            Action = action,
+            EntityType = entityType,
+            EntityName = entityType,
+            EntityId = entityId,
+            Description = $"{action} {entityType} #{entityId}",
+            UserId = userId,
+            UserName = userName ?? string.Empty,
+            OldValues = oldValues ?? string.Empty,
+            NewValues = newValues ?? string.Empty,
+            IpAddress = ipAddress ?? string.Empty,
+            Timestamp = DateTime.UtcNow
+        });
+
+        await _context.SaveChangesAsync();
+    }
+
+    public async Task<List<AuditLogDto>> GetRecentAsync(int count = 50) =>
+        (await _context.AuditLogs
+            .OrderByDescending(x => x.Timestamp)
+            .Take(Math.Max(count, 1))
+            .ToListAsync())
+        .Select(x => x.ToDto())
+        .ToList();
+}
+
+public sealed class NotificationService(FleetDbContext context) : INotificationService
+{
+    private readonly FleetDbContext _context = context;
+
+    public async Task CreateNotificationAsync(string title, string message, string type, string? relatedEntityType = null, int? relatedEntityId = null, int? userId = null, DateTime? expiresAt = null)
+    {
+        _context.Notifications.Add(new Notification
+        {
+            UserId = userId,
+            Title = ServiceHelpers.Clean(title),
+            Message = ServiceHelpers.Clean(message),
+            Type = string.IsNullOrWhiteSpace(type) ? "Info" : type,
+            RelatedEntityType = relatedEntityType ?? string.Empty,
+            RelatedEntityId = relatedEntityId,
+            ExpiresAt = expiresAt ?? DateTime.UtcNow.AddDays(7),
+            CreatedAt = DateTime.UtcNow
+        });
+
+        await _context.SaveChangesAsync();
+    }
+
+    public async Task<List<NotificationDto>> GetActiveNotificationsAsync() =>
+        (await _context.Notifications
+            .Where(n => !n.ExpiresAt.HasValue || n.ExpiresAt >= DateTime.UtcNow)
+            .OrderByDescending(n => n.CreatedAt)
+            .ToListAsync())
+        .Select(n => n.ToDto())
+        .ToList();
+
+    public async Task MarkAsReadAsync(int id)
+    {
+        var notification = await _context.Notifications.FirstOrDefaultAsync(n => n.Id == id)
+            ?? throw new InvalidOperationException("الإشعار غير موجود.");
+
+        notification.IsRead = true;
+        notification.ReadAt = DateTime.UtcNow;
+        await _context.SaveChangesAsync();
+    }
+}
+
+public sealed class SettingsService(FleetDbContext context, IAuditService auditService) : ISettingsService
+{
+    private readonly FleetDbContext _context = context;
+    private readonly IAuditService _auditService = auditService;
+
+    public async Task<CompanySettingsDto> GetSettingsAsync()
+    {
+        var settings = await _context.CompanySettings.OrderBy(x => x.Id).FirstOrDefaultAsync();
+        if (settings is null)
+        {
+            settings = new CompanySettings();
+            _context.CompanySettings.Add(settings);
+            await _context.SaveChangesAsync();
+        }
+
+        return settings.ToDto();
+    }
+
+    public async Task<CompanySettingsDto> SaveSettingsAsync(CompanySettingsDto dto)
+    {
+        var settings = await _context.CompanySettings.OrderBy(x => x.Id).FirstOrDefaultAsync();
+        var action = settings is null ? "Create" : "Update";
+        settings ??= new CompanySettings();
+
+        settings.CompanyName = ServiceHelpers.Clean(dto.CompanyName);
+        settings.CompanyNameEn = ServiceHelpers.Clean(dto.CompanyNameEn);
+        settings.LogoUrl = ServiceHelpers.Clean(dto.LogoUrl);
+        settings.Address = ServiceHelpers.Clean(dto.Address);
+        settings.PhoneNumber = ServiceHelpers.Clean(dto.PhoneNumber);
+        settings.Email = ServiceHelpers.Clean(dto.Email);
+        settings.Website = ServiceHelpers.Clean(dto.Website);
+        settings.TaxId = ServiceHelpers.Clean(dto.TaxId);
+        settings.CommercialRegistration = ServiceHelpers.Clean(dto.CommercialRegistration);
+        settings.CurrencySymbol = ServiceHelpers.Clean(dto.CurrencySymbol);
+        settings.DateFormat = ServiceHelpers.Clean(dto.DateFormat);
+        settings.TimeFormat = ServiceHelpers.Clean(dto.TimeFormat);
+        settings.DecimalPlaces = dto.DecimalPlaces;
+        settings.DefaultLanguage = ServiceHelpers.Clean(dto.DefaultLanguage);
+        settings.DefaultTheme = ServiceHelpers.Clean(dto.DefaultTheme);
+        settings.UpdatedAt = DateTime.UtcNow;
+
+        if (settings.Id == 0)
+        {
+            settings.CreatedAt = DateTime.UtcNow;
+            _context.CompanySettings.Add(settings);
+        }
+
+        await _context.SaveChangesAsync();
+        await _auditService.LogActionAsync(action, "CompanySettings", settings.Id, null, settings.CompanyName);
+        return settings.ToDto();
+    }
+}
+
+public sealed class ReportingService(FleetDbContext context) : IReportingService
+{
+    private readonly FleetDbContext _context = context;
+
+    public async Task<DashboardMetricsDto> GetDashboardMetricsAsync()
+    {
+        var totalExpenses = (await _context.Expenses.Select(x => x.Amount).ToListAsync()).Sum();
+        var totalFuelCost = (await _context.FuelTransactions.Select(x => x.TotalCost).ToListAsync()).Sum();
+        var treasuryBalance = (await _context.TreasuryTransactions
+            .Select(x => new { x.TransactionType, x.Amount })
+            .ToListAsync())
+            .Sum(x => ServiceHelpers.IsTreasuryIncome(x.TransactionType) ? x.Amount : -x.Amount);
+        var today = DateTime.Today;
+        var oilChangesDue = await _context.OilChanges
+            .Include(x => x.Vehicle)
+            .CountAsync(x => x.Vehicle != null && x.Vehicle.Mileage >= x.NextOilChangeOdometer - ServiceHelpers.DefaultOilAlertThresholdKm);
+
+        var metrics = new DashboardMetricsDto
+        {
+            TotalVehicles = await _context.Vehicles.CountAsync(),
+            AvailableVehicles = await _context.Vehicles.CountAsync(v => v.Status == null || v.Status == "" || v.Status == "Active" || v.Status == "Available" || v.Status == "متاح" || v.Status == "نشط"),
+            ActiveVehicles = await _context.Vehicles.CountAsync(v => v.Status == null || v.Status == "" || v.Status == "Active" || v.Status == "Available" || v.Status == "متاح" || v.Status == "نشط"),
+            VehiclesInTrip = await _context.Vehicles.CountAsync(v => v.Status == "InTrip" || v.Status == "جارية"),
+            VehiclesInMaintenance = await _context.Vehicles.CountAsync(v => v.Status == "Maintenance" || v.Status.Contains("صيانة")),
+            TotalContracts = await _context.Contracts.CountAsync(),
+            ActiveContracts = await _context.Contracts.CountAsync(c => c.EndDate >= DateTime.Today),
+            ExpiringContracts = await _context.Contracts.CountAsync(c => c.EndDate >= DateTime.Today && c.EndDate <= DateTime.Today.AddDays(30)),
+            OpenTrips = await _context.Trips.CountAsync(t => t.EndDate == null || t.Status == "Open" || t.Status == "Planned" || t.Status == "InProgress" || t.Status == "InTrip" || t.Status == "مفتوحة" || t.Status == "جارية"),
+            TripsToday = await _context.Trips.CountAsync(t => t.StartDate.Date == today),
+            OpenMaintenanceRequests = await _context.MaintenanceRequests.CountAsync(m => m.Status != "Completed" && m.Status != "مكتمل"),
+            CompletedMaintenanceRequests = await _context.MaintenanceRequests.CountAsync(m => m.Status == "Completed" || m.Status == "مكتمل"),
+            VehicleLicensesExpiring = await _context.Vehicles.CountAsync(v => v.RegistrationExpiryDate.HasValue && v.RegistrationExpiryDate.Value <= today.AddDays(30)),
+            DriversWithExpiringLicenses = await _context.Licenses.CountAsync(l => l.ExpiryDate >= DateTime.Today && l.ExpiryDate <= DateTime.Today.AddDays(30)),
+            InsurancePoliciesExpiring = await _context.Insurances.CountAsync(i => i.ExpiryDate <= DateTime.Today.AddDays(30)),
+            OilChangesDue = oilChangesDue,
+            TotalExpenses = totalExpenses,
+            TotalFuelCost = totalFuelCost,
+            TreasuryBalance = treasuryBalance
+        };
+
+        metrics.RecentActivities = await GetRecentActivityAsync(10);
+        metrics.Alerts = await GetAlertsAsync();
+        return metrics;
+    }
+
+    public async Task<List<AlertDto>> GetAlertsAsync()
+    {
+        var alerts = new List<AlertDto>();
+        var now = DateTime.Today;
+
+        var expiringContracts = await _context.Contracts
+            .Include(c => c.Vehicle)
+            .Where(c => c.EndDate >= now && c.EndDate <= now.AddDays(30))
+            .OrderBy(c => c.EndDate)
+            .Take(10)
+            .ToListAsync();
+
+        alerts.AddRange(expiringContracts.Select(c => new AlertDto
+        {
+            Id = c.Id,
+            Type = "Warning",
+            Title = "عقد يقترب من الانتهاء",
+            Message = $"العقد {c.ContractNumber} للمركبة {c.Vehicle?.PlateNumber} ينتهي بتاريخ {c.EndDate:yyyy-MM-dd}.",
+            RelatedEntityType = "Contract",
+            RelatedEntityId = c.Id,
+            DueDate = c.EndDate,
+            CreatedAt = c.UpdatedAt
+        }));
+
+        var expiringLicenses = await _context.Licenses
+            .Include(l => l.Driver)
+            .Where(l => l.ExpiryDate >= now && l.ExpiryDate <= now.AddDays(30))
+            .OrderBy(l => l.ExpiryDate)
+            .Take(10)
+            .ToListAsync();
+
+        alerts.AddRange(expiringLicenses.Select(l => new AlertDto
+        {
+            Id = l.Id,
+            Type = "Warning",
+            Title = "رخصة سائق تقترب من الانتهاء",
+            Message = $"رخصة السائق {l.Driver?.FullName} تنتهي بتاريخ {l.ExpiryDate:yyyy-MM-dd}.",
+            RelatedEntityType = "License",
+            RelatedEntityId = l.Id,
+            DueDate = l.ExpiryDate,
+            CreatedAt = l.UpdatedAt
+        }));
+
+        var expiringVehicleRegistrations = await _context.Vehicles
+            .Where(v => v.RegistrationExpiryDate.HasValue && v.RegistrationExpiryDate.Value <= now.AddDays(30))
+            .OrderBy(v => v.RegistrationExpiryDate)
+            .Take(10)
+            .ToListAsync();
+
+        alerts.AddRange(expiringVehicleRegistrations.Select(v => new AlertDto
+        {
+            Id = v.Id,
+            Type = "Warning",
+            Title = v.RegistrationExpiryDate!.Value.Date < now ? "ترخيص عربية منتهي" : "ترخيص عربية يحتاج تجديد",
+            Message = v.RegistrationExpiryDate!.Value.Date < now
+                ? $"ترخيص العربية {v.PlateNumber} منتهي منذ {v.RegistrationExpiryDate:yyyy-MM-dd} ويحتاج تجديد."
+                : $"العربية {v.PlateNumber} محتاجة تجديد ترخيص قبل {v.RegistrationExpiryDate:yyyy-MM-dd}.",
+            RelatedEntityType = "Vehicle",
+            RelatedEntityId = v.Id,
+            DueDate = v.RegistrationExpiryDate,
+            CreatedAt = v.UpdatedAt
+        }));
+
+        var expiringInsurance = await _context.Insurances
+            .Include(i => i.Vehicle)
+            .Where(i => i.ExpiryDate <= now.AddDays(30))
+            .OrderBy(i => i.ExpiryDate)
+            .Take(10)
+            .ToListAsync();
+
+        alerts.AddRange(expiringInsurance.Select(i => new AlertDto
+        {
+            Id = i.Id,
+            Type = "Warning",
+            Title = i.ExpiryDate.Date < now ? "تأمين عربية منتهي" : "تأمين عربية يحتاج تجديد",
+            Message = i.ExpiryDate.Date < now
+                ? $"تأمين العربية {i.Vehicle?.PlateNumber} منتهي منذ {i.ExpiryDate:yyyy-MM-dd} ويحتاج تجديد."
+                : $"العربية {i.Vehicle?.PlateNumber} محتاجة تجديد تأمين قبل {i.ExpiryDate:yyyy-MM-dd}.",
+            RelatedEntityType = "Insurance",
+            RelatedEntityId = i.Id,
+            DueDate = i.ExpiryDate,
+            CreatedAt = i.UpdatedAt
+        }));
+
+        var dueOilChanges = await _context.OilChanges
+            .Include(x => x.Vehicle)
+            .Where(x => x.Vehicle != null && x.Vehicle.Mileage >= x.NextOilChangeOdometer - ServiceHelpers.DefaultOilAlertThresholdKm)
+            .ToListAsync();
+
+        dueOilChanges = dueOilChanges
+            .OrderBy(x => x.NextOilChangeOdometer)
+            .Take(10)
+            .ToList();
+
+        alerts.AddRange(dueOilChanges.Select(x => new AlertDto
+        {
+            Id = x.Id,
+            Type = "Warning",
+            Title = "تغيير زيت مستحق",
+            Message = $"المركبة {x.Vehicle?.PlateNumber} اقتربت من موعد تغيير الزيت التالي عند {x.NextOilChangeOdometer:0} كم.",
+            RelatedEntityType = "OilChange",
+            RelatedEntityId = x.Id,
+            CreatedAt = x.UpdatedAt
+        }));
+
+        var openMaintenance = await _context.MaintenanceRequests
+            .Include(m => m.Vehicle)
+            .Where(m => m.Status != "Completed" && m.Status != "مكتمل" && m.RequestDate <= now.AddDays(-7))
+            .OrderBy(m => m.RequestDate)
+            .Take(10)
+            .ToListAsync();
+
+        alerts.AddRange(openMaintenance.Select(m => new AlertDto
+        {
+            Id = m.Id,
+            Type = "Info",
+            Title = "طلب صيانة مفتوح منذ فترة",
+            Message = $"طلب الصيانة للمركبة {m.Vehicle?.PlateNumber} ما زال مفتوحًا منذ {m.RequestDate:yyyy-MM-dd}.",
+            RelatedEntityType = "Maintenance",
+            RelatedEntityId = m.Id,
+            CreatedAt = m.UpdatedAt
+        }));
+
+        var overdueTrips = await _context.Trips
+            .Include(t => t.Vehicle)
+            .Where(t => (t.EndDate == null || t.Status == "Open" || t.Status == "Planned" || t.Status == "InProgress" || t.Status == "InTrip" || t.Status == "مفتوحة" || t.Status == "جارية") && t.StartDate <= now.AddDays(-1))
+            .OrderBy(t => t.StartDate)
+            .Take(10)
+            .ToListAsync();
+
+        alerts.AddRange(overdueTrips.Select(t => new AlertDto
+        {
+            Id = t.Id,
+            Type = "Info",
+            Title = "رحلة مفتوحة تحتاج إغلاق",
+            Message = $"رحلة المركبة {t.Vehicle?.PlateNumber} ما زالت مفتوحة منذ {t.StartDate:yyyy-MM-dd HH:mm}.",
+            RelatedEntityType = "Trip",
+            RelatedEntityId = t.Id,
+            CreatedAt = t.UpdatedAt
+        }));
+
+        return alerts
+            .OrderBy(a => GetAlertPriority(a, now))
+            .ThenBy(a => a.DueDate.HasValue ? Math.Abs((a.DueDate.Value.Date - now).Days) : int.MaxValue)
+            .ThenByDescending(a => a.CreatedAt)
+            .Take(20)
+            .ToList();
+    }
+
+    private static int GetAlertPriority(AlertDto alert, DateTime today)
+    {
+        if (!alert.DueDate.HasValue)
+        {
+            return 3;
+        }
+
+        var days = (alert.DueDate.Value.Date - today).Days;
+        return days switch
+        {
+            < 0 => 0,
+            <= 7 => 1,
+            _ => 2
+        };
+    }
+
+    public async Task<List<RecentActivityDto>> GetRecentActivityAsync(int count = 10) =>
+        await _context.AuditLogs
+            .OrderByDescending(a => a.Timestamp)
+            .Take(Math.Max(count, 1))
+            .Select(a => new RecentActivityDto
+            {
+                Id = a.Id,
+                EntityType = a.EntityType,
+                EntityName = string.IsNullOrWhiteSpace(a.EntityName) ? a.EntityType : a.EntityName,
+                Action = a.Action,
+                UserName = a.UserName,
+                Timestamp = a.Timestamp
+            })
+            .ToListAsync();
+
+    public async Task<ReportDataDto> GenerateReportAsync(ReportFilterDto filter)
+    {
+        var reportType = ServiceHelpers.Clean(filter.ReportType).ToLowerInvariant();
+        var startDate = filter.StartDate?.Date;
+        var endExclusive = filter.EndDate?.Date.AddDays(1);
+
+        if (startDate.HasValue && filter.EndDate.HasValue && filter.EndDate.Value.Date < startDate.Value)
+        {
+            throw new InvalidOperationException("تاريخ نهاية التقرير يجب أن يكون بعد تاريخ البداية.");
+        }
+
+        if (reportType == "vehicletrips")
+        {
+            return await GenerateVehicleTripsReportAsync(filter);
+        }
+
+        if (reportType == "vehiclelicenses")
+        {
+            var query = _context.Vehicles.AsQueryable();
+            if (startDate.HasValue)
+            {
+                query = query.Where(v => v.RegistrationExpiryDate.HasValue && v.RegistrationExpiryDate.Value >= startDate.Value);
+            }
+
+            if (endExclusive.HasValue)
+            {
+                query = query.Where(v => v.RegistrationExpiryDate.HasValue && v.RegistrationExpiryDate.Value < endExclusive.Value);
+            }
+
+            var vehicles = await query
+                .OrderBy(v => v.PlateNumber)
+                .ToListAsync();
+
+            return new ReportDataDto
+            {
+                ReportTitle = "تقرير تراخيص العربيات",
+                GeneratedDate = DateTime.UtcNow,
+                GeneratedBy = "System",
+                Columns = new List<string> { "رقم السيارة", "الموديل", "بداية الترخيص", "نهاية الترخيص", "الحالة", "الإنذار" },
+                Data = vehicles.Select(v => new Dictionary<string, object>
+                {
+                    ["رقم السيارة"] = v.PlateNumber,
+                    ["الموديل"] = v.Model,
+                    ["بداية الترخيص"] = v.RegistrationStartDate?.ToString("yyyy-MM-dd") ?? string.Empty,
+                    ["نهاية الترخيص"] = v.RegistrationExpiryDate?.ToString("yyyy-MM-dd") ?? string.Empty,
+                    ["الحالة"] = VehicleLicenseStatus(v.RegistrationExpiryDate),
+                    ["الإنذار"] = VehicleLicenseAlert(v.RegistrationExpiryDate)
+                }).ToList()
+            };
+        }
+
+        if (reportType == "insurance")
+        {
+            var query = _context.Insurances
+                .Include(i => i.Vehicle)
+                .AsQueryable();
+
+            if (startDate.HasValue)
+            {
+                query = query.Where(i => i.ExpiryDate >= startDate.Value);
+            }
+
+            if (endExclusive.HasValue)
+            {
+                query = query.Where(i => i.ExpiryDate < endExclusive.Value);
+            }
+
+            var insurance = await query
+                .OrderBy(i => i.ExpiryDate)
+                .ToListAsync();
+
+            return new ReportDataDto
+            {
+                ReportTitle = "تقرير التأمينات",
+                GeneratedDate = DateTime.UtcNow,
+                GeneratedBy = "System",
+                Columns = new List<string> { "رقم السيارة", "رقم الوثيقة", "شركة التأمين", "نوع الوثيقة", "بداية التأمين", "نهاية التأمين", "القسط", "الحالة", "الإنذار" },
+                Data = insurance.Select(i => new Dictionary<string, object>
+                {
+                    ["رقم السيارة"] = i.Vehicle?.PlateNumber ?? string.Empty,
+                    ["رقم الوثيقة"] = i.PolicyNumber,
+                    ["شركة التأمين"] = i.InsuranceCompany,
+                    ["نوع الوثيقة"] = i.PolicyType,
+                    ["بداية التأمين"] = i.StartDate,
+                    ["نهاية التأمين"] = i.ExpiryDate,
+                    ["القسط"] = i.PremiumAmount,
+                    ["الحالة"] = ServiceHelpers.InsuranceStatus(i.ExpiryDate),
+                    ["الإنذار"] = InsuranceAlert(i.ExpiryDate)
+                }).ToList()
+            };
+        }
+
+        if (reportType == "contracts")
+        {
+            var query = _context.Contracts
+                .Include(c => c.Vehicle)
+                .AsQueryable();
+
+            if (startDate.HasValue)
+            {
+                query = query.Where(c => c.EndDate >= startDate.Value);
+            }
+
+            if (endExclusive.HasValue)
+            {
+                query = query.Where(c => c.StartDate < endExclusive.Value);
+            }
+
+            var contracts = await query
+                .OrderByDescending(c => c.CreatedAt)
+                .ToListAsync();
+
+            return new ReportDataDto
+            {
+                ReportTitle = "تقرير العقود",
+                GeneratedDate = DateTime.UtcNow,
+                GeneratedBy = "System",
+                Columns = new List<string> { "رقم العقد", "رقم السيارة", "العميل", "بداية العقد", "نهاية العقد", "قيمة العقد", "المدفوع" },
+                Data = contracts.Select(c => new Dictionary<string, object>
+                {
+                    ["رقم العقد"] = c.ContractNumber,
+                    ["رقم السيارة"] = c.Vehicle?.PlateNumber ?? string.Empty,
+                    ["العميل"] = c.ClientName,
+                    ["بداية العقد"] = c.StartDate,
+                    ["نهاية العقد"] = c.EndDate,
+                    ["قيمة العقد"] = c.ContractValue,
+                    ["المدفوع"] = c.PaidAmount
+                }).ToList()
+            };
+        }
+
+        if (reportType == "maintenance")
+        {
+            var query = _context.MaintenanceRequests
+                .Include(m => m.Vehicle)
+                .Include(m => m.MaintenanceType)
+                .AsQueryable();
+
+            if (startDate.HasValue)
+            {
+                query = query.Where(m => m.RequestDate >= startDate.Value);
+            }
+
+            if (endExclusive.HasValue)
+            {
+                query = query.Where(m => m.RequestDate < endExclusive.Value);
+            }
+
+            var maintenance = await query
+                .OrderByDescending(m => m.CreatedAt)
+                .ToListAsync();
+
+            return new ReportDataDto
+            {
+                ReportTitle = "تقرير الصيانة",
+                GeneratedDate = DateTime.UtcNow,
+                GeneratedBy = "System",
+                Columns = new List<string> { "رقم السيارة", "نوع الصيانة", "تاريخ الطلب", "الحالة", "التكلفة الفعلية" },
+                Data = maintenance.Select(m => new Dictionary<string, object>
+                {
+                    ["رقم السيارة"] = m.Vehicle?.PlateNumber ?? string.Empty,
+                    ["نوع الصيانة"] = m.MaintenanceType?.Name ?? string.Empty,
+                    ["تاريخ الطلب"] = m.RequestDate,
+                    ["الحالة"] = ServiceHelpers.StatusDisplay(m.Status),
+                    ["التكلفة الفعلية"] = m.ActualCost
+                }).ToList()
+            };
+        }
+
+        if (reportType == "oilchanges")
+        {
+            var query = _context.OilChanges
+                .Include(x => x.Vehicle)
+                .AsQueryable();
+
+            if (startDate.HasValue)
+            {
+                query = query.Where(x => x.ChangeDate >= startDate.Value);
+            }
+
+            if (endExclusive.HasValue)
+            {
+                query = query.Where(x => x.ChangeDate < endExclusive.Value);
+            }
+
+            var oilChanges = await query
+                .OrderByDescending(x => x.ChangeDate)
+                .ToListAsync();
+
+            return new ReportDataDto
+            {
+                ReportTitle = "تقرير الزيوت",
+                GeneratedDate = DateTime.UtcNow,
+                GeneratedBy = "System",
+                Columns = new List<string> { "رقم السيارة", "تاريخ التغيير", "عداد التغيير", "تغيير الزيت القادم", "الحالة", "التكلفة" },
+                Data = oilChanges.Select(x => new Dictionary<string, object>
+                {
+                    ["رقم السيارة"] = x.Vehicle?.PlateNumber ?? string.Empty,
+                    ["تاريخ التغيير"] = x.ChangeDate,
+                    ["عداد التغيير"] = x.OdometerAtChange,
+                    ["تغيير الزيت القادم"] = x.NextOilChangeOdometer,
+                    ["الحالة"] = ServiceHelpers.StatusDisplay(x.Status),
+                    ["التكلفة"] = x.Cost
+                }).ToList()
+            };
+        }
+
+        if (reportType == "treasury")
+        {
+            var query = _context.TreasuryTransactions.AsQueryable();
+
+            if (startDate.HasValue)
+            {
+                query = query.Where(x => x.TransactionDate >= startDate.Value);
+            }
+
+            if (endExclusive.HasValue)
+            {
+                query = query.Where(x => x.TransactionDate < endExclusive.Value);
+            }
+
+            var treasury = await query
+                .OrderByDescending(x => x.TransactionDate)
+                .ToListAsync();
+
+            return new ReportDataDto
+            {
+                ReportTitle = "تقرير الخزينة",
+                GeneratedDate = DateTime.UtcNow,
+                GeneratedBy = "System",
+                Columns = new List<string> { "التاريخ", "نوع الحركة", "المبلغ", "الوصف", "مرتبط بـ" },
+                Data = treasury.Select(x => new Dictionary<string, object>
+                {
+                    ["التاريخ"] = x.TransactionDate,
+                    ["نوع الحركة"] = ServiceHelpers.TreasuryTypeDisplay(x.TransactionType),
+                    ["المبلغ"] = x.Amount,
+                    ["الوصف"] = x.Description,
+                    ["مرتبط بـ"] = x.RelatedEntityType
+                }).ToList()
+            };
+        }
+
+        var vehicleQuery = _context.Vehicles
+            .Include(v => v.VehicleType)
+            .AsQueryable();
+
+        if (startDate.HasValue)
+        {
+            vehicleQuery = vehicleQuery.Where(v => v.CreatedAt >= startDate.Value);
+        }
+
+        if (endExclusive.HasValue)
+        {
+            vehicleQuery = vehicleQuery.Where(v => v.CreatedAt < endExclusive.Value);
+        }
+
+        var allVehicles = await vehicleQuery
+            .OrderByDescending(v => v.CreatedAt)
+            .ToListAsync();
+
+        return new ReportDataDto
+        {
+            ReportTitle = "تقرير المركبات",
+            GeneratedDate = DateTime.UtcNow,
+            GeneratedBy = "System",
+            Columns = new List<string> { "رقم السيارة", "نوع العربية", "الموديل", "السنة", "الحالة", "العداد" },
+            Data = allVehicles.Select(v => new Dictionary<string, object>
+            {
+                ["رقم السيارة"] = v.PlateNumber,
+                ["نوع العربية"] = v.VehicleType?.Name ?? string.Empty,
+                ["الموديل"] = v.Model,
+                ["السنة"] = v.Year,
+                ["الحالة"] = ServiceHelpers.StatusDisplay(v.Status),
+                ["العداد"] = v.Mileage
+            }).ToList()
+        };
+
+        static string VehicleLicenseStatus(DateTime? expiryDate)
+        {
+            if (!expiryDate.HasValue)
+            {
+                return "غير مسجل";
+            }
+
+            if (expiryDate.Value.Date < DateTime.Today)
+            {
+                return "منتهي";
+            }
+
+            return expiryDate.Value.Date <= DateTime.Today.AddDays(30) ? "قارب الانتهاء" : "ساري";
+        }
+
+        static string VehicleLicenseAlert(DateTime? expiryDate)
+        {
+            if (!expiryDate.HasValue)
+            {
+                return "أدخل بداية ونهاية الترخيص";
+            }
+
+            var days = (expiryDate.Value.Date - DateTime.Today).Days;
+            return days switch
+            {
+                < 0 => "الترخيص منتهي",
+                <= 30 => $"يحتاج تجديد خلال {days} يوم",
+                _ => "لا يوجد إنذار"
+            };
+        }
+
+        static string InsuranceAlert(DateTime expiryDate)
+        {
+            var days = (expiryDate.Date - DateTime.Today).Days;
+            return days switch
+            {
+                < 0 => "التأمين منتهي",
+                <= 30 => $"يحتاج تجديد خلال {days} يوم",
+                _ => "لا يوجد إنذار"
+            };
+        }
+    }
+
+    private async Task<ReportDataDto> GenerateVehicleTripsReportAsync(ReportFilterDto filter)
+    {
+        var query = _context.Trips
+            .Include(t => t.Vehicle)
+            .Include(t => t.Driver)
+            .Include(t => t.RequesterEmployee)
+            .Include(t => t.SupervisorEmployee)
+            .AsQueryable();
+
+        if (filter.VehicleId.HasValue)
+        {
+            query = query.Where(t => t.VehicleId == filter.VehicleId.Value);
+        }
+
+        if (filter.StartDate.HasValue)
+        {
+            query = query.Where(t => t.StartDate >= filter.StartDate.Value.Date);
+        }
+
+        if (filter.EndDate.HasValue)
+        {
+            var endExclusive = filter.EndDate.Value.Date.AddDays(1);
+            query = query.Where(t => t.StartDate < endExclusive);
+        }
+
+        var selectedVehiclePlateNumber = filter.VehicleId.HasValue
+            ? await _context.Vehicles
+                .Where(v => v.Id == filter.VehicleId.Value)
+                .Select(v => v.PlateNumber)
+                .FirstOrDefaultAsync()
+            : null;
+
+        var trips = await query
+            .OrderByDescending(t => t.StartDate)
+            .ToListAsync();
+
+        var vehicleName = selectedVehiclePlateNumber ?? trips.FirstOrDefault()?.Vehicle?.PlateNumber;
+
+        return new ReportDataDto
+        {
+            ReportTitle = string.IsNullOrWhiteSpace(vehicleName)
+                ? "تقرير تشغيلات العربيات"
+                : $"تقرير تشغيلات العربية {vehicleName}",
+            GeneratedDate = DateTime.UtcNow,
+            GeneratedBy = "System",
+            Columns = new List<string>
+            {
+                "التاريخ",
+                "رقم السيارة",
+                "السائق",
+                "الموصي",
+                "المشرف",
+                "من",
+                "إلى",
+                "الغرض",
+                "الحالة",
+                "المسافة"
+            },
+            Data = trips.Select(t => new Dictionary<string, object>
+            {
+                ["التاريخ"] = t.StartDate,
+                ["رقم السيارة"] = t.Vehicle?.PlateNumber ?? string.Empty,
+                ["السائق"] = t.Driver?.FullName ?? string.Empty,
+                ["الموصي"] = string.IsNullOrWhiteSpace(t.RequesterNameText)
+                    ? t.RequesterEmployee?.FullName ?? string.Empty
+                    : t.RequesterNameText,
+                ["المشرف"] = t.SupervisorEmployee?.FullName ?? string.Empty,
+                ["من"] = t.StartLocation,
+                ["إلى"] = t.EndLocation,
+                ["الغرض"] = t.Purpose,
+                ["الحالة"] = t.Status,
+                ["المسافة"] = t.Distance
+            }).ToList()
+        };
+    }
+}

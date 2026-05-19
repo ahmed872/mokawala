@@ -1,0 +1,542 @@
+-- ============================================================================
+-- FLEET MANAGEMENT SYSTEM - COMPLETE DATABASE SCHEMA
+-- Database: FleetManagementDB
+-- Charset: utf8mb4
+-- Collation: utf8mb4_unicode_ci
+-- ============================================================================
+
+-- Create Database
+CREATE DATABASE IF NOT EXISTS `FleetManagementDB`
+CHARACTER SET utf8mb4
+COLLATE utf8mb4_unicode_ci;
+
+USE `FleetManagementDB`;
+
+-- ============================================================================
+-- TABLE: Users (Authentication and Authorization)
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS `Users` (
+    `Id` INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    `Username` VARCHAR(100) NOT NULL UNIQUE,
+    `Email` VARCHAR(255) NOT NULL UNIQUE,
+    `PasswordHash` VARCHAR(255) NOT NULL,
+    `FullName` VARCHAR(255) NOT NULL,
+    `Role` ENUM('Admin', 'Staff') NOT NULL DEFAULT 'Staff',
+    `IsActive` BOOLEAN NOT NULL DEFAULT TRUE,
+    `LastLogin` DATETIME,
+    `CreatedAt` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    `UpdatedAt` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    INDEX `idx_username` (`Username`),
+    INDEX `idx_email` (`Email`),
+    INDEX `idx_role` (`Role`),
+    INDEX `idx_isactive` (`IsActive`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ============================================================================
+-- TABLE: CompanySettings
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS `CompanySettings` (
+    `Id` INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    `CompanyName` VARCHAR(255) NOT NULL,
+    `CompanyLogo` LONGBLOB,
+    `Address` VARCHAR(500),
+    `PhoneNumber` VARCHAR(20),
+    `Email` VARCHAR(255),
+    `CreatedAt` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    `UpdatedAt` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ============================================================================
+-- TABLE: VehicleTypes (Master Data)
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS `VehicleTypes` (
+    `Id` INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    `Name` VARCHAR(100) NOT NULL UNIQUE,
+    `Description` VARCHAR(500),
+    `CreatedAt` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    INDEX `idx_name` (`Name`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ============================================================================
+-- TABLE: Vehicles
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS `Vehicles` (
+    `Id` INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    `PlateNumber` VARCHAR(50) NOT NULL UNIQUE,
+    `VehicleTypeId` INT NOT NULL,
+    `Model` VARCHAR(100),
+    `Year` INT,
+    `Status` VARCHAR(50) NOT NULL DEFAULT 'نشطة',
+    `AssignedTo` VARCHAR(255),
+    `Mileage` DECIMAL(10, 2) DEFAULT 0,
+    `PurchaseDate` DATE,
+    `CreatedAt` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    `UpdatedAt` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (`VehicleTypeId`) REFERENCES `VehicleTypes` (`Id`) ON DELETE RESTRICT,
+    INDEX `idx_plate` (`PlateNumber`),
+    INDEX `idx_status` (`Status`),
+    INDEX `idx_vehicletype` (`VehicleTypeId`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ============================================================================
+-- TABLE: ContractStatuses (Master Data)
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS `ContractStatuses` (
+    `Id` INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    `Name` VARCHAR(100) NOT NULL UNIQUE,
+    `Description` VARCHAR(500),
+    `CreatedAt` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    INDEX `idx_name` (`Name`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ============================================================================
+-- TABLE: Contracts
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS `Contracts` (
+    `Id` INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    `ContractNumber` VARCHAR(50) NOT NULL UNIQUE,
+    `VehicleId` INT NOT NULL,
+    `ClientName` VARCHAR(255) NOT NULL,
+    `StartDate` DATE NOT NULL,
+    `EndDate` DATE NOT NULL,
+    `ContractValue` DECIMAL(12, 2) NOT NULL,
+    `StatusId` INT NOT NULL,
+    `Status` VARCHAR(50) NOT NULL DEFAULT 'مسودة',
+    `Notes` TEXT,
+    `CreatedAt` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    `UpdatedAt` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (`VehicleId`) REFERENCES `Vehicles` (`Id`) ON DELETE RESTRICT,
+    FOREIGN KEY (`StatusId`) REFERENCES `ContractStatuses` (`Id`) ON DELETE RESTRICT,
+    INDEX `idx_number` (`ContractNumber`),
+    INDEX `idx_vehicle` (`VehicleId`),
+    INDEX `idx_status` (`Status`),
+    INDEX `idx_dates` (`StartDate`, `EndDate`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ============================================================================
+-- TABLE: MaintenanceTypes (Master Data)
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS `MaintenanceTypes` (
+    `Id` INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    `Name` VARCHAR(100) NOT NULL UNIQUE,
+    `Description` VARCHAR(500),
+    `CreatedAt` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    INDEX `idx_name` (`Name`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ============================================================================
+-- TABLE: ServiceProviders (Master Data)
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS `ServiceProviders` (
+    `Id` INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    `Name` VARCHAR(255) NOT NULL,
+    `PhoneNumber` VARCHAR(20),
+    `Email` VARCHAR(255),
+    `Address` VARCHAR(500),
+    `CreatedAt` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    INDEX `idx_name` (`Name`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ============================================================================
+-- TABLE: MaintenanceRequests
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS `MaintenanceRequests` (
+    `Id` INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    `VehicleId` INT NOT NULL,
+    `MaintenanceTypeId` INT NOT NULL,
+    `MaintenanceType` VARCHAR(100),
+    `MaintenanceDate` DATE NOT NULL,
+    `Cost` DECIMAL(10, 2),
+    `Status` VARCHAR(50) NOT NULL DEFAULT 'مفتوحة',
+    `ServiceProviderId` INT,
+    `ServiceProvider` VARCHAR(255),
+    `Notes` TEXT,
+    `CreatedAt` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    `UpdatedAt` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (`VehicleId`) REFERENCES `Vehicles` (`Id`) ON DELETE RESTRICT,
+    FOREIGN KEY (`MaintenanceTypeId`) REFERENCES `MaintenanceTypes` (`Id`) ON DELETE RESTRICT,
+    FOREIGN KEY (`ServiceProviderId`) REFERENCES `ServiceProviders` (`Id`) ON DELETE SET NULL,
+    INDEX `idx_vehicle` (`VehicleId`),
+    INDEX `idx_status` (`Status`),
+    INDEX `idx_date` (`MaintenanceDate`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ============================================================================
+-- TABLE: Drivers
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS `Drivers` (
+    `Id` INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    `FullName` VARCHAR(255) NOT NULL,
+    `LicenseNumber` VARCHAR(50) NOT NULL UNIQUE,
+    `LicenseExpiry` DATE,
+    `PhoneNumber` VARCHAR(20),
+    `Email` VARCHAR(255),
+    `Address` VARCHAR(500),
+    `DateOfBirth` DATE,
+    `Status` VARCHAR(50) NOT NULL DEFAULT 'نشط',
+    `CreatedAt` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    `UpdatedAt` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    INDEX `idx_license` (`LicenseNumber`),
+    INDEX `idx_status` (`Status`),
+    INDEX `idx_expiry` (`LicenseExpiry`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ============================================================================
+-- TABLE: Employees
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS `Employees` (
+    `Id` INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    `FullName` VARCHAR(255) NOT NULL,
+    `Email` VARCHAR(255),
+    `PhoneNumber` VARCHAR(20),
+    `Department` VARCHAR(100),
+    `Position` VARCHAR(100),
+    `HireDate` DATE,
+    `Status` VARCHAR(50) NOT NULL DEFAULT 'نشط',
+    `CreatedAt` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    `UpdatedAt` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    INDEX `idx_department` (`Department`),
+    INDEX `idx_status` (`Status`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ============================================================================
+-- TABLE: Trips
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS `Trips` (
+    `Id` INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    `VehicleId` INT NOT NULL,
+    `DriverId` INT NOT NULL,
+    `StartLocation` VARCHAR(255),
+    `EndLocation` VARCHAR(255),
+    `StartDate` DATETIME NOT NULL,
+    `EndDate` DATETIME,
+    `Distance` DECIMAL(10, 2),
+    `Status` VARCHAR(50) NOT NULL DEFAULT 'مخطط',
+    `CreatedAt` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    `UpdatedAt` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (`VehicleId`) REFERENCES `Vehicles` (`Id`) ON DELETE RESTRICT,
+    FOREIGN KEY (`DriverId`) REFERENCES `Drivers` (`Id`) ON DELETE RESTRICT,
+    INDEX `idx_vehicle` (`VehicleId`),
+    INDEX `idx_driver` (`DriverId`),
+    INDEX `idx_status` (`Status`),
+    INDEX `idx_dates` (`StartDate`, `EndDate`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ============================================================================
+-- TABLE: FuelTransactions
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS `FuelTransactions` (
+    `Id` INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    `VehicleId` INT NOT NULL,
+    `Quantity` DECIMAL(10, 2) NOT NULL,
+    `UnitPrice` DECIMAL(10, 2) NOT NULL,
+    `TotalCost` DECIMAL(12, 2) NOT NULL,
+    `FuelDate` DATE NOT NULL,
+    `Odometer` DECIMAL(10, 2),
+    `CreatedAt` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    `UpdatedAt` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (`VehicleId`) REFERENCES `Vehicles` (`Id`) ON DELETE RESTRICT,
+    INDEX `idx_vehicle` (`VehicleId`),
+    INDEX `idx_date` (`FuelDate`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ============================================================================
+-- TABLE: Expenses
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS `Expenses` (
+    `Id` INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    `VehicleId` INT NOT NULL,
+    `ExpenseType` VARCHAR(100),
+    `Amount` DECIMAL(12, 2) NOT NULL,
+    `ExpenseDate` DATE NOT NULL,
+    `Description` TEXT,
+    `CreatedAt` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    `UpdatedAt` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (`VehicleId`) REFERENCES `Vehicles` (`Id`) ON DELETE RESTRICT,
+    INDEX `idx_vehicle` (`VehicleId`),
+    INDEX `idx_type` (`ExpenseType`),
+    INDEX `idx_date` (`ExpenseDate`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ============================================================================
+-- TABLE: Licenses
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS `Licenses` (
+    `Id` INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    `DriverId` INT NOT NULL,
+    `LicenseNumber` VARCHAR(50) NOT NULL UNIQUE,
+    `IssuanceDate` DATE NOT NULL,
+    `ExpiryDate` DATE NOT NULL,
+    `LicenseType` VARCHAR(50),
+    `Status` VARCHAR(50) NOT NULL DEFAULT 'نشطة',
+    `CreatedAt` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    `UpdatedAt` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (`DriverId`) REFERENCES `Drivers` (`Id`) ON DELETE RESTRICT,
+    INDEX `idx_driver` (`DriverId`),
+    INDEX `idx_number` (`LicenseNumber`),
+    INDEX `idx_expiry` (`ExpiryDate`),
+    INDEX `idx_status` (`Status`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ============================================================================
+-- TABLE: Insurance
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS `Insurance` (
+    `Id` INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    `VehicleId` INT NOT NULL,
+    `InsuranceCompany` VARCHAR(255),
+    `PolicyNumber` VARCHAR(50) NOT NULL UNIQUE,
+    `StartDate` DATE NOT NULL,
+    `EndDate` DATE NOT NULL,
+    `CoverageAmount` DECIMAL(12, 2),
+    `Premium` DECIMAL(12, 2),
+    `Status` VARCHAR(50) NOT NULL DEFAULT 'نشطة',
+    `CreatedAt` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    `UpdatedAt` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (`VehicleId`) REFERENCES `Vehicles` (`Id`) ON DELETE RESTRICT,
+    INDEX `idx_vehicle` (`VehicleId`),
+    INDEX `idx_number` (`PolicyNumber`),
+    INDEX `idx_expiry` (`EndDate`),
+    INDEX `idx_status` (`Status`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ============================================================================
+-- TABLE: Custody
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS `Custody` (
+    `Id` INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    `EmployeeId` INT NOT NULL,
+    `ItemType` VARCHAR(100),
+    `ItemValue` DECIMAL(12, 2),
+    `IssuanceDate` DATE NOT NULL,
+    `ReturnDate` DATE,
+    `Status` VARCHAR(50) NOT NULL DEFAULT 'مسلمة',
+    `CreatedAt` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    `UpdatedAt` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (`EmployeeId`) REFERENCES `Employees` (`Id`) ON DELETE RESTRICT,
+    INDEX `idx_employee` (`EmployeeId`),
+    INDEX `idx_status` (`Status`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ============================================================================
+-- TABLE: Notifications
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS `Notifications` (
+    `Id` INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    `Title` VARCHAR(255) NOT NULL,
+    `Message` TEXT NOT NULL,
+    `Type` VARCHAR(50) NOT NULL DEFAULT 'Info',
+    `IsRead` BOOLEAN NOT NULL DEFAULT FALSE,
+    `CreatedAt` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    INDEX `idx_isread` (`IsRead`),
+    INDEX `idx_type` (`Type`),
+    INDEX `idx_created` (`CreatedAt`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ============================================================================
+-- TABLE: AuditLogs
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS `AuditLogs` (
+    `Id` INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    `Action` VARCHAR(50) NOT NULL,
+    `EntityType` VARCHAR(100) NOT NULL,
+    `EntityId` INT NOT NULL,
+    `Description` TEXT,
+    `UserId` INT,
+    `Timestamp` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    INDEX `idx_entity` (`EntityType`, `EntityId`),
+    INDEX `idx_action` (`Action`),
+    INDEX `idx_user` (`UserId`),
+    INDEX `idx_timestamp` (`Timestamp`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ============================================================================
+-- SEED DATA
+-- ============================================================================
+
+-- Seed: CompanySettings
+INSERT INTO `CompanySettings` (`CompanyName`, `Address`, `PhoneNumber`, `Email`, `CreatedAt`, `UpdatedAt`)
+VALUES ('شركة الأسطول المتحدة', 'الرياض، المملكة العربية السعودية', '+966112345678', 'info@fleetcompany.sa', NOW(), NOW());
+
+-- Seed: Users (Admin and Staff)
+-- Admin: username=admin, password=Admin@123 (BCrypt hash)
+-- Staff: username=staff, password=Staff@123 (BCrypt hash)
+INSERT INTO `Users` (`Username`, `Email`, `FullName`, `PasswordHash`, `Role`, `IsActive`, `CreatedAt`, `UpdatedAt`)
+VALUES 
+('admin', 'admin@fleetcompany.sa', 'مسؤول النظام', '$2a$11$N9qo8uLOickgx2ZMRZoMyeIjZAgcg7b3XeKeUxWdeS86AGR0wqAsS', 'Admin', TRUE, NOW(), NOW()),
+('staff', 'staff@fleetcompany.sa', 'موظف', '$2a$11$N9qo8uLOickgx2ZMRZoMyeIjZAgcg7b3XeKeUxWdeS86AGR0wqAsS', 'Staff', TRUE, NOW(), NOW());
+
+-- Seed: VehicleTypes
+INSERT INTO `VehicleTypes` (`Name`, `Description`, `CreatedAt`)
+VALUES 
+('سيارة ركاب', 'سيارة ركاب عادية', NOW()),
+('شاحنة', 'شاحنة نقل بضائع', NOW()),
+('حافلة', 'حافلة نقل ركاب', NOW()),
+('سيارة نقل خفيفة', 'سيارة نقل خفيفة', NOW()),
+('سيارة إسعاف', 'سيارة إسعاف طبية', NOW());
+
+-- Seed: ContractStatuses
+INSERT INTO `ContractStatuses` (`Name`, `Description`, `CreatedAt`)
+VALUES 
+('مسودة', 'العقد في مرحلة المسودة', NOW()),
+('نشط', 'العقد نشط وسارٍ', NOW()),
+('منتهي', 'انتهى العقد', NOW()),
+('ملغى', 'تم إلغاء العقد', NOW()),
+('معلق', 'العقد معلق مؤقتاً', NOW());
+
+-- Seed: MaintenanceTypes
+INSERT INTO `MaintenanceTypes` (`Name`, `Description`, `CreatedAt`)
+VALUES 
+('صيانة دورية', 'صيانة دورية منتظمة', NOW()),
+('تغيير الزيت', 'تغيير زيت المحرك', NOW()),
+('إصلاح', 'إصلاح الأعطال', NOW()),
+('فحص شامل', 'فحص شامل للمركبة', NOW()),
+('تغيير الإطارات', 'تغيير إطارات المركبة', NOW()),
+('صيانة الفرامل', 'صيانة نظام الفرامل', NOW()),
+('صيانة الكهرباء', 'صيانة الأنظمة الكهربائية', NOW());
+
+-- Seed: ServiceProviders
+INSERT INTO `ServiceProviders` (`Name`, `PhoneNumber`, `Email`, `Address`, `CreatedAt`)
+VALUES 
+('مركز الصيانة الأول', '+966112345678', 'contact@maintenance1.sa', 'الرياض', NOW()),
+('مركز الصيانة الثاني', '+966112345679', 'contact@maintenance2.sa', 'جدة', NOW()),
+('مركز الصيانة الثالث', '+966112345680', 'contact@maintenance3.sa', 'الدمام', NOW()),
+('مركز الصيانة الرابع', '+966112345681', 'contact@maintenance4.sa', 'الرياض', NOW());
+
+-- Seed: Vehicles
+INSERT INTO `Vehicles` (`PlateNumber`, `VehicleTypeId`, `Model`, `Year`, `Status`, `AssignedTo`, `Mileage`, `PurchaseDate`, `CreatedAt`, `UpdatedAt`)
+VALUES 
+('ر ع 1234', 1, 'تويوتا كامري', 2020, 'نشطة', 'محمد علي', 45000, '2020-01-15', NOW(), NOW()),
+('ر ع 1235', 1, 'هيونداي إلنترا', 2021, 'نشطة', 'أحمد سالم', 32000, '2021-03-20', NOW(), NOW()),
+('ر ع 1236', 2, 'فولفو FH16', 2019, 'نشطة', 'علي محمود', 78000, '2019-06-10', NOW(), NOW()),
+('ر ع 1237', 3, 'مرسيدس بنز', 2018, 'صيانة', 'فارس خالد', 95000, '2018-09-05', NOW(), NOW()),
+('ر ع 1238', 4, 'نيسان NV200', 2022, 'نشطة', 'سارة أحمد', 12000, '2022-02-14', NOW(), NOW());
+
+-- Seed: Drivers
+INSERT INTO `Drivers` (`FullName`, `LicenseNumber`, `LicenseExpiry`, `PhoneNumber`, `Email`, `Address`, `DateOfBirth`, `Status`, `CreatedAt`, `UpdatedAt`)
+VALUES 
+('محمد علي الشمري', 'DL-001-2024', '2025-12-31', '+966501234567', 'mohammad@example.sa', 'الرياض', '1985-05-15', 'نشط', NOW(), NOW()),
+('أحمد سالم الدوسري', 'DL-002-2024', '2026-06-30', '+966502345678', 'ahmed@example.sa', 'جدة', '1988-08-22', 'نشط', NOW(), NOW()),
+('علي محمود الغامدي', 'DL-003-2024', '2025-03-15', '+966503456789', 'ali@example.sa', 'الدمام', '1982-11-10', 'نشط', NOW(), NOW()),
+('فارس خالد المطيري', 'DL-004-2024', '2024-09-20', '+966504567890', 'faris@example.sa', 'الرياض', '1990-02-28', 'نشط', NOW(), NOW()),
+('سارة أحمد العتيبي', 'DL-005-2024', '2026-01-10', '+966505678901', 'sarah@example.sa', 'الرياض', '1992-07-05', 'نشط', NOW(), NOW());
+
+-- Seed: Employees
+INSERT INTO `Employees` (`FullName`, `Email`, `PhoneNumber`, `Department`, `Position`, `HireDate`, `Status`, `CreatedAt`, `UpdatedAt`)
+VALUES 
+('مدير الأسطول', 'manager@fleetcompany.sa', '+966511234567', 'الإدارة', 'مدير الأسطول', '2018-01-01', 'نشط', NOW(), NOW()),
+('مشرف الصيانة', 'maintenance@fleetcompany.sa', '+966512345678', 'الصيانة', 'مشرف الصيانة', '2019-03-15', 'نشط', NOW(), NOW()),
+('محاسب', 'accountant@fleetcompany.sa', '+966513456789', 'المالية', 'محاسب', '2020-06-01', 'نشط', NOW(), NOW()),
+('موظف العمليات', 'operations@fleetcompany.sa', '+966514567890', 'العمليات', 'موظف عمليات', '2021-02-10', 'نشط', NOW(), NOW()),
+('موظف الموارد البشرية', 'hr@fleetcompany.sa', '+966515678901', 'الموارد البشرية', 'موظف موارد بشرية', '2020-09-20', 'نشط', NOW(), NOW());
+
+-- Seed: Contracts
+INSERT INTO `Contracts` (`ContractNumber`, `VehicleId`, `ClientName`, `StartDate`, `EndDate`, `ContractValue`, `StatusId`, `Status`, `Notes`, `CreatedAt`, `UpdatedAt`)
+VALUES 
+('CNT-001-2024', 1, 'شركة النقل السريع', '2024-01-01', '2024-12-31', 50000.00, 2, 'نشط', 'عقد نقل شهري', NOW(), NOW()),
+('CNT-002-2024', 2, 'شركة التوزيع الموحدة', '2024-02-01', '2025-01-31', 60000.00, 2, 'نشط', 'عقد توزيع سنوي', NOW(), NOW()),
+('CNT-003-2024', 3, 'شركة الخدمات اللوجستية', '2024-03-01', '2024-09-30', 75000.00, 2, 'نشط', 'عقد خدمات لوجستية', NOW(), NOW()),
+('CNT-004-2024', 4, 'مستشفى الملك فهد', '2024-01-15', '2024-12-15', 45000.00, 3, 'منتهي', 'عقد خدمات إسعاف', NOW(), NOW()),
+('CNT-005-2024', 5, 'شركة التجارة الإلكترونية', '2024-04-01', '2025-03-31', 55000.00, 1, 'مسودة', 'عقد توصيل قيد المراجعة', NOW(), NOW());
+
+-- Seed: MaintenanceRequests
+INSERT INTO `MaintenanceRequests` (`VehicleId`, `MaintenanceTypeId`, `MaintenanceType`, `MaintenanceDate`, `Cost`, `Status`, `ServiceProviderId`, `ServiceProvider`, `Notes`, `CreatedAt`, `UpdatedAt`)
+VALUES 
+(1, 2, 'تغيير الزيت', '2024-04-01', 250.00, 'مكتملة', 1, 'مركز الصيانة الأول', 'تم تغيير الزيت بنجاح', NOW(), NOW()),
+(2, 1, 'صيانة دورية', '2024-04-05', 500.00, 'مكتملة', 2, 'مركز الصيانة الثاني', 'صيانة دورية شاملة', NOW(), NOW()),
+(3, 3, 'إصلاح', '2024-04-10', 1500.00, 'مفتوحة', 3, 'مركز الصيانة الثالث', 'إصلاح محرك', NOW(), NOW()),
+(4, 6, 'صيانة الفرامل', '2024-04-12', 800.00, 'مكتملة', 4, 'مركز الصيانة الرابع', 'صيانة نظام الفرامل', NOW(), NOW()),
+(5, 5, 'تغيير الإطارات', '2024-04-15', 600.00, 'مفتوحة', 1, 'مركز الصيانة الأول', 'تغيير 4 إطارات', NOW(), NOW());
+
+-- Seed: Trips
+INSERT INTO `Trips` (`VehicleId`, `DriverId`, `StartLocation`, `EndLocation`, `StartDate`, `EndDate`, `Distance`, `Status`, `CreatedAt`, `UpdatedAt`)
+VALUES 
+(1, 1, 'الرياض', 'جدة', '2024-04-01 08:00:00', '2024-04-01 14:30:00', 950, 'مكتملة', NOW(), NOW()),
+(2, 2, 'جدة', 'الدمام', '2024-04-02 07:00:00', '2024-04-02 18:00:00', 1300, 'مكتملة', NOW(), NOW()),
+(3, 3, 'الدمام', 'الرياض', '2024-04-03 06:00:00', '2024-04-03 16:00:00', 1400, 'مكتملة', NOW(), NOW()),
+(1, 1, 'الرياض', 'الخرج', '2024-04-10 09:00:00', NULL, 80, 'جارية', NOW(), NOW()),
+(2, 2, 'الرياض', 'القصيم', '2024-04-11 08:00:00', NULL, 320, 'مخطط', NOW(), NOW());
+
+-- Seed: FuelTransactions
+INSERT INTO `FuelTransactions` (`VehicleId`, `Quantity`, `UnitPrice`, `TotalCost`, `FuelDate`, `Odometer`, `CreatedAt`, `UpdatedAt`)
+VALUES 
+(1, 50, 2.50, 125.00, '2024-04-01', 45000, NOW(), NOW()),
+(2, 60, 2.50, 150.00, '2024-04-02', 32000, NOW(), NOW()),
+(3, 80, 2.50, 200.00, '2024-04-03', 78000, NOW(), NOW()),
+(4, 45, 2.50, 112.50, '2024-04-05', 95000, NOW(), NOW()),
+(5, 40, 2.50, 100.00, '2024-04-06', 12000, NOW(), NOW());
+
+-- Seed: Expenses
+INSERT INTO `Expenses` (`VehicleId`, `ExpenseType`, `Amount`, `ExpenseDate`, `Description`, `CreatedAt`, `UpdatedAt`)
+VALUES 
+(1, 'تأمين', 5000.00, '2024-04-01', 'تجديد التأمين السنوي', NOW(), NOW()),
+(2, 'رسوم مرور', 500.00, '2024-04-02', 'رسوم مرور شهرية', NOW(), NOW()),
+(3, 'إصلاحات', 2000.00, '2024-04-03', 'إصلاح محرك', NOW(), NOW()),
+(4, 'تنظيف', 300.00, '2024-04-05', 'تنظيف دوري', NOW(), NOW()),
+(5, 'أخرى', 150.00, '2024-04-06', 'مصروفات متنوعة', NOW(), NOW());
+
+-- Seed: Licenses
+INSERT INTO `Licenses` (`DriverId`, `LicenseNumber`, `IssuanceDate`, `ExpiryDate`, `LicenseType`, `Status`, `CreatedAt`, `UpdatedAt`)
+VALUES 
+(1, 'DL-001-2024', '2020-12-31', '2025-12-31', 'عام', 'نشطة', NOW(), NOW()),
+(2, 'DL-002-2024', '2021-06-30', '2026-06-30', 'عام', 'نشطة', NOW(), NOW()),
+(3, 'DL-003-2024', '2020-03-15', '2025-03-15', 'ثقيل', 'نشطة', NOW(), NOW()),
+(4, 'DL-004-2024', '2021-09-20', '2024-09-20', 'عام', 'منتهية', NOW(), NOW()),
+(5, 'DL-005-2024', '2022-01-10', '2026-01-10', 'عام', 'نشطة', NOW(), NOW());
+
+-- Seed: Insurance
+INSERT INTO `Insurance` (`VehicleId`, `InsuranceCompany`, `PolicyNumber`, `StartDate`, `EndDate`, `CoverageAmount`, `Premium`, `Status`, `CreatedAt`, `UpdatedAt`)
+VALUES 
+(1, 'شركة التأمين الوطنية', 'POL-001-2024', '2024-01-01', '2024-12-31', 500000.00, 5000.00, 'نشطة', NOW(), NOW()),
+(2, 'شركة التأمين الخليجية', 'POL-002-2024', '2024-02-01', '2025-01-31', 600000.00, 6000.00, 'نشطة', NOW(), NOW()),
+(3, 'شركة التأمين الدولية', 'POL-003-2024', '2024-03-01', '2024-12-31', 750000.00, 7500.00, 'نشطة', NOW(), NOW()),
+(4, 'شركة التأمين الوطنية', 'POL-004-2024', '2023-01-01', '2023-12-31', 400000.00, 4000.00, 'منتهية', NOW(), NOW()),
+(5, 'شركة التأمين الخليجية', 'POL-005-2024', '2024-04-01', '2025-03-31', 550000.00, 5500.00, 'نشطة', NOW(), NOW());
+
+-- Seed: Custody
+INSERT INTO `Custody` (`EmployeeId`, `ItemType`, `ItemValue`, `IssuanceDate`, `ReturnDate`, `Status`, `CreatedAt`, `UpdatedAt`)
+VALUES 
+(1, 'حاسوب محمول', 5000.00, '2023-01-15', NULL, 'مسلمة', NOW(), NOW()),
+(2, 'هاتف ذكي', 2000.00, '2023-02-20', NULL, 'مسلمة', NOW(), NOW()),
+(3, 'طابعة', 3000.00, '2023-03-10', '2024-03-10', 'مرجعة', NOW(), NOW()),
+(4, 'كاميرا', 4000.00, '2023-04-05', NULL, 'مسلمة', NOW(), NOW()),
+(5, 'جهاز GPS', 1500.00, '2023-05-12', NULL, 'مسلمة', NOW(), NOW());
+
+-- Seed: Notifications
+INSERT INTO `Notifications` (`Title`, `Message`, `Type`, `IsRead`, `CreatedAt`)
+VALUES 
+('تنبيه انتهاء الترخيص', 'ترخيص المركبة ر ع 1234 سينتهي في 30 يوماً', 'Warning', FALSE, NOW()),
+('تنبيه الصيانة المستحقة', 'المركبة ر ع 1235 تحتاج إلى صيانة دورية', 'Warning', FALSE, NOW()),
+('تنبيه التأمين', 'بوليصة التأمين للمركبة ر ع 1236 ستنتهي قريباً', 'Warning', FALSE, NOW()),
+('رحلة مكتملة', 'تم إكمال الرحلة من الرياض إلى جدة بنجاح', 'Success', TRUE, NOW()),
+('معاملة وقود جديدة', 'تم إضافة معاملة وقود جديدة للمركبة ر ع 1237', 'Info', TRUE, NOW());
+
+-- Seed: AuditLogs
+INSERT INTO `AuditLogs` (`Action`, `EntityType`, `EntityId`, `Description`, `UserId`, `Timestamp`)
+VALUES 
+('CREATE', 'Vehicle', 1, 'تم إضافة مركبة جديدة: ر ع 1234', 1, NOW()),
+('CREATE', 'Contract', 1, 'تم إضافة عقد جديد: CNT-001-2024', 1, NOW()),
+('CREATE', 'MaintenanceRequest', 1, 'تم إضافة طلب صيانة جديد', 1, NOW()),
+('UPDATE', 'Vehicle', 1, 'تم تحديث بيانات المركبة', 1, NOW()),
+('DELETE', 'Expense', 1, 'تم حذف مصروف', 1, NOW());
+
+-- ============================================================================
+-- INDEXES FOR PERFORMANCE
+-- ============================================================================
+
+-- Additional indexes for better query performance
+CREATE INDEX `idx_users_role_active` ON `Users` (`Role`, `IsActive`);
+CREATE INDEX `idx_vehicles_type_status` ON `Vehicles` (`VehicleTypeId`, `Status`);
+CREATE INDEX `idx_contracts_vehicle_status` ON `Contracts` (`VehicleId`, `Status`);
+CREATE INDEX `idx_maintenance_vehicle_status` ON `MaintenanceRequests` (`VehicleId`, `Status`);
+CREATE INDEX `idx_trips_vehicle_driver` ON `Trips` (`VehicleId`, `DriverId`);
+CREATE INDEX `idx_fuel_vehicle_date` ON `FuelTransactions` (`VehicleId`, `FuelDate`);
+CREATE INDEX `idx_expenses_vehicle_type` ON `Expenses` (`VehicleId`, `ExpenseType`);
+CREATE INDEX `idx_licenses_driver_expiry` ON `Licenses` (`DriverId`, `ExpiryDate`);
+CREATE INDEX `idx_insurance_vehicle_expiry` ON `Insurance` (`VehicleId`, `EndDate`);
+CREATE INDEX `idx_custody_employee_status` ON `Custody` (`EmployeeId`, `Status`);
+CREATE INDEX `idx_auditlogs_entity_timestamp` ON `AuditLogs` (`EntityType`, `Timestamp`);
+
+-- ============================================================================
+-- END OF DATABASE SCHEMA AND SEED DATA
+-- ============================================================================

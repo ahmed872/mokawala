@@ -1,0 +1,200 @@
+<Window x:Class="FleetManagementSystem.WPF.TripCloseWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="إغلاق / تعديل التشغيلة"
+        Width="760"
+        Height="650"
+        MinWidth="680"
+        MinHeight="560"
+        WindowStartupLocation="CenterOwner"
+        ResizeMode="CanResize"
+        FlowDirection="RightToLeft"
+        Background="#F2F5F8">
+    <Window.Resources>
+        <SolidColorBrush x:Key="TripCloseAccentBrush" Color="#123B53" />
+        <SolidColorBrush x:Key="TripCloseTextBrush" Color="#1F2D3A" />
+        <SolidColorBrush x:Key="TripCloseMutedBrush" Color="#6B7A88" />
+        <SolidColorBrush x:Key="TripCloseBorderBrush" Color="#D7E0E8" />
+
+        <Style x:Key="TripCloseLabelStyle" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="13" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Foreground" Value="{StaticResource TripCloseTextBrush}" />
+            <Setter Property="Margin" Value="0,0,0,7" />
+        </Style>
+
+        <Style x:Key="TripCloseInputStyle" TargetType="TextBox">
+            <Setter Property="Height" Value="40" />
+            <Setter Property="Padding" Value="12,6" />
+            <Setter Property="FontSize" Value="14" />
+            <Setter Property="Foreground" Value="{StaticResource TripCloseTextBrush}" />
+            <Setter Property="Background" Value="#F8FBFD" />
+            <Setter Property="BorderBrush" Value="{StaticResource TripCloseBorderBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+        </Style>
+
+        <Style x:Key="TripCloseButtonStyle" TargetType="Button">
+            <Setter Property="Height" Value="42" />
+            <Setter Property="MinWidth" Value="130" />
+            <Setter Property="Margin" Value="10,0,0,0" />
+            <Setter Property="Padding" Value="18,8" />
+            <Setter Property="FontSize" Value="14" />
+            <Setter Property="FontWeight" Value="Bold" />
+            <Setter Property="Foreground" Value="White" />
+            <Setter Property="Background" Value="{StaticResource TripCloseAccentBrush}" />
+            <Setter Property="BorderBrush" Value="{StaticResource TripCloseAccentBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="Cursor" Value="Hand" />
+        </Style>
+    </Window.Resources>
+
+    <Grid Margin="22">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <Border Background="White"
+                BorderBrush="{StaticResource TripCloseBorderBrush}"
+                BorderThickness="1"
+                CornerRadius="12"
+                Padding="18">
+            <StackPanel>
+                <TextBlock Text="إغلاق / تعديل التشغيلة"
+                           FontSize="24"
+                           FontWeight="Bold"
+                           Foreground="{StaticResource TripCloseAccentBrush}" />
+                <TextBlock x:Name="TripSummaryTextBlock"
+                           Margin="0,8,0,0"
+                           FontSize="14"
+                           Foreground="{StaticResource TripCloseMutedBrush}"
+                           TextWrapping="Wrap" />
+            </StackPanel>
+        </Border>
+
+        <ScrollViewer Grid.Row="1"
+                      Margin="0,16,0,16"
+                      VerticalScrollBarVisibility="Auto">
+            <Border Background="White"
+                    BorderBrush="{StaticResource TripCloseBorderBrush}"
+                    BorderThickness="1"
+                    CornerRadius="12"
+                    Padding="18">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+
+                    <StackPanel Margin="0,0,12,14">
+                        <TextBlock Text="بداية التشغيلة" Style="{StaticResource TripCloseLabelStyle}" />
+                        <TextBox x:Name="StartDateTextBox"
+                                 IsReadOnly="True"
+                                 Style="{StaticResource TripCloseInputStyle}" />
+                    </StackPanel>
+
+                    <StackPanel Grid.Column="1" Margin="0,0,0,14">
+                        <TextBlock Text="عداد البداية" Style="{StaticResource TripCloseLabelStyle}" />
+                        <TextBox x:Name="StartMileageTextBox"
+                                 IsReadOnly="True"
+                                 Style="{StaticResource TripCloseInputStyle}" />
+                    </StackPanel>
+
+                    <StackPanel Grid.Row="1" Margin="0,0,12,14">
+                        <TextBlock Text="تاريخ الإغلاق" Style="{StaticResource TripCloseLabelStyle}" />
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="100" />
+                            </Grid.ColumnDefinitions>
+                            <DatePicker x:Name="EndDatePicker"
+                                        Height="40" />
+                            <TextBox x:Name="EndTimeTextBox"
+                                     Grid.Column="1"
+                                     Margin="8,0,0,0"
+                                     ToolTip="الوقت بصيغة 24 ساعة مثل 15:30"
+                                     Style="{StaticResource TripCloseInputStyle}" />
+                        </Grid>
+                    </StackPanel>
+
+                    <StackPanel Grid.Row="1" Grid.Column="1" Margin="0,0,0,14">
+                        <TextBlock Text="عداد النهاية" Style="{StaticResource TripCloseLabelStyle}" />
+                        <TextBox x:Name="EndMileageTextBox"
+                                 TextChanged="EndMileageTextBox_TextChanged"
+                                 Style="{StaticResource TripCloseInputStyle}" />
+                    </StackPanel>
+
+                    <StackPanel Grid.Row="2" Margin="0,0,12,14">
+                        <TextBlock Text="المسافة" Style="{StaticResource TripCloseLabelStyle}" />
+                        <TextBox x:Name="DistanceTextBox"
+                                 Style="{StaticResource TripCloseInputStyle}"
+                                 IsReadOnly="True"
+                                 ToolTip="تُحسب تلقائيًا من عداد النهاية ناقص عداد البداية" />
+                    </StackPanel>
+
+                    <StackPanel Grid.Row="2" Grid.Column="1" Margin="0,0,0,14">
+                        <TextBlock Text="تكلفة التشغيلة" Style="{StaticResource TripCloseLabelStyle}" />
+                        <TextBox x:Name="TripCostTextBox"
+                                 Style="{StaticResource TripCloseInputStyle}" />
+                    </StackPanel>
+
+                    <StackPanel Grid.Row="3" Margin="0,0,12,14">
+                        <TextBlock Text="الوقود المستهلك" Style="{StaticResource TripCloseLabelStyle}" />
+                        <TextBox x:Name="FuelConsumedTextBox"
+                                 Style="{StaticResource TripCloseInputStyle}" />
+                    </StackPanel>
+
+                    <StackPanel Grid.Row="3" Grid.Column="1" Margin="0,0,0,14">
+                        <TextBlock Text="حالة التشغيلة" Style="{StaticResource TripCloseLabelStyle}" />
+                        <ComboBox x:Name="StatusComboBox"
+                                  Height="40">
+                            <ComboBoxItem Content="مغلقة" Tag="Closed" />
+                            <ComboBoxItem Content="جارية" Tag="Open" />
+                        </ComboBox>
+                    </StackPanel>
+
+                    <StackPanel Grid.Row="4" Grid.ColumnSpan="2" Margin="0,0,0,14">
+                        <TextBlock Text="ملاحظات" Style="{StaticResource TripCloseLabelStyle}" />
+                        <TextBox x:Name="NotesTextBox"
+                                 Height="92"
+                                 Padding="12,8"
+                                 TextWrapping="Wrap"
+                                 AcceptsReturn="True"
+                                 VerticalScrollBarVisibility="Auto"
+                                 Style="{StaticResource TripCloseInputStyle}" />
+                    </StackPanel>
+
+                    <TextBlock x:Name="ValidationTextBlock"
+                               Grid.Row="5"
+                               Grid.ColumnSpan="2"
+                               Foreground="#B42318"
+                               TextWrapping="Wrap" />
+                </Grid>
+            </Border>
+        </ScrollViewer>
+
+        <WrapPanel Grid.Row="2"
+                   HorizontalAlignment="Left">
+            <Button Style="{StaticResource TripCloseButtonStyle}"
+                    Click="SaveButton_Click">
+                حفظ
+            </Button>
+            <Button Style="{StaticResource TripCloseButtonStyle}"
+                    Background="#6B7A88"
+                    BorderBrush="#6B7A88"
+                    Click="CancelButton_Click">
+                إلغاء
+            </Button>
+        </WrapPanel>
+    </Grid>
+</Window>
