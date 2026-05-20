@@ -40,19 +40,57 @@ public partial class TripPermitWindow : Window
     {
         try
         {
+            var scrollViewer = FindScrollViewer(this);
+            var savedScrollOffset = scrollViewer?.VerticalOffset ?? 0;
+
+            if (scrollViewer != null)
+            {
+                // Reset scroll to avoid visual clipping
+                scrollViewer.ScrollToTop();
+                scrollViewer.UpdateLayout();
+            }
+
+            var hostWidth = FormRoot.ActualWidth > 0 ? FormRoot.ActualWidth : FormRoot.Width;
+            var hostHeight = FormRoot.ActualHeight > 0 ? FormRoot.ActualHeight : FormRoot.Height;
+
+            // Force layout pass
+            FormRoot.Measure(new Size(hostWidth, hostHeight));
+            FormRoot.Arrange(new Rect(0, 0, hostWidth, hostHeight));
+            FormRoot.UpdateLayout();
+
+            // Print the exact A5 visual; DirectPrintHelper handles the PDF orientation correction.
             DirectPrintHelper.PrintVisualToDefaultPrinter(FormRoot, "نموذج تشغيل مركبة");
+
+            if (scrollViewer != null)
+            {
+                // Restore state
+                scrollViewer.ScrollToVerticalOffset(savedScrollOffset);
+                scrollViewer.UpdateLayout();
+            }
         }
         catch (Exception ex)
         {
             MessageBox.Show(
-                DirectPrintHelper.BuildDirectPrintErrorMessage(ex),
-                "تعذر الطباعة",
-                MessageBoxButton.OK,
-                MessageBoxImage.Error);
+               DirectPrintHelper.BuildDirectPrintErrorMessage(ex),
+               "تعذر الطباعة",
+               MessageBoxButton.OK,
+               MessageBoxImage.Error);
         }
     }
 
     private void CloseButton_Click(object sender, RoutedEventArgs e) => Close();
+
+    private static ScrollViewer? FindScrollViewer(DependencyObject parent)
+    {
+        for (var i = 0; i < System.Windows.Media.VisualTreeHelper.GetChildrenCount(parent); i++)
+        {
+            var child = System.Windows.Media.VisualTreeHelper.GetChild(parent, i);
+            if (child is ScrollViewer scrollViewer) return scrollViewer;
+            var nested = FindScrollViewer(child);
+            if (nested != null) return nested;
+        }
+        return null;
+    }
 
     private static string BuildInsuranceText(VehicleDto? vehicle)
     {
@@ -62,11 +100,11 @@ public partial class TripPermitWindow : Window
         }
 
         var accident = string.IsNullOrWhiteSpace(vehicle.AccidentInsuranceDetails)
-            ? "حوادث: غير مسجل"
-            : $"حوادث: {vehicle.AccidentInsuranceDetails}";
+            ? "تأمين حوادث: غير مسجل"
+            : $"تأمين حوادث: {vehicle.AccidentInsuranceDetails}";
         var social = string.IsNullOrWhiteSpace(vehicle.SocialInsuranceDetails)
-            ? "اجتماعي: غير مسجل"
-            : $"اجتماعي: {vehicle.SocialInsuranceDetails}";
+            ? "تأمين اجتماعي: غير مسجل"
+            : $"تأمين اجتماعي: {vehicle.SocialInsuranceDetails}";
 
         return $"{accident}\n{social}";
     }

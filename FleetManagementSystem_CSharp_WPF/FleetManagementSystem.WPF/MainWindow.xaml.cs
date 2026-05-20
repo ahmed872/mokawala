@@ -468,12 +468,14 @@ public partial class MainWindow : Window
         var alerts = (metrics.Alerts ?? new List<AlertDto>())
             .Where(IsDashboardRenewalAlert)
             .ToList();
+
         var dashboardAlerts = alerts
             .Select(DashboardAlertItem.FromAlert)
             .OrderBy(alert => alert.SortPriority)
             .ThenBy(alert => alert.SortDistance)
             .ThenBy(alert => alert.DueDate ?? DateTime.MaxValue)
             .ToList();
+
         AlertsListBox.ItemsSource = alerts;
         DashboardAlertsListBox.ItemsSource = dashboardAlerts;
         DashboardAlertCountTextBlock.Text = BuildDashboardAlertCountText(dashboardAlerts.Count);
@@ -1726,6 +1728,44 @@ public partial class MainWindow : Window
     private async void SaveEmployeeButton_Click(object sender, RoutedEventArgs e) => await RunSafeAsync(async () => { var item = Selected<EmployeeDto>(EmployeesGrid) ?? throw new InvalidOperationException("اختر موظفًا أولًا."); await _employeeService.SaveAsync(ToForm(item)); await LoadEmployeesAsync(); });
     private async void DeleteEmployeeButton_Click(object sender, RoutedEventArgs e) => await RunSafeAsync(() => DeleteSelectedAsync(EmployeesGrid, _employees, x => x.Id, _employeeService.DeleteAsync, LoadEmployeesAsync));
 
+    private void TripFilter_Changed(object sender, RoutedEventArgs e)
+    {
+        var view = CollectionViewSource.GetDefaultView(TripsGrid.ItemsSource);
+        if (view == null) return;
+
+        view.Filter = item =>
+        {
+            // تم تغيير Models إلى DTOs
+            if (item is not FleetManagementSystem.Core.DTOs.TripDto trip) return false;
+
+            if (TripFilterId != null && !string.IsNullOrWhiteSpace(TripFilterId.Text) && !trip.Id.ToString().Contains(TripFilterId.Text.Trim(), StringComparison.OrdinalIgnoreCase))
+                return false;
+
+            if (TripFilterDate != null && TripFilterDate.SelectedDate.HasValue && trip.StartDate.Date != TripFilterDate.SelectedDate.Value.Date)
+                return false;
+
+            if (TripFilterPlate != null && !string.IsNullOrWhiteSpace(TripFilterPlate.Text) && (trip.VehiclePlateNumber == null || !trip.VehiclePlateNumber.Contains(TripFilterPlate.Text.Trim(), StringComparison.OrdinalIgnoreCase)))
+                return false;
+
+            if (TripFilterStartLocation != null && !string.IsNullOrWhiteSpace(TripFilterStartLocation.Text) && (trip.StartLocation == null || !trip.StartLocation.Contains(TripFilterStartLocation.Text.Trim(), StringComparison.OrdinalIgnoreCase)))
+                return false;
+
+            if (TripFilterEndLocation != null && !string.IsNullOrWhiteSpace(TripFilterEndLocation.Text) && (trip.EndLocation == null || !trip.EndLocation.Contains(TripFilterEndLocation.Text.Trim(), StringComparison.OrdinalIgnoreCase)))
+                return false;
+
+            if (TripFilterDriver != null && !string.IsNullOrWhiteSpace(TripFilterDriver.Text) && (trip.DriverName == null || !trip.DriverName.Contains(TripFilterDriver.Text.Trim(), StringComparison.OrdinalIgnoreCase)))
+                return false;
+
+            // استخدام TripFilterPerson لفلترة الموصي (RequesterName)
+            if (TripFilterPerson != null && !string.IsNullOrWhiteSpace(TripFilterPerson.Text) && (trip.RequesterName == null || !trip.RequesterName.Contains(TripFilterPerson.Text.Trim(), StringComparison.OrdinalIgnoreCase)))
+                return false;
+
+            if (TripFilterPurpose != null && !string.IsNullOrWhiteSpace(TripFilterPurpose.Text) && (trip.Purpose == null || !trip.Purpose.Contains(TripFilterPurpose.Text.Trim(), StringComparison.OrdinalIgnoreCase)))
+                return false;
+
+            return true;
+        };
+    }
     private async void RefreshTripsButton_Click(object sender, RoutedEventArgs e) => await RunSafeAsync(LoadTripsAsync);
     private async void AddTripButton_Click(object sender, RoutedEventArgs e)
     {
@@ -1752,6 +1792,77 @@ public partial class MainWindow : Window
 
     private async void DeleteTripButton_Click(object sender, RoutedEventArgs e) =>
         await RunSafeAsync(() => DeleteSelectedAsync(TripsGrid, _trips, x => x.Id, _tripService.DeleteAsync, LoadTripsAsync));
+
+    private void PrintTripsButton_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            var pd = new PrintDialog();
+            if (pd.ShowDialog() != true) return;
+
+            var flowDoc = new FlowDocument
+            {
+                ColumnWidth = pd.PrintableAreaWidth,
+                PageWidth = pd.PrintableAreaWidth,
+                PageHeight = pd.PrintableAreaHeight,
+                PagePadding = new Thickness(30),
+                FontFamily = new FontFamily("Cairo, Arial, Tahoma")
+            };
+
+            var title = new Paragraph(new Run("سجل التشغيلات"))
+            {
+                FontSize = 24,
+                FontWeight = FontWeights.Bold,
+                TextAlignment = TextAlignment.Center,
+                Margin = new Thickness(0, 0, 0, 20)
+            };
+            flowDoc.Blocks.Add(title);
+
+            var table = new Table { CellSpacing = 0, BorderBrush = Brushes.Black, BorderThickness = new Thickness(1) };
+            int columnsCount = 10;
+            for (int i = 0; i < columnsCount; i++) table.Columns.Add(new TableColumn());
+
+            var headerGroup = new TableRowGroup();
+            var headerRow = new TableRow { Background = Brushes.LightGray, FontWeight = FontWeights.Bold };
+            string[] headers = { "سيريال", "التاريخ", "السيارة", "من/إلى", "اسم السائق", "الموصي", "المشرف", "الغرض", "الحالة", "المسافة" };
+
+            foreach (var h in headers)
+            {
+                headerRow.Cells.Add(new TableCell(new Paragraph(new Run(h)) { TextAlignment = TextAlignment.Center, Padding = new Thickness(5) }) { BorderBrush = Brushes.Black, BorderThickness = new Thickness(1) });
+            }
+            headerGroup.Rows.Add(headerRow);
+            table.RowGroups.Add(headerGroup);
+
+            var dataGroup = new TableRowGroup();
+            var view = CollectionViewSource.GetDefaultView(TripsGrid.ItemsSource);
+            if (view != null)
+            {
+                foreach (TripDto trip in view)
+                {
+                    var row = new TableRow();
+                    row.Cells.Add(new TableCell(new Paragraph(new Run(trip.Id.ToString()))) { BorderBrush = Brushes.Black, BorderThickness = new Thickness(1), Padding = new Thickness(5), TextAlignment = TextAlignment.Center });
+                    row.Cells.Add(new TableCell(new Paragraph(new Run(trip.StartDate.ToString("yyyy-MM-dd")))) { BorderBrush = Brushes.Black, BorderThickness = new Thickness(1), Padding = new Thickness(5), TextAlignment = TextAlignment.Center });
+                    row.Cells.Add(new TableCell(new Paragraph(new Run(trip.VehiclePlateNumber ?? ""))) { BorderBrush = Brushes.Black, BorderThickness = new Thickness(1), Padding = new Thickness(5), TextAlignment = TextAlignment.Center });
+                    row.Cells.Add(new TableCell(new Paragraph(new Run($"{trip.StartLocation} - {trip.EndLocation}"))) { BorderBrush = Brushes.Black, BorderThickness = new Thickness(1), Padding = new Thickness(5), TextAlignment = TextAlignment.Center });
+                    row.Cells.Add(new TableCell(new Paragraph(new Run(trip.DriverName ?? ""))) { BorderBrush = Brushes.Black, BorderThickness = new Thickness(1), Padding = new Thickness(5), TextAlignment = TextAlignment.Center });
+                    row.Cells.Add(new TableCell(new Paragraph(new Run(trip.RequesterName ?? ""))) { BorderBrush = Brushes.Black, BorderThickness = new Thickness(1), Padding = new Thickness(5), TextAlignment = TextAlignment.Center });
+                    row.Cells.Add(new TableCell(new Paragraph(new Run(trip.SupervisorName ?? ""))) { BorderBrush = Brushes.Black, BorderThickness = new Thickness(1), Padding = new Thickness(5), TextAlignment = TextAlignment.Center });
+                    row.Cells.Add(new TableCell(new Paragraph(new Run(trip.Purpose ?? ""))) { BorderBrush = Brushes.Black, BorderThickness = new Thickness(1), Padding = new Thickness(5), TextAlignment = TextAlignment.Center });
+                    row.Cells.Add(new TableCell(new Paragraph(new Run(trip.Status ?? ""))) { BorderBrush = Brushes.Black, BorderThickness = new Thickness(1), Padding = new Thickness(5), TextAlignment = TextAlignment.Center });
+                    row.Cells.Add(new TableCell(new Paragraph(new Run(trip.Distance.ToString("0.##")))) { BorderBrush = Brushes.Black, BorderThickness = new Thickness(1), Padding = new Thickness(5), TextAlignment = TextAlignment.Center });
+                    dataGroup.Rows.Add(row);
+                }
+            }
+            table.RowGroups.Add(dataGroup);
+            flowDoc.Blocks.Add(table);
+
+            pd.PrintDocument(((IDocumentPaginatorSource)flowDoc).DocumentPaginator, "تقرير التشغيلات");
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"عذراً، حدث خطأ أثناء الطباعة: {ex.Message}", "خطأ في الطباعة", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+    }
 
     private async void CloseTripButton_Click(object sender, RoutedEventArgs e) => await RunSafeAsync(async () =>
     {
