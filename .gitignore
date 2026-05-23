@@ -10,14 +10,6 @@
 qa-backups/
 **/qa-backups/
 
-# Local development and test databases
-**/fleet-management.*.db
-**/fleet-management.db
-
-# Test results
-ui-test-results.json
-**/ui-test-results.json
-
 # User-specific files
 *.rsuser
 *.suo
