@@ -8,6 +8,8 @@
         MinHeight="640"
         WindowStartupLocation="CenterScreen"
         ResizeMode="NoResize"
+        AutomationProperties.AutomationId="LoginWindow"
+        AutomationProperties.Name="نافذة تسجيل الدخول"
         FlowDirection="RightToLeft"
         Background="{StaticResource PageBackgroundBrush}">
     <Window.Resources>
@@ -125,6 +127,8 @@
                            Text="اسم المستخدم" />
                 <TextBox x:Name="UsernameTextBox"
                          Grid.Row="2"
+                         AutomationProperties.AutomationId="UsernameTextBox"
+                         AutomationProperties.Name="اسم المستخدم"
                          Style="{StaticResource InputTextBoxStyle}" />
 
                 <TextBlock Grid.Row="3"
@@ -133,6 +137,8 @@
                            Text="كلمة المرور" />
                 <PasswordBox x:Name="PasswordBox"
                              Grid.Row="4"
+                             AutomationProperties.AutomationId="PasswordBox"
+                             AutomationProperties.Name="كلمة المرور"
                              Style="{StaticResource InputPasswordStyle}" />
 
                 <TextBlock x:Name="ErrorTextBlock"
@@ -144,6 +150,7 @@
                 <Button Grid.Row="6"
                         Margin="0,22,0,0"
                         Style="{StaticResource PrimaryLoginButtonStyle}"
+                        AutomationProperties.AutomationId="LoginButton"
                         IsDefault="True"
                         Click="LoginButton_Click">
                     دخول
@@ -151,6 +158,7 @@
 
                 <Button Grid.Row="7"
                         Margin="0,14,0,0"
+                        AutomationProperties.AutomationId="ConnectionSettingsButton"
                         HorizontalAlignment="Left"
                         Background="Transparent"
                         BorderThickness="0"

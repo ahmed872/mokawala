@@ -329,6 +329,7 @@ namespace FleetManagementSystem.Core.DTOs
         public string AssignedTo { get; set; } = string.Empty;
         public DateTime PurchaseDate { get; set; }
         public decimal PurchasePrice { get; set; }
+        public string RegistrationType { get; set; } = "ترخيص";
         public DateTime? RegistrationStartDate { get; set; }
         public DateTime? RegistrationExpiryDate { get; set; }
         public string AccidentInsuranceDetails { get; set; } = string.Empty;
@@ -357,6 +358,7 @@ namespace FleetManagementSystem.Core.DTOs
         public string AssignedTo { get; set; } = string.Empty;
         public DateTime PurchaseDate { get; set; }
         public decimal PurchasePrice { get; set; }
+        public string RegistrationType { get; set; } = "ترخيص";
         public DateTime? RegistrationStartDate { get; set; }
         public DateTime? RegistrationExpiryDate { get; set; }
         public string AccidentInsuranceDetails { get; set; } = string.Empty;
@@ -653,6 +655,7 @@ namespace FleetManagementSystem.Core.DTOs
     /// </summary>
     public class TripDto
     {
+        public int Serial { get; set; }
         public int Id { get; set; }
         public int VehicleId { get; set; }
         public string VehiclePlateNumber { get; set; } = string.Empty;
@@ -674,7 +677,10 @@ namespace FleetManagementSystem.Core.DTOs
         public string Status { get; set; } = string.Empty;
         public decimal FuelConsumed { get; set; }
         public decimal TripCost { get; set; }
+        public decimal RegisteredFuelQuantity { get; set; }
+        public decimal RegisteredFuelCost { get; set; }
         public string Notes { get; set; } = string.Empty;
+        public string TripSummary => $"{Id} - {VehiclePlateNumber} - {StartDate:yyyy-MM-dd HH:mm}";
     }
 
     /// <summary>
@@ -713,6 +719,8 @@ namespace FleetManagementSystem.Core.DTOs
     {
         public int Id { get; set; }
         public string VehiclePlateNumber { get; set; } = string.Empty;
+        public int? TripId { get; set; }
+        public string TripSummary { get; set; } = string.Empty;
         public DateTime TransactionDate { get; set; }
         public string FuelType { get; set; } = string.Empty;
         public decimal Quantity { get; set; }
@@ -728,6 +736,8 @@ namespace FleetManagementSystem.Core.DTOs
         public int Id { get; set; }
         public int VehicleId { get; set; }
         public string VehiclePlateNumber { get; set; } = string.Empty;
+        public int? TripId { get; set; }
+        public string TripSummary { get; set; } = string.Empty;
         public DateTime TransactionDate { get; set; }
         public string FuelType { get; set; } = string.Empty;
         public decimal Quantity { get; set; }
@@ -747,6 +757,7 @@ namespace FleetManagementSystem.Core.DTOs
     {
         public int Id { get; set; }
         public int VehicleId { get; set; }
+        public int? TripId { get; set; }
         public DateTime TransactionDate { get; set; }
         public string FuelType { get; set; } = string.Empty;
         public decimal Quantity { get; set; }
@@ -831,6 +842,11 @@ namespace FleetManagementSystem.Core.DTOs
         public decimal Quantity { get; set; }
         public decimal Cost { get; set; }
         public decimal NextOilChangeOdometer { get; set; }
+        public decimal CurrentVehicleMileage { get; set; }
+        public decimal OilChangeIntervalKm { get; set; }
+        public decimal KmSinceOilChange { get; set; }
+        public decimal RemainingKm { get; set; }
+        public string OilAlert { get; set; } = string.Empty;
         public string Status { get; set; } = string.Empty;
         public bool IsDue { get; set; }
         public string Notes { get; set; } = string.Empty;
@@ -958,6 +974,10 @@ namespace FleetManagementSystem.Core.DTOs
         public int Id { get; set; }
         public int VehicleId { get; set; }
         public string VehiclePlateNumber { get; set; } = string.Empty;
+        public string VehicleModel { get; set; } = string.Empty;
+        public int VehicleYear { get; set; }
+        public string VehicleChassisNumber { get; set; } = string.Empty;
+        public string VehicleEngineNumber { get; set; } = string.Empty;
         public string PolicyNumber { get; set; } = string.Empty;
         public string InsuranceCompany { get; set; } = string.Empty;
         public string PolicyType { get; set; } = string.Empty;
@@ -972,11 +992,11 @@ namespace FleetManagementSystem.Core.DTOs
         public string DocumentUrl { get; set; } = string.Empty;
         public string Notes { get; set; } = string.Empty;
         public int DaysUntilExpiry => (ExpiryDate.Date - DateTime.Today).Days;
-        public bool IsExpiringSoon => DaysUntilExpiry >= 0 && DaysUntilExpiry <= 30;
+        public bool IsExpiringSoon => DaysUntilExpiry >= 0 && DaysUntilExpiry <= 60;
         public string ExpiryAlert => DaysUntilExpiry switch
         {
             < 0 => "منتهي",
-            <= 30 => $"ينتهي خلال {DaysUntilExpiry} يوم",
+            <= 60 => $"ينتهي خلال {DaysUntilExpiry} يوم",
             _ => "ساري"
         };
     }

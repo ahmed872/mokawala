@@ -11,7 +11,7 @@ public sealed class ClientConnectionProfile
     public string Username { get; set; } = "fleet_user";
     public string Password { get; set; } = string.Empty;
     public bool UseSsl { get; set; }
-    public string SqlitePath { get; set; } = "fleet-management.dev.db";
+    public string SqlitePath { get; set; } = "fleet-management.preview.db";
 
     public bool IsMySql => Provider.Equals("MySql", StringComparison.OrdinalIgnoreCase);
     public bool IsSqlite => Provider.Equals("Sqlite", StringComparison.OrdinalIgnoreCase);
@@ -20,7 +20,7 @@ public sealed class ClientConnectionProfile
     {
         if (IsSqlite)
         {
-            var sqlitePath = string.IsNullOrWhiteSpace(SqlitePath) ? "fleet-management.dev.db" : SqlitePath.Trim();
+            var sqlitePath = string.IsNullOrWhiteSpace(SqlitePath) ? "fleet-management.preview.db" : SqlitePath.Trim();
             return $"Data Source={sqlitePath}";
         }
 
@@ -75,7 +75,7 @@ public sealed class ClientConnectionProfile
             return new ClientConnectionProfile
             {
                 Provider = "Sqlite",
-                SqlitePath = string.IsNullOrWhiteSpace(sqlitePath) ? "fleet-management.dev.db" : sqlitePath
+                SqlitePath = string.IsNullOrWhiteSpace(sqlitePath) ? "fleet-management.preview.db" : sqlitePath
             };
         }
 

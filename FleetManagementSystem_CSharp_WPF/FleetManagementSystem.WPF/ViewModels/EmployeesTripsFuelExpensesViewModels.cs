@@ -681,13 +681,13 @@ namespace FleetManagementSystem.WPF.ViewModels
 
             if (Entity?.Quantity <= 0)
             {
-                AddError(nameof(Entity.Quantity), "الكمية يجب أن تكون أكبر من صفر");
+                AddError(nameof(Entity.Quantity), "عدد اللترات يجب أن يكون أكبر من صفر");
                 isValid = false;
             }
 
             if (Entity?.UnitPrice <= 0)
             {
-                AddError(nameof(Entity.UnitPrice), "سعر الوحدة يجب أن يكون أكبر من صفر");
+                AddError(nameof(Entity.UnitPrice), "سعر اللتر يجب أن يكون أكبر من صفر");
                 isValid = false;
             }
 

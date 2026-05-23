@@ -1,0 +1,274 @@
+<Window x:Class="FleetManagementSystem.WPF.OilChangeEntryWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="تسجيل زيت"
+        Width="720"
+        Height="620"
+        MinWidth="680"
+        MinHeight="560"
+        WindowStartupLocation="CenterOwner"
+        ResizeMode="CanResize"
+        FlowDirection="RightToLeft"
+        Background="{StaticResource PageBackgroundBrush}"
+        AutomationProperties.AutomationId="OilChangeEntryWindow"
+        AutomationProperties.Name="نافذة تسجيل زيت">
+    <Window.Resources>
+        <SolidColorBrush x:Key="EntryAccentBrush" Color="#123B53"/>
+        <SolidColorBrush x:Key="EntryAccentSoftBrush" Color="#2A607D"/>
+        <SolidColorBrush x:Key="EntryTextBrush" Color="#1F2D3A"/>
+        <SolidColorBrush x:Key="EntryMutedBrush" Color="#6B7A88"/>
+        <SolidColorBrush x:Key="EntryBorderBrush" Color="#D7E0E8"/>
+        <SolidColorBrush x:Key="EntryAltBrush" Color="#F7FAFC"/>
+
+        <Style x:Key="EntryCardStyle" TargetType="Border">
+            <Setter Property="Background" Value="White"/>
+            <Setter Property="BorderBrush" Value="{StaticResource EntryBorderBrush}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="CornerRadius" Value="12"/>
+            <Setter Property="Padding" Value="18"/>
+        </Style>
+
+        <Style x:Key="EntryLabelStyle" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="{StaticResource EntryMutedBrush}"/>
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Margin" Value="0,0,0,8"/>
+        </Style>
+
+        <Style x:Key="EntryValueStyle" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="{StaticResource EntryTextBrush}"/>
+            <Setter Property="FontSize" Value="15"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="TextWrapping" Value="Wrap"/>
+        </Style>
+
+        <Style x:Key="EntryTextBoxStyle" TargetType="TextBox" BasedOn="{StaticResource AppTextBoxStyle}">
+            <Setter Property="Height" Value="42"/>
+            <Setter Property="Background" Value="{StaticResource EntryAltBrush}"/>
+            <Setter Property="BorderBrush" Value="{StaticResource EntryBorderBrush}"/>
+        </Style>
+
+        <Style x:Key="EntryComboBoxStyle" TargetType="ComboBox" BasedOn="{StaticResource AppComboBoxStyle}">
+            <Setter Property="Height" Value="42"/>
+            <Setter Property="Background" Value="{StaticResource EntryAltBrush}"/>
+            <Setter Property="BorderBrush" Value="{StaticResource EntryBorderBrush}"/>
+        </Style>
+
+        <Style x:Key="EntryDatePickerStyle" TargetType="DatePicker">
+            <Setter Property="Height" Value="42"/>
+            <Setter Property="FontSize" Value="14"/>
+            <Setter Property="Foreground" Value="{StaticResource EntryTextBrush}"/>
+            <Setter Property="Background" Value="{StaticResource EntryAltBrush}"/>
+            <Setter Property="BorderBrush" Value="{StaticResource EntryBorderBrush}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+        </Style>
+
+        <Style x:Key="EntryPrimaryButtonStyle" TargetType="Button">
+            <Setter Property="Height" Value="44"/>
+            <Setter Property="MinWidth" Value="128"/>
+            <Setter Property="Padding" Value="20,8"/>
+            <Setter Property="FontSize" Value="14"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="Background" Value="{StaticResource EntryAccentBrush}"/>
+            <Setter Property="BorderBrush" Value="{StaticResource EntryAccentBrush}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="ButtonBorder"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="8">
+                            <ContentPresenter HorizontalAlignment="Center"
+                                              VerticalAlignment="Center"
+                                              Margin="{TemplateBinding Padding}"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="ButtonBorder" Property="Background" Value="{StaticResource EntryAccentSoftBrush}"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="ButtonBorder" Property="Opacity" Value="0.86"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="EntrySecondaryButtonStyle" TargetType="Button" BasedOn="{StaticResource EntryPrimaryButtonStyle}">
+            <Setter Property="Foreground" Value="{StaticResource EntryAccentBrush}"/>
+            <Setter Property="Background" Value="{StaticResource AccentPaleBrush}"/>
+            <Setter Property="BorderBrush" Value="#C9DAE4"/>
+        </Style>
+    </Window.Resources>
+
+    <Grid Margin="18">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <Border Style="{StaticResource EntryCardStyle}">
+            <StackPanel>
+                <TextBlock Text="تسجيل زيت"
+                           FontSize="24"
+                           FontWeight="Bold"
+                           Foreground="{StaticResource EntryTextBrush}"/>
+                <TextBlock Margin="0,5,0,0"
+                           Text="سجل عداد العربية وقت تغيير الزيت، وسيحسب النظام موعد التغيير القادم من قيمة تغيير الزيت كل كام كم المسجلة في بيانات العربية."
+                           FontSize="13"
+                           FontWeight="SemiBold"
+                           Foreground="{StaticResource EntryMutedBrush}"
+                           TextWrapping="Wrap"/>
+            </StackPanel>
+        </Border>
+
+        <ScrollViewer Grid.Row="1"
+                      Margin="0,14"
+                      VerticalScrollBarVisibility="Auto">
+            <Border Style="{StaticResource EntryCardStyle}">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+
+                    <StackPanel Margin="0,0,10,14">
+                        <TextBlock Text="العربية" Style="{StaticResource EntryLabelStyle}"/>
+                        <ComboBox x:Name="VehicleComboBox"
+                                  AutomationProperties.AutomationId="OilVehicleComboBox"
+                                  Style="{StaticResource EntryComboBoxStyle}"
+                                  DisplayMemberPath="PlateNumber"
+                                  SelectedValuePath="Id"
+                                  SelectionChanged="VehicleComboBox_SelectionChanged"/>
+                    </StackPanel>
+
+                    <StackPanel Grid.Column="1" Margin="10,0,0,14">
+                        <TextBlock Text="تاريخ التغيير" Style="{StaticResource EntryLabelStyle}"/>
+                        <DatePicker x:Name="ChangeDatePicker"
+                                    AutomationProperties.AutomationId="OilChangeDatePicker"
+                                    Style="{StaticResource EntryDatePickerStyle}"
+                                    SelectedDateFormat="Short"/>
+                    </StackPanel>
+
+                    <Border Grid.Row="1"
+                            Grid.ColumnSpan="2"
+                            Background="{StaticResource AccentPaleBrush}"
+                            BorderBrush="#C9DAE4"
+                            BorderThickness="1"
+                            CornerRadius="8"
+                            Padding="12"
+                            Margin="0,0,0,14">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Margin="0,0,10,0">
+                                <TextBlock Text="عداد العربية الحالي" Style="{StaticResource EntryLabelStyle}"/>
+                                <TextBlock x:Name="VehicleMileageTextBlock" Style="{StaticResource EntryValueStyle}" Text="—"/>
+                            </StackPanel>
+                            <StackPanel Grid.Column="1" Margin="10,0,0,0">
+                                <TextBlock Text="تغيير الزيت كل كام كم" Style="{StaticResource EntryLabelStyle}"/>
+                                <TextBlock x:Name="VehicleOilIntervalTextBlock" Style="{StaticResource EntryValueStyle}" Text="—"/>
+                            </StackPanel>
+                            <StackPanel Grid.Column="2" Margin="10,0,0,0">
+                                <TextBlock Text="التغيير القادم المتوقع" Style="{StaticResource EntryLabelStyle}"/>
+                                <TextBlock x:Name="NextOilChangePreviewTextBlock" Style="{StaticResource EntryValueStyle}" Text="—"/>
+                            </StackPanel>
+                        </Grid>
+                    </Border>
+
+                    <StackPanel Grid.Row="2" Margin="0,0,10,14">
+                        <TextBlock Text="عداد العربية وقت تغيير الزيت" Style="{StaticResource EntryLabelStyle}"/>
+                        <TextBox x:Name="OdometerTextBox"
+                                 AutomationProperties.AutomationId="OilOdometerTextBox"
+                                 Style="{StaticResource EntryTextBoxStyle}"
+                                 TextChanged="OilOdometerTextBox_TextChanged"/>
+                    </StackPanel>
+
+                    <StackPanel Grid.Row="2" Grid.Column="1" Margin="10,0,0,14">
+                        <TextBlock Text="نوع الزيت" Style="{StaticResource EntryLabelStyle}"/>
+                        <TextBox x:Name="OilTypeTextBox"
+                                 AutomationProperties.AutomationId="OilTypeTextBox"
+                                 Style="{StaticResource EntryTextBoxStyle}"/>
+                    </StackPanel>
+
+                    <StackPanel Grid.Row="3" Margin="0,0,10,14">
+                        <TextBlock Text="كمية الزيت باللتر" Style="{StaticResource EntryLabelStyle}"/>
+                        <TextBox x:Name="QuantityTextBox"
+                                 AutomationProperties.AutomationId="OilQuantityTextBox"
+                                 Style="{StaticResource EntryTextBoxStyle}"/>
+                    </StackPanel>
+
+                    <StackPanel Grid.Row="3" Grid.Column="1" Margin="10,0,0,14">
+                        <TextBlock Text="تكلفة الزيت" Style="{StaticResource EntryLabelStyle}"/>
+                        <TextBox x:Name="CostTextBox"
+                                 AutomationProperties.AutomationId="OilCostTextBox"
+                                 Style="{StaticResource EntryTextBoxStyle}"/>
+                    </StackPanel>
+
+                    <StackPanel Grid.Row="4" Margin="0,0,10,14">
+                        <TextBlock Text="الحالة" Style="{StaticResource EntryLabelStyle}"/>
+                        <ComboBox x:Name="StatusComboBox"
+                                  AutomationProperties.AutomationId="OilStatusComboBox"
+                                  Style="{StaticResource EntryComboBoxStyle}">
+                            <ComboBoxItem Content="تم التغيير" Tag="Completed"/>
+                            <ComboBoxItem Content="مجدول" Tag="Scheduled"/>
+                        </ComboBox>
+                    </StackPanel>
+
+                    <StackPanel Grid.Row="5" Grid.ColumnSpan="2">
+                        <TextBlock Text="ملاحظات" Style="{StaticResource EntryLabelStyle}"/>
+                        <TextBox x:Name="NotesTextBox"
+                                 AutomationProperties.AutomationId="OilNotesTextBox"
+                                 Height="86"
+                                 Padding="12,8"
+                                 Style="{StaticResource EntryTextBoxStyle}"
+                                 TextWrapping="Wrap"
+                                 AcceptsReturn="True"
+                                 VerticalScrollBarVisibility="Auto"/>
+                        <TextBlock x:Name="ValidationTextBlock"
+                                   Margin="0,10,0,0"
+                                   Foreground="{StaticResource DangerBrush}"
+                                   FontWeight="SemiBold"
+                                   TextWrapping="Wrap"/>
+                    </StackPanel>
+                </Grid>
+            </Border>
+        </ScrollViewer>
+
+        <Border Grid.Row="2"
+                Style="{StaticResource EntryCardStyle}"
+                Padding="14">
+            <StackPanel Orientation="Horizontal"
+                        HorizontalAlignment="Left"
+                        FlowDirection="LeftToRight">
+                <Button Style="{StaticResource EntryPrimaryButtonStyle}"
+                        IsDefault="True"
+                        AutomationProperties.AutomationId="OilSaveButton"
+                        Click="SaveButton_Click">حفظ</Button>
+                <Button Style="{StaticResource EntrySecondaryButtonStyle}"
+                        Margin="10,0,0,0"
+                        IsCancel="True"
+                        AutomationProperties.AutomationId="OilCancelButton"
+                        Click="CancelButton_Click">إلغاء</Button>
+            </StackPanel>
+        </Border>
+    </Grid>
+</Window>

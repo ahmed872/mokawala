@@ -1,0 +1,272 @@
+<Window x:Class="FleetManagementSystem.WPF.FuelEntryWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="تسجيل بنزين"
+        Width="760"
+        Height="640"
+        MinWidth="720"
+        MinHeight="580"
+        WindowStartupLocation="CenterOwner"
+        ResizeMode="CanResize"
+        FlowDirection="RightToLeft"
+        Background="{StaticResource PageBackgroundBrush}"
+        AutomationProperties.AutomationId="FuelEntryWindow"
+        AutomationProperties.Name="نافذة تسجيل بنزين">
+    <Window.Resources>
+        <SolidColorBrush x:Key="EntryAccentBrush" Color="#123B53"/>
+        <SolidColorBrush x:Key="EntryAccentSoftBrush" Color="#2A607D"/>
+        <SolidColorBrush x:Key="EntryTextBrush" Color="#1F2D3A"/>
+        <SolidColorBrush x:Key="EntryMutedBrush" Color="#6B7A88"/>
+        <SolidColorBrush x:Key="EntryBorderBrush" Color="#D7E0E8"/>
+        <SolidColorBrush x:Key="EntryAltBrush" Color="#F7FAFC"/>
+
+        <Style x:Key="EntryCardStyle" TargetType="Border">
+            <Setter Property="Background" Value="White"/>
+            <Setter Property="BorderBrush" Value="{StaticResource EntryBorderBrush}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="CornerRadius" Value="12"/>
+            <Setter Property="Padding" Value="18"/>
+        </Style>
+
+        <Style x:Key="EntryLabelStyle" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="{StaticResource EntryMutedBrush}"/>
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Margin" Value="0,0,0,8"/>
+        </Style>
+
+        <Style x:Key="EntryTextBoxStyle" TargetType="TextBox" BasedOn="{StaticResource AppTextBoxStyle}">
+            <Setter Property="Height" Value="42"/>
+            <Setter Property="Background" Value="{StaticResource EntryAltBrush}"/>
+            <Setter Property="BorderBrush" Value="{StaticResource EntryBorderBrush}"/>
+        </Style>
+
+        <Style x:Key="EntryComboBoxStyle" TargetType="ComboBox" BasedOn="{StaticResource AppComboBoxStyle}">
+            <Setter Property="Height" Value="42"/>
+            <Setter Property="Background" Value="{StaticResource EntryAltBrush}"/>
+            <Setter Property="BorderBrush" Value="{StaticResource EntryBorderBrush}"/>
+        </Style>
+
+        <Style x:Key="EntryDatePickerStyle" TargetType="DatePicker">
+            <Setter Property="Height" Value="42"/>
+            <Setter Property="FontSize" Value="14"/>
+            <Setter Property="Foreground" Value="{StaticResource EntryTextBrush}"/>
+            <Setter Property="Background" Value="{StaticResource EntryAltBrush}"/>
+            <Setter Property="BorderBrush" Value="{StaticResource EntryBorderBrush}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+        </Style>
+
+        <Style x:Key="EntryPrimaryButtonStyle" TargetType="Button">
+            <Setter Property="Height" Value="44"/>
+            <Setter Property="MinWidth" Value="128"/>
+            <Setter Property="Padding" Value="20,8"/>
+            <Setter Property="FontSize" Value="14"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="Background" Value="{StaticResource EntryAccentBrush}"/>
+            <Setter Property="BorderBrush" Value="{StaticResource EntryAccentBrush}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="ButtonBorder"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="8">
+                            <ContentPresenter HorizontalAlignment="Center"
+                                              VerticalAlignment="Center"
+                                              Margin="{TemplateBinding Padding}"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="ButtonBorder" Property="Background" Value="{StaticResource EntryAccentSoftBrush}"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="ButtonBorder" Property="Opacity" Value="0.86"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="EntrySecondaryButtonStyle" TargetType="Button" BasedOn="{StaticResource EntryPrimaryButtonStyle}">
+            <Setter Property="Foreground" Value="{StaticResource EntryAccentBrush}"/>
+            <Setter Property="Background" Value="{StaticResource AccentPaleBrush}"/>
+            <Setter Property="BorderBrush" Value="#C9DAE4"/>
+        </Style>
+    </Window.Resources>
+
+    <Grid Margin="18">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <Border Style="{StaticResource EntryCardStyle}">
+            <StackPanel>
+                <TextBlock Text="تسجيل بنزين"
+                           FontSize="24"
+                           FontWeight="Bold"
+                           Foreground="{StaticResource EntryTextBrush}"/>
+                <TextBlock Margin="0,5,0,0"
+                           Text="اختر العربية أولًا، وستظهر تشغيلات نفس العربية فقط. عدد اللترات وسعر اللتر يحسبان إجمالي التكلفة تلقائيًا."
+                           FontSize="13"
+                           FontWeight="SemiBold"
+                           Foreground="{StaticResource EntryMutedBrush}"
+                           TextWrapping="Wrap"/>
+            </StackPanel>
+        </Border>
+
+        <ScrollViewer Grid.Row="1"
+                      Margin="0,14"
+                      VerticalScrollBarVisibility="Auto">
+            <Border Style="{StaticResource EntryCardStyle}">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+
+                    <StackPanel Margin="0,0,10,14">
+                        <TextBlock Text="العربية" Style="{StaticResource EntryLabelStyle}"/>
+                        <ComboBox x:Name="VehicleComboBox"
+                                  AutomationProperties.AutomationId="FuelVehicleComboBox"
+                                  Style="{StaticResource EntryComboBoxStyle}"
+                                  DisplayMemberPath="PlateNumber"
+                                  SelectedValuePath="Id"
+                                  SelectionChanged="VehicleComboBox_SelectionChanged"/>
+                    </StackPanel>
+
+                    <StackPanel Grid.Column="1" Margin="10,0,0,14">
+                        <TextBlock Text="التشغيلة" Style="{StaticResource EntryLabelStyle}"/>
+                        <ComboBox x:Name="TripComboBox"
+                                  AutomationProperties.AutomationId="FuelTripComboBox"
+                                  Style="{StaticResource EntryComboBoxStyle}"
+                                  DisplayMemberPath="Label"
+                                  SelectionChanged="TripComboBox_SelectionChanged"/>
+                    </StackPanel>
+
+                    <StackPanel Grid.Row="1" Margin="0,0,10,14">
+                        <TextBlock Text="تاريخ التسجيل" Style="{StaticResource EntryLabelStyle}"/>
+                        <DatePicker x:Name="TransactionDatePicker"
+                                    AutomationProperties.AutomationId="FuelTransactionDatePicker"
+                                    Style="{StaticResource EntryDatePickerStyle}"
+                                    SelectedDateFormat="Short"/>
+                    </StackPanel>
+
+                    <StackPanel Grid.Row="1" Grid.Column="1" Margin="10,0,0,14">
+                        <TextBlock Text="نوع الوقود" Style="{StaticResource EntryLabelStyle}"/>
+                        <TextBox x:Name="FuelTypeTextBox"
+                                 AutomationProperties.AutomationId="FuelTypeTextBox"
+                                 Style="{StaticResource EntryTextBoxStyle}"/>
+                    </StackPanel>
+
+                    <StackPanel Grid.Row="2" Margin="0,0,10,14">
+                        <TextBlock Text="عدد اللترات" Style="{StaticResource EntryLabelStyle}"/>
+                        <TextBox x:Name="QuantityTextBox"
+                                 AutomationProperties.AutomationId="FuelQuantityTextBox"
+                                 Style="{StaticResource EntryTextBoxStyle}"
+                                 ToolTip="عدد اللترات التي تم تموينها"
+                                 TextChanged="FuelCostInput_Changed"/>
+                    </StackPanel>
+
+                    <StackPanel Grid.Row="2" Grid.Column="1" Margin="10,0,0,14">
+                        <TextBlock Text="سعر اللتر" Style="{StaticResource EntryLabelStyle}"/>
+                        <TextBox x:Name="UnitPriceTextBox"
+                                 AutomationProperties.AutomationId="FuelUnitPriceTextBox"
+                                 Style="{StaticResource EntryTextBoxStyle}"
+                                 ToolTip="سعر لتر البنزين"
+                                 TextChanged="FuelCostInput_Changed"/>
+                    </StackPanel>
+
+                    <StackPanel Grid.Row="3" Margin="0,0,10,14">
+                        <TextBlock Text="إجمالي التكلفة" Style="{StaticResource EntryLabelStyle}"/>
+                        <TextBox x:Name="TotalCostTextBox"
+                                 AutomationProperties.AutomationId="FuelTotalCostTextBox"
+                                 Style="{StaticResource EntryTextBoxStyle}"
+                                 ToolTip="لو كتبت إجمالي التكلفة مع سعر اللتر، سيحسب النظام عدد اللترات"
+                                 TextChanged="FuelCostInput_Changed"/>
+                    </StackPanel>
+
+                    <StackPanel Grid.Row="3" Grid.Column="1" Margin="10,0,0,14">
+                        <TextBlock Text="عداد العربية وقت التموين" Style="{StaticResource EntryLabelStyle}"/>
+                        <TextBox x:Name="OdometerTextBox"
+                                 AutomationProperties.AutomationId="FuelOdometerTextBox"
+                                 Style="{StaticResource EntryTextBoxStyle}"/>
+                        <TextBlock x:Name="FuelVehicleMileageTextBlock"
+                                   Margin="2,6,0,0"
+                                   Foreground="{StaticResource EntryMutedBrush}"
+                                   FontSize="12"
+                                   FontWeight="SemiBold"
+                                   Text="عداد العربية الحالي: —"/>
+                    </StackPanel>
+
+                    <StackPanel Grid.Row="4" Margin="0,0,10,14">
+                        <TextBlock Text="محطة البنزين" Style="{StaticResource EntryLabelStyle}"/>
+                        <TextBox x:Name="FuelStationTextBox"
+                                 AutomationProperties.AutomationId="FuelStationTextBox"
+                                 Style="{StaticResource EntryTextBoxStyle}"/>
+                    </StackPanel>
+
+                    <CheckBox x:Name="PaidFromTreasuryCheckBox"
+                              Grid.Row="4"
+                              Grid.Column="1"
+                              Margin="10,30,0,14"
+                              AutomationProperties.AutomationId="FuelPaidFromTreasuryCheckBox"
+                              Content="صرف من الخزينة"
+                              FontSize="14"
+                              FontWeight="SemiBold"
+                              Foreground="{StaticResource EntryTextBrush}"/>
+
+                    <StackPanel Grid.Row="5" Grid.ColumnSpan="2">
+                        <TextBlock Text="ملاحظات" Style="{StaticResource EntryLabelStyle}"/>
+                        <TextBox x:Name="NotesTextBox"
+                                 AutomationProperties.AutomationId="FuelNotesTextBox"
+                                 Height="86"
+                                 Padding="12,8"
+                                 Style="{StaticResource EntryTextBoxStyle}"
+                                 TextWrapping="Wrap"
+                                 AcceptsReturn="True"
+                                 VerticalScrollBarVisibility="Auto"/>
+                        <TextBlock x:Name="ValidationTextBlock"
+                                   Margin="0,10,0,0"
+                                   Foreground="{StaticResource DangerBrush}"
+                                   FontWeight="SemiBold"
+                                   TextWrapping="Wrap"/>
+                    </StackPanel>
+                </Grid>
+            </Border>
+        </ScrollViewer>
+
+        <Border Grid.Row="2"
+                Style="{StaticResource EntryCardStyle}"
+                Padding="14">
+            <StackPanel Orientation="Horizontal"
+                        HorizontalAlignment="Left"
+                        FlowDirection="LeftToRight">
+                <Button Style="{StaticResource EntryPrimaryButtonStyle}"
+                        IsDefault="True"
+                        AutomationProperties.AutomationId="FuelSaveButton"
+                        Click="SaveButton_Click">حفظ</Button>
+                <Button Style="{StaticResource EntrySecondaryButtonStyle}"
+                        Margin="10,0,0,0"
+                        IsCancel="True"
+                        AutomationProperties.AutomationId="FuelCancelButton"
+                        Click="CancelButton_Click">إلغاء</Button>
+            </StackPanel>
+        </Border>
+    </Grid>
+</Window>

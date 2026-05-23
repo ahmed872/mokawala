@@ -167,7 +167,7 @@
                         </Border>
                         <Border Grid.Column="1" Style="{StaticResource PermitCellStyle}">
                             <StackPanel>
-                                <TextBlock Text="النوع / الموديل" Style="{StaticResource PermitLabelStyle}" />
+                                <TextBlock Text="الموديل" Style="{StaticResource PermitLabelStyle}" />
                                 <TextBlock x:Name="VehicleModelTextBlock" Style="{StaticResource PermitValueStyle}" />
                             </StackPanel>
                         </Border>

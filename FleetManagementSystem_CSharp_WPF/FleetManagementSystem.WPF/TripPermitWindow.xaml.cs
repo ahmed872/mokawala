@@ -20,7 +20,7 @@ public partial class TripPermitWindow : Window
         TripStatusTextBlock.Text = NormalizeStatus(trip.Status);
 
         VehiclePlateTextBlock.Text = ValueOrDash(vehicle?.PlateNumber, trip.VehiclePlateNumber);
-        VehicleModelTextBlock.Text = ValueOrDash($"{vehicle?.VehicleType} / {vehicle?.Model}".Trim(' ', '/'));
+        VehicleModelTextBlock.Text = ValueOrDash(vehicle?.Model);
         VehicleChassisTextBlock.Text = ValueOrDash(vehicle?.ChassisNumber);
         VehicleEngineTextBlock.Text = ValueOrDash(vehicle?.EngineNumber);
         RegistrationStartTextBlock.Text = FormatDate(vehicle?.RegistrationStartDate);
@@ -30,7 +30,7 @@ public partial class TripPermitWindow : Window
         DriverNameTextBlock.Text = ValueOrDash(trip.DriverName);
         RequesterNameTextBlock.Text = ValueOrDash(trip.RequesterName);
         SupervisorNameTextBlock.Text = ValueOrDash(trip.SupervisorName);
-        RouteTextBlock.Text = $"{ValueOrDash(trip.StartLocation)} إلى {ValueOrDash(trip.EndLocation)}";
+        RouteTextBlock.Text = BuildRouteText(trip.StartLocation, trip.EndLocation);
         PurposeTextBlock.Text = string.IsNullOrWhiteSpace(trip.Notes)
             ? ValueOrDash(trip.Purpose)
             : $"{ValueOrDash(trip.Purpose)}\n{trip.Notes}";
@@ -99,18 +99,13 @@ public partial class TripPermitWindow : Window
             return "—";
         }
 
-        var accident = string.IsNullOrWhiteSpace(vehicle.AccidentInsuranceDetails)
+        return string.IsNullOrWhiteSpace(vehicle.AccidentInsuranceDetails)
             ? "تأمين حوادث: غير مسجل"
             : $"تأمين حوادث: {vehicle.AccidentInsuranceDetails}";
-        var social = string.IsNullOrWhiteSpace(vehicle.SocialInsuranceDetails)
-            ? "تأمين اجتماعي: غير مسجل"
-            : $"تأمين اجتماعي: {vehicle.SocialInsuranceDetails}";
-
-        return $"{accident}\n{social}";
     }
 
     private static string FormatDate(DateTime? value) =>
-        value.HasValue ? value.Value.ToString("yyyy-MM-dd") : "—";
+        value.HasValue ? value.Value.ToString("yyyy-MM-dd") : "غير مسجل";
 
     private static string ValueOrDash(params string?[] values)
     {
@@ -124,6 +119,9 @@ public partial class TripPermitWindow : Window
 
         return "—";
     }
+
+    private static string BuildRouteText(string? startLocation, string? endLocation)
+        => $"{ValueOrDash(startLocation)} إلى {ValueOrDash(endLocation)}";
 
     private static string NormalizeStatus(string? status) =>
         status?.Trim() switch

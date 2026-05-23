@@ -10,6 +10,7 @@ using System.Globalization;
 using System.IO;
 using System.Text;
 using System.Windows;
+using System.Windows.Automation;
 using System.Windows.Controls;
 using System.Windows.Data;
 using System.Windows.Documents;
@@ -23,6 +24,7 @@ namespace FleetManagementSystem.WPF;
 
 public partial class MainWindow : Window
 {
+    private const int VehicleRegistrationAlertDays = 60;
     private const double DefaultGridColumnWidth = 190;
     private const double NarrowGridColumnWidth = 95;
     private const double CompactGridColumnWidth = 140;
@@ -37,6 +39,8 @@ public partial class MainWindow : Window
         "DriverName",
         "RequesterName",
         "SupervisorName",
+        "SocialInsuranceDetails",
+        "TripSummary",
         "MaintenanceType",
         "ServiceProvider",
         "Items",
@@ -60,11 +64,12 @@ public partial class MainWindow : Window
         ["AssignedTo"] = "مخصص لـ",
         ["PurchaseDate"] = "تاريخ الشراء",
         ["PurchasePrice"] = "سعر الشراء",
+        ["RegistrationType"] = "نوع الرخصة",
         ["RegistrationStartDate"] = "بداية الترخيص",
         ["RegistrationExpiryDate"] = "نهاية الترخيص",
         ["AccidentInsuranceDetails"] = "تأمين الحوادث",
         ["SocialInsuranceDetails"] = "التأمين الاجتماعي",
-        ["OilChangeIntervalKm"] = "دورية الزيت",
+        ["OilChangeIntervalKm"] = "تغيير الزيت كل كام كم",
         ["MaintenanceIntervalKm"] = "دورية الصيانة",
         ["Notes"] = "ملاحظات",
         ["ContractNumber"] = "رقم العقد",
@@ -98,6 +103,15 @@ public partial class MainWindow : Window
         ["TerminationDate"] = "تاريخ الانتهاء",
         ["TransactionDate"] = "التاريخ",
         ["TransactionType"] = "نوع الحركة",
+        ["TripId"] = "رقم التشغيلة",
+        ["TripSummary"] = "التشغيلة",
+        ["FuelType"] = "نوع الوقود",
+        ["Quantity"] = "عدد اللترات",
+        ["UnitPrice"] = "سعر اللتر",
+        ["TotalCost"] = "إجمالي البنزين",
+        ["FuelStation"] = "محطة البنزين",
+        ["Odometer"] = "عداد التموين",
+        ["PaidFromTreasury"] = "من الخزينة",
         ["Amount"] = "المبلغ",
         ["RelatedEntityType"] = "مرتبط بـ",
         ["RelatedEntityId"] = "رقم المرتبط",
@@ -117,6 +131,12 @@ public partial class MainWindow : Window
         ["HandoverDate"] = "تاريخ التسليم",
         ["ReturnDate"] = "تاريخ الإرجاع",
         ["VehicleConditionRating"] = "تقييم الحالة",
+        ["NextOilChangeOdometer"] = "تغيير الزيت القادم",
+        ["CurrentVehicleMileage"] = "عداد العربية الحالي",
+        ["KmSinceOilChange"] = "المقطوع من آخر تغيير",
+        ["RemainingKm"] = "المتبقي كم",
+        ["OilAlert"] = "إنذار الزيت",
+        ["IsDue"] = "يحتاج متابعة",
         ["Username"] = "اسم المستخدم",
         ["Role"] = "الدور",
         ["Password"] = "كلمة المرور"
@@ -162,13 +182,16 @@ public partial class MainWindow : Window
     private readonly ObservableCollection<ServiceProviderDto> _serviceProviders = new();
     private readonly ObservableCollection<NotificationDto> _notifications = new();
     private readonly ObservableCollection<UserFormDto> _users = new();
+    private readonly List<DashboardAlertItem> _dashboardAlertItems = new();
 
     private UserDto? _currentUser;
     private CompanySettingsDto? _settings;
     private ReportDataDto? _currentReport;
+    private readonly Dictionary<string, string> _reportColumnFilters = new(StringComparer.OrdinalIgnoreCase);
     private readonly DispatcherTimer _clockTimer;
 
     public ObservableCollection<VehicleDto> VehiclesForBinding => _vehicles;
+    public ObservableCollection<TripDto> TripsForBinding => _trips;
     public ObservableCollection<DriverDto> DriversForBinding => _drivers;
     public ObservableCollection<EmployeeDto> EmployeesForBinding => _employees;
     public ObservableCollection<ContractStatusDto> ContractStatusesForBinding => _contractStatuses;
@@ -176,12 +199,18 @@ public partial class MainWindow : Window
     public ObservableCollection<ServiceProviderDto> ServiceProvidersForBinding => _serviceProviders;
     public IReadOnlyList<string> TreasuryTransactionTypes { get; } = new[] { "إيراد", "صرف" };
     public IReadOnlyList<string> PaymentMethods { get; } = new[] { "نقدي", "تحويل بنكي", "بطاقة" };
+    public IReadOnlyList<string> RegistrationTypes { get; } = new[] { "ترخيص", "تصريح" };
 
     public sealed class VehicleLicenseRow
     {
         public int VehicleId { get; set; }
         public string PlateNumber { get; set; } = string.Empty;
         public string Model { get; set; } = string.Empty;
+        public int Year { get; set; } = DateTime.Today.Year;
+        public string ChassisNumber { get; set; } = string.Empty;
+        public string EngineNumber { get; set; } = string.Empty;
+        public decimal OilChangeIntervalKm { get; set; } = 10000;
+        public string RegistrationType { get; set; } = "ترخيص";
         public DateTime? RegistrationStartDate { get; set; }
         public DateTime? RegistrationExpiryDate { get; set; }
         public int? DaysUntilExpiry => RegistrationExpiryDate.HasValue
@@ -191,14 +220,14 @@ public partial class MainWindow : Window
         {
             null => "غير مسجل",
             < 0 => "منتهي",
-            <= 30 => "قارب الانتهاء",
+            <= VehicleRegistrationAlertDays => "قارب الانتهاء",
             _ => "ساري"
         };
         public string ExpiryAlert => DaysUntilExpiry switch
         {
             null => "أدخل بداية ونهاية الترخيص",
             < 0 => "الترخيص منتهي",
-            <= 30 => $"يحتاج تجديد خلال {DaysUntilExpiry} يوم",
+            <= VehicleRegistrationAlertDays => $"يحتاج تجديد خلال {DaysUntilExpiry} يوم",
             _ => "لا يوجد إنذار"
         };
 
@@ -207,6 +236,11 @@ public partial class MainWindow : Window
             VehicleId = vehicle.Id,
             PlateNumber = vehicle.PlateNumber,
             Model = vehicle.Model,
+            Year = vehicle.Year,
+            ChassisNumber = vehicle.ChassisNumber,
+            EngineNumber = vehicle.EngineNumber,
+            OilChangeIntervalKm = vehicle.OilChangeIntervalKm > 0 ? vehicle.OilChangeIntervalKm : 10000,
+            RegistrationType = string.IsNullOrWhiteSpace(vehicle.RegistrationType) ? "ترخيص" : vehicle.RegistrationType,
             RegistrationStartDate = vehicle.RegistrationStartDate,
             RegistrationExpiryDate = vehicle.RegistrationExpiryDate
         };
@@ -251,12 +285,16 @@ public partial class MainWindow : Window
         {
             var dueDate = alert.DueDate?.Date;
             var days = dueDate.HasValue ? (dueDate.Value - DateTime.Today).Days : (int?)null;
-            var priority = days switch
+            var priority = days.HasValue ? days switch
             {
-                null => 3,
                 < 0 => 0,
                 <= 7 => 1,
                 _ => 2
+            } : alert.Type switch
+            {
+                "Critical" or "Error" => 0,
+                "Warning" => 1,
+                _ => 3
             };
 
             var (accent, background, border, chip) = priority switch
@@ -274,7 +312,7 @@ public partial class MainWindow : Window
                 CategoryInitial = GetCategoryInitial(alert.RelatedEntityType),
                 StatusText = GetStatusText(days),
                 TimingText = GetTimingText(days),
-                DueDateText = dueDate.HasValue ? $"تاريخ الانتهاء {dueDate:yyyy-MM-dd}" : "لا يوجد تاريخ انتهاء",
+                DueDateText = dueDate.HasValue ? $"تاريخ الانتهاء {dueDate:yyyy-MM-dd}" : GetNoDateText(alert.RelatedEntityType),
                 DueDate = dueDate,
                 SortPriority = priority,
                 SortDistance = days.HasValue ? Math.Abs(days.Value) : int.MaxValue,
@@ -291,6 +329,7 @@ public partial class MainWindow : Window
             {
                 "Vehicle" => "ترخيص",
                 "Insurance" => "تأمين",
+                "OilChange" => "زيت",
                 _ => "متابعة"
             };
 
@@ -299,8 +338,14 @@ public partial class MainWindow : Window
             {
                 "Vehicle" => "ر",
                 "Insurance" => "ت",
+                "OilChange" => "ز",
                 _ => "!"
             };
+
+        private static string GetNoDateText(string relatedEntityType) =>
+            string.Equals(relatedEntityType, "OilChange", StringComparison.OrdinalIgnoreCase)
+                ? "الإنذار مرتبط بقراءة العداد"
+                : "لا يوجد تاريخ انتهاء";
 
         private static string GetStatusText(int? days) =>
             days switch
@@ -476,18 +521,54 @@ public partial class MainWindow : Window
             .ThenBy(alert => alert.DueDate ?? DateTime.MaxValue)
             .ToList();
 
+        _dashboardAlertItems.Clear();
+        _dashboardAlertItems.AddRange(dashboardAlerts);
+
         AlertsListBox.ItemsSource = alerts;
-        DashboardAlertsListBox.ItemsSource = dashboardAlerts;
-        DashboardAlertCountTextBlock.Text = BuildDashboardAlertCountText(dashboardAlerts.Count);
-        DashboardAlertSummaryTextBlock.Text = BuildDashboardAlertSummaryText(dashboardAlerts);
-        DashboardAlertsListBox.Visibility = dashboardAlerts.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
-        DashboardNoAlertsPanel.Visibility = dashboardAlerts.Count > 0 ? Visibility.Collapsed : Visibility.Visible;
+        ApplyDashboardAlertMonthFilter();
         ActivityListBox.ItemsSource = metrics.RecentActivities;
+    }
+
+    private void DashboardAlertMonthFilter_Changed(object sender, SelectionChangedEventArgs e) => ApplyDashboardAlertMonthFilter();
+
+    private void ApplyDashboardAlertMonthFilter()
+    {
+        if (DashboardAlertsListBox is null ||
+            DashboardAlertCountTextBlock is null ||
+            DashboardAlertSummaryTextBlock is null ||
+            DashboardNoAlertsPanel is null)
+        {
+            return;
+        }
+
+        var selectedMonth = GetSelectedDashboardAlertMonth();
+        var filteredAlerts = _dashboardAlertItems
+            .Where(alert => !selectedMonth.HasValue || alert.DueDate?.Month == selectedMonth.Value)
+            .ToList();
+
+        DashboardAlertsListBox.ItemsSource = filteredAlerts;
+        DashboardAlertCountTextBlock.Text = BuildDashboardAlertCountText(filteredAlerts.Count);
+        DashboardAlertSummaryTextBlock.Text = BuildDashboardAlertSummaryText(filteredAlerts);
+        DashboardAlertsListBox.Visibility = filteredAlerts.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
+        DashboardNoAlertsPanel.Visibility = filteredAlerts.Count > 0 ? Visibility.Collapsed : Visibility.Visible;
+    }
+
+    private int? GetSelectedDashboardAlertMonth()
+    {
+        if (DashboardAlertMonthComboBox?.SelectedItem is not ComboBoxItem item ||
+            !int.TryParse(item.Tag?.ToString(), out var month) ||
+            month is < 1 or > 12)
+        {
+            return null;
+        }
+
+        return month;
     }
 
     private static bool IsDashboardRenewalAlert(AlertDto alert) =>
         string.Equals(alert.RelatedEntityType, "Vehicle", StringComparison.OrdinalIgnoreCase) ||
-        string.Equals(alert.RelatedEntityType, "Insurance", StringComparison.OrdinalIgnoreCase);
+        string.Equals(alert.RelatedEntityType, "Insurance", StringComparison.OrdinalIgnoreCase) ||
+        string.Equals(alert.RelatedEntityType, "OilChange", StringComparison.OrdinalIgnoreCase);
 
     private static string BuildDashboardAlertCountText(int count) =>
         count switch
@@ -502,7 +583,7 @@ public partial class MainWindow : Window
     {
         if (alerts.Count == 0)
         {
-            return "كل التراخيص والتأمينات المسجلة خارج نطاق الخطر الحالي.";
+            return "كل التراخيص والتأمينات والزيوت المسجلة خارج نطاق الخطر الحالي.";
         }
 
         var expiredCount = alerts.Count(alert => alert.SortPriority == 0);
@@ -524,10 +605,6 @@ public partial class MainWindow : Window
     {
         ReplaceCollection(_vehicles, await _vehicleService.GetAllAsync());
 
-        if (ReportVehicleComboBox is not null && ReportVehicleComboBox.SelectedItem is null && _vehicles.Count > 0)
-        {
-            ReportVehicleComboBox.SelectedItem = _vehicles[0];
-        }
     }
     private async Task LoadContractsAsync() => ReplaceCollection(_contracts, await _contractService.GetAllAsync());
     private async Task LoadMaintenanceAsync() => ReplaceCollection(_maintenance, await _maintenanceService.GetAllAsync());
@@ -538,7 +615,19 @@ public partial class MainWindow : Window
     private async Task LoadTripsAsync()
     {
         var selectedTripId = Selected<TripDto>(TripsGrid)?.Id ?? 0;
-        ReplaceCollection(_trips, await _tripService.GetAllAsync());
+        var trips = await _tripService.GetAllAsync();
+        var fuelItems = await _fuelService.GetAllAsync();
+        ReplaceCollection(_fuel, fuelItems);
+
+        for (var index = 0; index < trips.Count; index++)
+        {
+            trips[index].Serial = index + 1;
+            var linkedFuel = GetTripFuelTransactions(trips[index], fuelItems).ToList();
+            trips[index].RegisteredFuelQuantity = linkedFuel.Sum(f => f.Quantity);
+            trips[index].RegisteredFuelCost = linkedFuel.Sum(f => f.TotalCost);
+        }
+
+        ReplaceCollection(_trips, trips);
 
         if (selectedTripId > 0)
         {
@@ -782,9 +871,10 @@ public partial class MainWindow : Window
 
     private static string GetColumnWidthKey(DataGridColumn column)
     {
-        if (column.Header is TextBlock headerTextBlock)
+        var headerText = GetHeaderText(column.Header);
+        if (!string.IsNullOrWhiteSpace(headerText))
         {
-            return headerTextBlock.ToolTip?.ToString() ?? headerTextBlock.Text;
+            return headerText;
         }
 
         if (column is DataGridBoundColumn boundColumn &&
@@ -795,6 +885,33 @@ public partial class MainWindow : Window
         }
 
         return column.Header?.ToString() ?? string.Empty;
+    }
+
+    private static string GetHeaderText(object? header)
+    {
+        if (header is TextBlock textBlock)
+        {
+            return textBlock.ToolTip?.ToString() ?? textBlock.Text;
+        }
+
+        if (header is Panel panel)
+        {
+            foreach (var child in panel.Children)
+            {
+                var value = GetHeaderText(child);
+                if (!string.IsNullOrWhiteSpace(value))
+                {
+                    return value;
+                }
+            }
+        }
+
+        if (header is ContentControl contentControl)
+        {
+            return GetHeaderText(contentControl.Content);
+        }
+
+        return string.Empty;
     }
 
     private static void ApplyReadableColumnWidth(DataGridColumn column, string key)
@@ -812,6 +929,18 @@ public partial class MainWindow : Window
         }
 
         var normalizedKey = key.Trim();
+
+        if (normalizedKey is "من" or "إلى" ||
+            normalizedKey.Contains("الغرض", StringComparison.OrdinalIgnoreCase))
+        {
+            return ExtraWideGridColumnWidth;
+        }
+
+        if (normalizedKey.Contains("بنزين", StringComparison.OrdinalIgnoreCase) ||
+            normalizedKey.Contains("وقود", StringComparison.OrdinalIgnoreCase))
+        {
+            return CompactGridColumnWidth;
+        }
 
         if (normalizedKey.Equals("Id", StringComparison.OrdinalIgnoreCase) ||
             normalizedKey.Equals("رقم", StringComparison.OrdinalIgnoreCase) ||
@@ -945,13 +1074,87 @@ public partial class MainWindow : Window
             var newRow = table.NewRow();
             foreach (var column in report.Columns)
             {
-                newRow[column] = row.TryGetValue(column, out var value) ? value ?? DBNull.Value : DBNull.Value;
+                newRow[column] = row.TryGetValue(column, out var value) ? FormatReportCellValue(value) : DBNull.Value;
             }
 
             table.Rows.Add(newRow);
         }
 
         return table;
+    }
+
+    private static object FormatReportCellValue(object? value) => value switch
+    {
+        null => DBNull.Value,
+        DBNull => DBNull.Value,
+        DateTime date => date.ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture),
+        DateTimeOffset date => date.ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture),
+        _ => value
+    };
+
+    private ReportDataDto BuildDisplayedReportSnapshot(ReportDataDto source)
+    {
+        if (ReportsGrid.ItemsSource is not DataView view)
+        {
+            return source;
+        }
+
+        var table = view.Table;
+        if (table is null)
+        {
+            return source;
+        }
+
+        var columns = table.Columns
+            .Cast<DataColumn>()
+            .Select(column => column.ColumnName)
+            .ToList();
+
+        var rows = view
+            .Cast<DataRowView>()
+            .Select(row =>
+            {
+                var values = new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase);
+                foreach (var column in columns)
+                {
+                    values[column] = table.Columns.Contains(column) ? row[column] : DBNull.Value;
+                }
+
+                return values;
+            })
+            .ToList();
+
+        return new ReportDataDto
+        {
+            ReportTitle = source.ReportTitle,
+            GeneratedDate = source.GeneratedDate,
+            GeneratedBy = source.GeneratedBy,
+            Columns = columns,
+            Data = rows
+        };
+    }
+
+    private static ReportDataDto BuildSelectedReportRowSnapshot(ReportDataDto source, DataRowView selectedRow)
+    {
+        var columns = selectedRow.Row.Table.Columns
+            .Cast<DataColumn>()
+            .Select(column => column.ColumnName)
+            .ToList();
+
+        var values = new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase);
+        foreach (var column in columns)
+        {
+            values[column] = selectedRow.Row.Table.Columns.Contains(column) ? selectedRow[column] : DBNull.Value;
+        }
+
+        return new ReportDataDto
+        {
+            ReportTitle = $"{source.ReportTitle} - سجل محدد",
+            GeneratedDate = source.GeneratedDate,
+            GeneratedBy = source.GeneratedBy,
+            Columns = columns,
+            Data = new List<Dictionary<string, object>> { values }
+        };
     }
 
     private static string SafeFileName(string value)
@@ -1011,12 +1214,17 @@ public partial class MainWindow : Window
 
     private static FlowDocument BuildReportDocument(ReportDataDto report)
     {
+        var pageWidth = Math.Max(980, report.Columns.Sum(GetReportColumnPrintWidth) + 72);
         var document = new FlowDocument
         {
             FlowDirection = FlowDirection.RightToLeft,
-            FontFamily = new System.Windows.Media.FontFamily("Segoe UI"),
-            FontSize = report.Columns.Count > 8 ? 9 : 11,
-            PagePadding = new Thickness(36)
+            FontFamily = new FontFamily("Segoe UI"),
+            FontSize = report.Columns.Count > 10 ? 9.5 : 11,
+            PagePadding = new Thickness(36),
+            PageWidth = pageWidth,
+            MinPageWidth = pageWidth,
+            MaxPageWidth = pageWidth,
+            ColumnWidth = pageWidth
         };
 
         document.Blocks.Add(new Paragraph(new Run(report.ReportTitle))
@@ -1036,9 +1244,9 @@ public partial class MainWindow : Window
         });
 
         var table = new Table { CellSpacing = 0 };
-        foreach (var _ in report.Columns)
+        foreach (var column in report.Columns)
         {
-            table.Columns.Add(new TableColumn { Width = new GridLength(1, GridUnitType.Star) });
+            table.Columns.Add(new TableColumn { Width = new GridLength(GetReportColumnPrintWidth(column)) });
         }
 
         var rowGroup = new TableRowGroup();
@@ -1081,6 +1289,62 @@ public partial class MainWindow : Window
         table.RowGroups.Add(rowGroup);
         document.Blocks.Add(table);
         return document;
+    }
+
+    private static double GetReportColumnPrintWidth(string column)
+    {
+        if (string.IsNullOrWhiteSpace(column))
+        {
+            return 125;
+        }
+
+        var normalized = column.Trim();
+        if (normalized is "سيريال" or "رقم" or "Id")
+        {
+            return 80;
+        }
+
+        if (normalized.Contains("تاريخ", StringComparison.OrdinalIgnoreCase) ||
+            normalized.Contains("بداية", StringComparison.OrdinalIgnoreCase) ||
+            normalized.Contains("نهاية", StringComparison.OrdinalIgnoreCase) ||
+            normalized.Contains("Expiry", StringComparison.OrdinalIgnoreCase))
+        {
+            return 140;
+        }
+
+        if (normalized.Contains("الغرض", StringComparison.OrdinalIgnoreCase) ||
+            normalized.Contains("ملاحظات", StringComparison.OrdinalIgnoreCase) ||
+            normalized.Contains("تفاصيل", StringComparison.OrdinalIgnoreCase) ||
+            normalized.Contains("الوصف", StringComparison.OrdinalIgnoreCase))
+        {
+            return 220;
+        }
+
+        if (normalized.Contains("السائق", StringComparison.OrdinalIgnoreCase) ||
+            normalized.Contains("الموصي", StringComparison.OrdinalIgnoreCase) ||
+            normalized.Contains("المشرف", StringComparison.OrdinalIgnoreCase) ||
+            normalized.Contains("رقم السيارة", StringComparison.OrdinalIgnoreCase) ||
+            normalized.Contains("محطة", StringComparison.OrdinalIgnoreCase))
+        {
+            return 155;
+        }
+
+        if (normalized is "من" or "إلى" ||
+            normalized.Contains("منطقة", StringComparison.OrdinalIgnoreCase))
+        {
+            return 165;
+        }
+
+        if (normalized.Contains("وقود", StringComparison.OrdinalIgnoreCase) ||
+            normalized.Contains("تكلفة", StringComparison.OrdinalIgnoreCase) ||
+            normalized.Contains("المسافة", StringComparison.OrdinalIgnoreCase) ||
+            normalized.Contains("العداد", StringComparison.OrdinalIgnoreCase) ||
+            normalized.Contains("الحالة", StringComparison.OrdinalIgnoreCase))
+        {
+            return 125;
+        }
+
+        return 135;
     }
 
     private static TableCell CreateReportCell(string value, bool isHeader)
@@ -1198,6 +1462,466 @@ public partial class MainWindow : Window
         yield return Section("أول سجلات التقرير", displayedRows.ToArray());
     }
 
+    private IReadOnlyList<VehicleLicenseRow> GetVisibleLicenseRows()
+    {
+        var view = CollectionViewSource.GetDefaultView(LicensesGrid.ItemsSource);
+        return view is null
+            ? _vehicleLicenses.ToList()
+            : view.Cast<object>().OfType<VehicleLicenseRow>().ToList();
+    }
+
+    private IReadOnlyList<InsuranceDto> GetVisibleInsuranceRows()
+    {
+        var view = CollectionViewSource.GetDefaultView(InsuranceGrid.ItemsSource);
+        return view is null
+            ? _insurance.ToList()
+            : view.Cast<object>().OfType<InsuranceDto>().ToList();
+    }
+
+    private IReadOnlyList<FuelTransactionDto> GetVisibleFuelRows()
+    {
+        var view = CollectionViewSource.GetDefaultView(FuelGrid.ItemsSource);
+        return view is null
+            ? _fuel.ToList()
+            : view.Cast<object>().OfType<FuelTransactionDto>().ToList();
+    }
+
+    private ReportDataDto BuildVehicleLicensesReportSnapshot(IEnumerable<VehicleLicenseRow> licenses, string title)
+    {
+        var rows = licenses.ToList();
+        return new ReportDataDto
+        {
+            ReportTitle = title,
+            GeneratedDate = DateTime.UtcNow,
+            GeneratedBy = _currentUser?.Username ?? "System",
+            Columns = new List<string>
+            {
+                "رقم السيارة",
+                "الموديل",
+                "سنة الصنع",
+                "رقم الشاسيه",
+                "رقم الموتور",
+                "تغيير الزيت كل كام كم",
+                "نوع الرخصة",
+                "بداية الترخيص",
+                "نهاية الترخيص",
+                "الحالة",
+                "الإنذار"
+            },
+            Data = rows.Select(license => new Dictionary<string, object>
+            {
+                ["رقم السيارة"] = license.PlateNumber,
+                ["الموديل"] = license.Model,
+                ["سنة الصنع"] = license.Year,
+                ["رقم الشاسيه"] = license.ChassisNumber,
+                ["رقم الموتور"] = license.EngineNumber,
+                ["تغيير الزيت كل كام كم"] = license.OilChangeIntervalKm,
+                ["نوع الرخصة"] = license.RegistrationType,
+                ["بداية الترخيص"] = license.RegistrationStartDate ?? (object)string.Empty,
+                ["نهاية الترخيص"] = license.RegistrationExpiryDate ?? (object)string.Empty,
+                ["الحالة"] = license.Status,
+                ["الإنذار"] = license.ExpiryAlert
+            }).ToList()
+        };
+    }
+
+    private ReportDataDto BuildInsuranceReportSnapshot(IEnumerable<InsuranceDto> insuranceItems, string title)
+    {
+        var rows = insuranceItems.ToList();
+        return new ReportDataDto
+        {
+            ReportTitle = title,
+            GeneratedDate = DateTime.UtcNow,
+            GeneratedBy = _currentUser?.Username ?? "System",
+            Columns = new List<string>
+            {
+                "رقم السيارة",
+                "الموديل",
+                "سنة الصنع",
+                "رقم الشاسيه",
+                "رقم الموتور",
+                "رقم الوثيقة",
+                "شركة التأمين",
+                "نوع الوثيقة",
+                "بداية التأمين",
+                "نهاية التأمين",
+                "القسط",
+                "مبلغ التغطية",
+                "مندوب التأمين",
+                "هاتف المندوب",
+                "الحالة",
+                "الإنذار",
+                "ملاحظات"
+            },
+            Data = rows.Select(insurance => new Dictionary<string, object>
+            {
+                ["رقم السيارة"] = insurance.VehiclePlateNumber,
+                ["الموديل"] = insurance.VehicleModel,
+                ["سنة الصنع"] = insurance.VehicleYear,
+                ["رقم الشاسيه"] = insurance.VehicleChassisNumber,
+                ["رقم الموتور"] = insurance.VehicleEngineNumber,
+                ["رقم الوثيقة"] = insurance.PolicyNumber,
+                ["شركة التأمين"] = insurance.InsuranceCompany,
+                ["نوع الوثيقة"] = insurance.PolicyType,
+                ["بداية التأمين"] = insurance.StartDate,
+                ["نهاية التأمين"] = insurance.ExpiryDate,
+                ["القسط"] = insurance.PremiumAmount,
+                ["مبلغ التغطية"] = insurance.CoverageAmount,
+                ["مندوب التأمين"] = insurance.AgentName,
+                ["هاتف المندوب"] = insurance.AgentPhoneNumber,
+                ["الحالة"] = insurance.Status,
+                ["الإنذار"] = insurance.ExpiryAlert,
+                ["ملاحظات"] = ValueOrDash(insurance.CoverageDetails, insurance.Notes)
+            }).ToList()
+        };
+    }
+
+    private ReportDataDto BuildVehiclesReportSnapshot(IEnumerable<VehicleDto> vehicles)
+    {
+        var rows = vehicles.ToList();
+        return new ReportDataDto
+        {
+            ReportTitle = "تقرير المركبات",
+            GeneratedDate = DateTime.UtcNow,
+            GeneratedBy = _currentUser?.Username ?? "System",
+            Columns = new List<string>
+            {
+                "رقم السيارة",
+                "نوع العربية",
+                "الموديل",
+                "سنة الصنع",
+                "اللون",
+                "رقم الشاسيه",
+                "رقم الموتور",
+                "العداد الحالي",
+                "الحالة",
+                "مخصص لـ",
+                "تاريخ الشراء",
+                "نوع الرخصة",
+                "بداية الترخيص",
+                "نهاية الترخيص",
+                "تأمين الحوادث",
+                "تغيير الزيت كل كام كم",
+                "دورية الصيانة",
+                "ملاحظات"
+            },
+            Data = rows.Select(vehicle => new Dictionary<string, object>
+            {
+                ["رقم السيارة"] = vehicle.PlateNumber,
+                ["نوع العربية"] = vehicle.VehicleType,
+                ["الموديل"] = vehicle.Model,
+                ["سنة الصنع"] = vehicle.Year,
+                ["اللون"] = vehicle.Color,
+                ["رقم الشاسيه"] = vehicle.ChassisNumber,
+                ["رقم الموتور"] = vehicle.EngineNumber,
+                ["العداد الحالي"] = vehicle.CurrentMileage,
+                ["الحالة"] = vehicle.Status,
+                ["مخصص لـ"] = vehicle.AssignedTo,
+                ["تاريخ الشراء"] = vehicle.PurchaseDate,
+                ["نوع الرخصة"] = vehicle.RegistrationType,
+                ["بداية الترخيص"] = vehicle.RegistrationStartDate ?? (object)string.Empty,
+                ["نهاية الترخيص"] = vehicle.RegistrationExpiryDate ?? (object)string.Empty,
+                ["تأمين الحوادث"] = vehicle.AccidentInsuranceDetails,
+                ["تغيير الزيت كل كام كم"] = vehicle.OilChangeIntervalKm,
+                ["دورية الصيانة"] = vehicle.MaintenanceIntervalKm,
+                ["ملاحظات"] = vehicle.Notes
+            }).ToList()
+        };
+    }
+
+    private ReportDataDto BuildFuelReportSnapshot(IEnumerable<FuelTransactionDto> fuelItems, string? title = null)
+    {
+        var rows = fuelItems.ToList();
+        return new ReportDataDto
+        {
+            ReportTitle = string.IsNullOrWhiteSpace(title) ? "تقرير البنزين" : title,
+            GeneratedDate = DateTime.UtcNow,
+            GeneratedBy = _currentUser?.Username ?? "System",
+            Columns = new List<string>
+            {
+                "مسلسل",
+                "رقم العربية",
+                "رقم التشغيلة",
+                "التاريخ",
+                "نوع الوقود",
+                "عدد اللترات",
+                "سعر اللتر",
+                "إجمالي البنزين",
+                "محطة البنزين",
+                "عداد التموين",
+                "من الخزينة",
+                "ملاحظات"
+            },
+            Data = rows.Select((fuel, index) => new Dictionary<string, object>
+            {
+                ["مسلسل"] = index + 1,
+                ["رقم العربية"] = fuel.VehiclePlateNumber,
+                ["رقم التشغيلة"] = fuel.TripId?.ToString(CultureInfo.InvariantCulture) ?? string.Empty,
+                ["التاريخ"] = fuel.TransactionDate,
+                ["نوع الوقود"] = fuel.FuelType,
+                ["عدد اللترات"] = fuel.Quantity,
+                ["سعر اللتر"] = fuel.UnitPrice,
+                ["إجمالي البنزين"] = fuel.TotalCost,
+                ["محطة البنزين"] = fuel.FuelStation,
+                ["عداد التموين"] = fuel.Odometer,
+                ["من الخزينة"] = fuel.PaidFromTreasury ? "نعم" : "لا",
+                ["ملاحظات"] = fuel.Notes
+            }).ToList()
+        };
+    }
+
+    private ReportDataDto BuildContractsReportSnapshot(IEnumerable<ContractDto> contracts)
+    {
+        var rows = contracts.ToList();
+        return new ReportDataDto
+        {
+            ReportTitle = "تقرير العقود",
+            GeneratedDate = DateTime.UtcNow,
+            GeneratedBy = _currentUser?.Username ?? "System",
+            Columns = new List<string>
+            {
+                "رقم العقد",
+                "رقم السيارة",
+                "العميل",
+                "بداية العقد",
+                "نهاية العقد",
+                "قيمة العقد",
+                "المدفوع",
+                "الحالة",
+                "ملاحظات"
+            },
+            Data = rows.Select(contract => new Dictionary<string, object>
+            {
+                ["رقم العقد"] = contract.ContractNumber,
+                ["رقم السيارة"] = contract.VehiclePlateNumber,
+                ["العميل"] = contract.ClientName,
+                ["بداية العقد"] = contract.StartDate,
+                ["نهاية العقد"] = contract.EndDate,
+                ["قيمة العقد"] = contract.ContractValue,
+                ["المدفوع"] = contract.PaidAmount,
+                ["الحالة"] = contract.Status,
+                ["ملاحظات"] = contract.Notes
+            }).ToList()
+        };
+    }
+
+    private ReportDataDto BuildMaintenanceReportSnapshot(IEnumerable<MaintenanceRequestDto> maintenanceItems)
+    {
+        var rows = maintenanceItems.ToList();
+        return new ReportDataDto
+        {
+            ReportTitle = "تقرير الصيانة",
+            GeneratedDate = DateTime.UtcNow,
+            GeneratedBy = _currentUser?.Username ?? "System",
+            Columns = new List<string>
+            {
+                "رقم العربية",
+                "نوع الصيانة",
+                "مركز الخدمة",
+                "تاريخ الطلب",
+                "تاريخ الإكمال",
+                "الحالة",
+                "التكلفة المتوقعة",
+                "التكلفة الفعلية",
+                "الوصف",
+                "الأعمال المنفذة",
+                "ملاحظات"
+            },
+            Data = rows.Select(maintenance => new Dictionary<string, object>
+            {
+                ["رقم العربية"] = maintenance.VehiclePlateNumber,
+                ["نوع الصيانة"] = maintenance.MaintenanceType,
+                ["مركز الخدمة"] = maintenance.ServiceProvider,
+                ["تاريخ الطلب"] = maintenance.RequestDate,
+                ["تاريخ الإكمال"] = maintenance.CompletionDate ?? (object)string.Empty,
+                ["الحالة"] = maintenance.Status,
+                ["التكلفة المتوقعة"] = maintenance.EstimatedCost,
+                ["التكلفة الفعلية"] = maintenance.ActualCost,
+                ["الوصف"] = maintenance.Description,
+                ["الأعمال المنفذة"] = maintenance.WorkPerformed,
+                ["ملاحظات"] = maintenance.Notes
+            }).ToList()
+        };
+    }
+
+    private ReportDataDto BuildOilChangesReportSnapshot(IEnumerable<OilChangeDto> oilChanges)
+    {
+        var rows = oilChanges.ToList();
+        return new ReportDataDto
+        {
+            ReportTitle = "تقرير الزيوت",
+            GeneratedDate = DateTime.UtcNow,
+            GeneratedBy = _currentUser?.Username ?? "System",
+            Columns = new List<string>
+            {
+                "مسلسل",
+                "رقم العربية",
+                "تاريخ التغيير",
+                "عداد التغيير",
+                "نوع الزيت",
+                "كمية الزيت باللتر",
+                "تكلفة الزيت",
+                "التغيير القادم",
+                "عداد العربية",
+                "تغيير الزيت كل كام كم",
+                "المقطوع",
+                "المتبقي",
+                "إنذار الزيت",
+                "الحالة",
+                "يحتاج متابعة",
+                "ملاحظات"
+            },
+            Data = rows.Select((oil, index) => new Dictionary<string, object>
+            {
+                ["مسلسل"] = index + 1,
+                ["رقم العربية"] = oil.VehiclePlateNumber,
+                ["تاريخ التغيير"] = oil.ChangeDate,
+                ["عداد التغيير"] = oil.OdometerAtChange,
+                ["نوع الزيت"] = oil.OilType,
+                ["كمية الزيت باللتر"] = oil.Quantity,
+                ["تكلفة الزيت"] = oil.Cost,
+                ["التغيير القادم"] = oil.NextOilChangeOdometer,
+                ["عداد العربية"] = oil.CurrentVehicleMileage,
+                ["تغيير الزيت كل كام كم"] = oil.OilChangeIntervalKm,
+                ["المقطوع"] = oil.KmSinceOilChange,
+                ["المتبقي"] = oil.RemainingKm,
+                ["إنذار الزيت"] = oil.OilAlert,
+                ["الحالة"] = oil.Status,
+                ["يحتاج متابعة"] = oil.IsDue ? "نعم" : "لا",
+                ["ملاحظات"] = oil.Notes
+            }).ToList()
+        };
+    }
+
+    private ReportDataDto BuildTreasuryReportSnapshot(IEnumerable<TreasuryTransactionDto> treasuryTransactions)
+    {
+        var rows = treasuryTransactions.ToList();
+        return new ReportDataDto
+        {
+            ReportTitle = "تقرير الخزينة",
+            GeneratedDate = DateTime.UtcNow,
+            GeneratedBy = _currentUser?.Username ?? "System",
+            Columns = new List<string>
+            {
+                "رقم",
+                "التاريخ",
+                "نوع الحركة",
+                "المبلغ",
+                "الوصف",
+                "مرتبط بـ",
+                "رقم المرتبط",
+                "طريقة الدفع",
+                "ملاحظات"
+            },
+            Data = rows.Select(transaction => new Dictionary<string, object>
+            {
+                ["رقم"] = transaction.Id,
+                ["التاريخ"] = transaction.TransactionDate,
+                ["نوع الحركة"] = transaction.TransactionType,
+                ["المبلغ"] = transaction.Amount,
+                ["الوصف"] = transaction.Description,
+                ["مرتبط بـ"] = transaction.RelatedEntityType,
+                ["رقم المرتبط"] = transaction.RelatedEntityId?.ToString(CultureInfo.InvariantCulture) ?? string.Empty,
+                ["طريقة الدفع"] = transaction.PaymentMethod,
+                ["ملاحظات"] = transaction.Notes
+            }).ToList()
+        };
+    }
+
+    private static bool ReportDateMatches(DateTime date, ReportFilterDto filter) =>
+        ReportDateMatches((DateTime?)date, filter);
+
+    private static bool ReportDateMatches(DateTime? date, ReportFilterDto filter)
+    {
+        if (!filter.StartDate.HasValue && !filter.EndDate.HasValue)
+        {
+            return true;
+        }
+
+        if (!date.HasValue)
+        {
+            return false;
+        }
+
+        var value = date.Value.Date;
+        return (!filter.StartDate.HasValue || value >= filter.StartDate.Value.Date) &&
+               (!filter.EndDate.HasValue || value <= filter.EndDate.Value.Date);
+    }
+
+    private ReportDataDto BuildTripsReportSnapshot(IReadOnlyList<TripDto> trips, string title) =>
+        new()
+        {
+            ReportTitle = title,
+            GeneratedDate = DateTime.UtcNow,
+            GeneratedBy = _currentUser?.Username ?? "System",
+            Columns = new List<string>
+            {
+                "سيريال",
+                "التاريخ",
+                "النهاية",
+                "رقم السيارة",
+                "من",
+                "إلى",
+                "السائق",
+                "الموصي",
+                "المشرف",
+                "الغرض",
+                "الحالة",
+                "المسافة",
+                "بنزين مسجل",
+                "تكلفة البنزين",
+                "ملاحظات"
+            },
+            Data = trips.Select((trip, index) => new Dictionary<string, object>
+            {
+                ["سيريال"] = trip.Serial > 0 ? trip.Serial : index + 1,
+                ["التاريخ"] = trip.StartDate,
+                ["النهاية"] = trip.EndDate ?? (object)string.Empty,
+                ["رقم السيارة"] = trip.VehiclePlateNumber,
+                ["من"] = trip.StartLocation,
+                ["إلى"] = trip.EndLocation,
+                ["السائق"] = trip.DriverName,
+                ["الموصي"] = trip.RequesterName,
+                ["المشرف"] = trip.SupervisorName,
+                ["الغرض"] = trip.Purpose,
+                ["الحالة"] = trip.Status,
+                ["المسافة"] = trip.Distance,
+                ["بنزين مسجل"] = trip.RegisteredFuelQuantity,
+                ["تكلفة البنزين"] = trip.RegisteredFuelCost,
+                ["ملاحظات"] = trip.Notes
+            }).ToList()
+        };
+
+    private decimal GetLoadedTripFuelQuantity(TripDto trip)
+    {
+        var linkedFuel = GetLoadedTripFuelTransactions(trip).ToList();
+        return linkedFuel.Sum(f => f.Quantity);
+    }
+
+    private decimal GetLoadedTripFuelCost(TripDto trip)
+    {
+        var linkedFuel = GetLoadedTripFuelTransactions(trip).ToList();
+        return linkedFuel.Sum(f => f.TotalCost);
+    }
+
+    private IEnumerable<FuelTransactionDto> GetLoadedTripFuelTransactions(TripDto trip)
+    {
+        return GetTripFuelTransactions(trip, _fuel);
+    }
+
+    private static IEnumerable<FuelTransactionDto> GetTripFuelTransactions(TripDto trip, IEnumerable<FuelTransactionDto> fuelTransactions)
+    {
+        var tripStartDate = trip.StartDate.Date;
+        var tripEndDate = (trip.EndDate ?? DateTime.Today).Date;
+
+        return fuelTransactions.Where(f =>
+            f.TripId == trip.Id ||
+            (!f.TripId.HasValue &&
+             f.VehicleId == trip.VehicleId &&
+             f.TransactionDate.Date >= tripStartDate &&
+             f.TransactionDate.Date <= tripEndDate));
+    }
+
     private VehicleFormDto ToVehicleFormFromLicense(VehicleLicenseRow licenseRow, VehicleDto? existingVehicle)
     {
         var vehicleTypeId = existingVehicle?.VehicleTypeId > 0
@@ -1211,21 +1935,24 @@ public partial class MainWindow : Window
             PlateNumber = licenseRow.PlateNumber.Trim(),
             VehicleTypeId = vehicleTypeId,
             Model = licenseRow.Model?.Trim() ?? existingVehicle?.Model ?? string.Empty,
-            Year = existingVehicle?.Year > 0 ? existingVehicle.Year : DateTime.Today.Year,
+            Year = licenseRow.Year > 0 ? licenseRow.Year : existingVehicle?.Year > 0 ? existingVehicle.Year : DateTime.Today.Year,
             Manufacturer = existingVehicle?.Manufacturer ?? string.Empty,
             Color = existingVehicle?.Color ?? string.Empty,
-            ChassisNumber = existingVehicle?.ChassisNumber ?? string.Empty,
-            EngineNumber = existingVehicle?.EngineNumber ?? string.Empty,
+            ChassisNumber = string.IsNullOrWhiteSpace(licenseRow.ChassisNumber) ? existingVehicle?.ChassisNumber ?? string.Empty : licenseRow.ChassisNumber.Trim(),
+            EngineNumber = string.IsNullOrWhiteSpace(licenseRow.EngineNumber) ? existingVehicle?.EngineNumber ?? string.Empty : licenseRow.EngineNumber.Trim(),
             CurrentMileage = existingVehicle?.CurrentMileage ?? 0,
             Status = string.IsNullOrWhiteSpace(existingVehicle?.Status) ? "Available" : existingVehicle.Status,
             AssignedTo = existingVehicle?.AssignedTo ?? string.Empty,
             PurchaseDate = existingVehicle is null || existingVehicle.PurchaseDate == default ? DateTime.Today : existingVehicle.PurchaseDate,
             PurchasePrice = existingVehicle?.PurchasePrice ?? 0,
+            RegistrationType = string.IsNullOrWhiteSpace(licenseRow.RegistrationType) ? "ترخيص" : licenseRow.RegistrationType.Trim(),
             RegistrationStartDate = licenseRow.RegistrationStartDate,
             RegistrationExpiryDate = licenseRow.RegistrationExpiryDate,
             AccidentInsuranceDetails = existingVehicle?.AccidentInsuranceDetails ?? string.Empty,
             SocialInsuranceDetails = existingVehicle?.SocialInsuranceDetails ?? string.Empty,
-            OilChangeIntervalKm = existingVehicle?.OilChangeIntervalKm > 0 ? existingVehicle.OilChangeIntervalKm : 10000,
+            OilChangeIntervalKm = licenseRow.OilChangeIntervalKm > 0
+                ? licenseRow.OilChangeIntervalKm
+                : existingVehicle?.OilChangeIntervalKm > 0 ? existingVehicle.OilChangeIntervalKm : 10000,
             MaintenanceIntervalKm = existingVehicle?.MaintenanceIntervalKm > 0 ? existingVehicle.MaintenanceIntervalKm : 15000,
             Notes = existingVehicle?.Notes ?? string.Empty
         };
@@ -1247,6 +1974,7 @@ public partial class MainWindow : Window
         AssignedTo = dto.AssignedTo,
         PurchaseDate = dto.PurchaseDate,
         PurchasePrice = dto.PurchasePrice,
+        RegistrationType = string.IsNullOrWhiteSpace(dto.RegistrationType) ? "ترخيص" : dto.RegistrationType,
         RegistrationStartDate = dto.RegistrationStartDate,
         RegistrationExpiryDate = dto.RegistrationExpiryDate,
         AccidentInsuranceDetails = dto.AccidentInsuranceDetails,
@@ -1350,6 +2078,7 @@ public partial class MainWindow : Window
     {
         Id = dto.Id,
         VehicleId = dto.VehicleId,
+        TripId = dto.TripId,
         TransactionDate = dto.TransactionDate,
         FuelType = dto.FuelType,
         Quantity = dto.Quantity,
@@ -1467,6 +2196,12 @@ public partial class MainWindow : Window
             return true;
         }
 
+        if (string.Equals(propertyName, "TripId", StringComparison.OrdinalIgnoreCase))
+        {
+            column = CreateLookupColumn(propertyName, "التشغيلة", _trips, "TripSummary", "Id");
+            return true;
+        }
+
         if (string.Equals(propertyName, "ContractStatusId", StringComparison.OrdinalIgnoreCase))
         {
             column = CreateLookupColumn(propertyName, "حالة العقد", _contractStatuses, "Name", "Id");
@@ -1516,6 +2251,14 @@ public partial class MainWindow : Window
             return;
         }
 
+        if (ReferenceEquals(sender, ReportsGrid))
+        {
+            e.Column.Header = CreateReportColumnHeader(e.PropertyName);
+            e.Column.Width = new DataGridLength(DefaultGridColumnWidth);
+            e.Column.MinWidth = CompactGridColumnWidth;
+            return;
+        }
+
         if (TryCreateLookupColumn(e.PropertyName, out var lookupColumn))
         {
             e.Column = lookupColumn;
@@ -1524,6 +2267,11 @@ public partial class MainWindow : Window
         }
 
         if (e.PropertyName.Equals("Id", StringComparison.OrdinalIgnoreCase))
+        {
+            e.Column.IsReadOnly = true;
+        }
+
+        if (IsCalculatedColumn(e.PropertyName))
         {
             e.Column.IsReadOnly = true;
         }
@@ -1547,6 +2295,14 @@ public partial class MainWindow : Window
 
         ApplyReadableColumnWidth(e.Column, e.PropertyName);
     }
+
+    private static bool IsCalculatedColumn(string propertyName) =>
+        propertyName.Equals("NextOilChangeOdometer", StringComparison.OrdinalIgnoreCase) ||
+        propertyName.Equals("CurrentVehicleMileage", StringComparison.OrdinalIgnoreCase) ||
+        propertyName.Equals("RemainingKm", StringComparison.OrdinalIgnoreCase) ||
+        propertyName.Equals("OilAlert", StringComparison.OrdinalIgnoreCase) ||
+        propertyName.Equals("IsDue", StringComparison.OrdinalIgnoreCase) ||
+        propertyName.Equals("TreasuryTransactionId", StringComparison.OrdinalIgnoreCase);
 
     private async void RefreshAllButton_Click(object sender, RoutedEventArgs e) => await RunSafeAsync(RefreshAllAsync);
 
@@ -1579,6 +2335,9 @@ public partial class MainWindow : Window
     private void QuickOpenCustodyButton_Click(object sender, RoutedEventArgs e) => SelectTabByTag("Custody");
     private void QuickOpenTreasuryButton_Click(object sender, RoutedEventArgs e) => SelectTabByTag("Treasury");
     private void QuickOpenReportsButton_Click(object sender, RoutedEventArgs e) => SelectTabByTag("Reports");
+    private void BackToTripsButton_Click(object sender, RoutedEventArgs e) => SelectTabByTag("Trips");
+    private void BackToLicensesButton_Click(object sender, RoutedEventArgs e) => SelectTabByTag("Licenses");
+
     private void DashboardAddUserButton_Click(object sender, RoutedEventArgs e)
     {
         if (!string.Equals(_currentUser?.Role, "Admin", StringComparison.OrdinalIgnoreCase))
@@ -1738,10 +2497,13 @@ public partial class MainWindow : Window
             // تم تغيير Models إلى DTOs
             if (item is not FleetManagementSystem.Core.DTOs.TripDto trip) return false;
 
-            if (TripFilterId != null && !string.IsNullOrWhiteSpace(TripFilterId.Text) && !trip.Id.ToString().Contains(TripFilterId.Text.Trim(), StringComparison.OrdinalIgnoreCase))
+            if (TripFilterSerial != null && !string.IsNullOrWhiteSpace(TripFilterSerial.Text) && !trip.Serial.ToString().Contains(TripFilterSerial.Text.Trim(), StringComparison.OrdinalIgnoreCase))
                 return false;
 
             if (TripFilterDate != null && TripFilterDate.SelectedDate.HasValue && trip.StartDate.Date != TripFilterDate.SelectedDate.Value.Date)
+                return false;
+
+            if (TripFilterEndDate != null && TripFilterEndDate.SelectedDate.HasValue && trip.EndDate?.Date != TripFilterEndDate.SelectedDate.Value.Date)
                 return false;
 
             if (TripFilterPlate != null && !string.IsNullOrWhiteSpace(TripFilterPlate.Text) && (trip.VehiclePlateNumber == null || !trip.VehiclePlateNumber.Contains(TripFilterPlate.Text.Trim(), StringComparison.OrdinalIgnoreCase)))
@@ -1753,6 +2515,13 @@ public partial class MainWindow : Window
             if (TripFilterEndLocation != null && !string.IsNullOrWhiteSpace(TripFilterEndLocation.Text) && (trip.EndLocation == null || !trip.EndLocation.Contains(TripFilterEndLocation.Text.Trim(), StringComparison.OrdinalIgnoreCase)))
                 return false;
 
+            if (TripFilterLocation != null && !string.IsNullOrWhiteSpace(TripFilterLocation.Text))
+            {
+                var route = $"{trip.StartLocation} {trip.EndLocation}";
+                if (!route.Contains(TripFilterLocation.Text.Trim(), StringComparison.OrdinalIgnoreCase))
+                    return false;
+            }
+
             if (TripFilterDriver != null && !string.IsNullOrWhiteSpace(TripFilterDriver.Text) && (trip.DriverName == null || !trip.DriverName.Contains(TripFilterDriver.Text.Trim(), StringComparison.OrdinalIgnoreCase)))
                 return false;
 
@@ -1760,17 +2529,343 @@ public partial class MainWindow : Window
             if (TripFilterPerson != null && !string.IsNullOrWhiteSpace(TripFilterPerson.Text) && (trip.RequesterName == null || !trip.RequesterName.Contains(TripFilterPerson.Text.Trim(), StringComparison.OrdinalIgnoreCase)))
                 return false;
 
+            if (TripFilterSupervisor != null && !string.IsNullOrWhiteSpace(TripFilterSupervisor.Text) && (trip.SupervisorName == null || !trip.SupervisorName.Contains(TripFilterSupervisor.Text.Trim(), StringComparison.OrdinalIgnoreCase)))
+                return false;
+
             if (TripFilterPurpose != null && !string.IsNullOrWhiteSpace(TripFilterPurpose.Text) && (trip.Purpose == null || !trip.Purpose.Contains(TripFilterPurpose.Text.Trim(), StringComparison.OrdinalIgnoreCase)))
+                return false;
+
+            if (TripFilterStatus != null && !string.IsNullOrWhiteSpace(TripFilterStatus.Text) && (trip.Status == null || !trip.Status.Contains(TripFilterStatus.Text.Trim(), StringComparison.OrdinalIgnoreCase)))
+                return false;
+
+            if (TripFilterDistance != null && !string.IsNullOrWhiteSpace(TripFilterDistance.Text) && !trip.Distance.ToString("0.##", CultureInfo.InvariantCulture).Contains(TripFilterDistance.Text.Trim(), StringComparison.OrdinalIgnoreCase))
+                return false;
+
+            if (TripFilterRegisteredFuel != null && !string.IsNullOrWhiteSpace(TripFilterRegisteredFuel.Text) && !trip.RegisteredFuelQuantity.ToString("0.##", CultureInfo.InvariantCulture).Contains(TripFilterRegisteredFuel.Text.Trim(), StringComparison.OrdinalIgnoreCase))
+                return false;
+
+            if (TripFilterRegisteredFuelCost != null && !string.IsNullOrWhiteSpace(TripFilterRegisteredFuelCost.Text) && !trip.RegisteredFuelCost.ToString("0.##", CultureInfo.InvariantCulture).Contains(TripFilterRegisteredFuelCost.Text.Trim(), StringComparison.OrdinalIgnoreCase))
+                return false;
+
+            if (TripFilterNotes != null && !string.IsNullOrWhiteSpace(TripFilterNotes.Text) && (trip.Notes == null || !trip.Notes.Contains(TripFilterNotes.Text.Trim(), StringComparison.OrdinalIgnoreCase)))
                 return false;
 
             return true;
         };
     }
+
+    private void FuelFilter_Changed(object sender, RoutedEventArgs e)
+    {
+        var view = CollectionViewSource.GetDefaultView(FuelGrid.ItemsSource);
+        if (view is null)
+        {
+            return;
+        }
+
+        view.Filter = FuelRowMatchesFilters;
+        view.Refresh();
+    }
+
+    private bool FuelRowMatchesFilters(object item)
+    {
+        if (item is not FuelTransactionDto fuel)
+        {
+            return false;
+        }
+
+        return TextFilterMatches(FuelFilterPlate, fuel.VehiclePlateNumber)
+            && TextFilterMatches(FuelFilterTrip, fuel.TripId?.ToString(CultureInfo.InvariantCulture))
+            && DateFilterMatches(FuelFilterDate, fuel.TransactionDate)
+            && TextFilterMatches(FuelFilterType, fuel.FuelType)
+            && TextFilterMatches(FuelFilterQuantity, fuel.Quantity.ToString("0.##", CultureInfo.InvariantCulture))
+            && TextFilterMatches(FuelFilterUnitPrice, fuel.UnitPrice.ToString("0.##", CultureInfo.InvariantCulture))
+            && TextFilterMatches(FuelFilterTotalCost, fuel.TotalCost.ToString("0.##", CultureInfo.InvariantCulture))
+            && TextFilterMatches(FuelFilterStation, fuel.FuelStation)
+            && TextFilterMatches(FuelFilterOdometer, fuel.Odometer.ToString("0.##", CultureInfo.InvariantCulture))
+            && TextFilterMatches(FuelFilterTreasury, fuel.PaidFromTreasury ? "نعم true yes" : "لا false no")
+            && TextFilterMatches(FuelFilterNotes, fuel.Notes);
+    }
+
+    private void OilFilter_Changed(object sender, RoutedEventArgs e)
+    {
+        var view = CollectionViewSource.GetDefaultView(OilChangesGrid.ItemsSource);
+        if (view is null)
+        {
+            return;
+        }
+
+        view.Filter = OilRowMatchesFilters;
+        view.Refresh();
+    }
+
+    private bool OilRowMatchesFilters(object item)
+    {
+        if (item is not OilChangeDto oil)
+        {
+            return false;
+        }
+
+        return TextFilterMatches(OilFilterPlate, oil.VehiclePlateNumber)
+            && DateFilterMatches(OilFilterDate, oil.ChangeDate)
+            && TextFilterMatches(OilFilterOdometer, oil.OdometerAtChange.ToString("0.##", CultureInfo.InvariantCulture))
+            && TextFilterMatches(OilFilterType, oil.OilType)
+            && TextFilterMatches(OilFilterQuantity, oil.Quantity.ToString("0.##", CultureInfo.InvariantCulture))
+            && TextFilterMatches(OilFilterCost, oil.Cost.ToString("0.##", CultureInfo.InvariantCulture))
+            && TextFilterMatches(OilFilterNext, oil.NextOilChangeOdometer.ToString("0.##", CultureInfo.InvariantCulture))
+            && TextFilterMatches(OilFilterCurrent, oil.CurrentVehicleMileage.ToString("0.##", CultureInfo.InvariantCulture))
+            && TextFilterMatches(OilFilterInterval, oil.OilChangeIntervalKm.ToString("0.##", CultureInfo.InvariantCulture))
+            && TextFilterMatches(OilFilterSince, oil.KmSinceOilChange.ToString("0.##", CultureInfo.InvariantCulture))
+            && TextFilterMatches(OilFilterRemaining, oil.RemainingKm.ToString("0.##", CultureInfo.InvariantCulture))
+            && TextFilterMatches(OilFilterAlert, oil.OilAlert)
+            && TextFilterMatches(OilFilterStatus, oil.Status)
+            && TextFilterMatches(OilFilterDue, oil.IsDue ? "نعم true yes" : "لا false no")
+            && TextFilterMatches(OilFilterNotes, oil.Notes);
+    }
+
+    private void LicenseFilter_Changed(object sender, RoutedEventArgs e)
+    {
+        var view = CollectionViewSource.GetDefaultView(LicensesGrid.ItemsSource);
+        if (view is null)
+        {
+            return;
+        }
+
+        view.Filter = LicenseRowMatchesFilters;
+        view.Refresh();
+    }
+
+    private bool LicenseRowMatchesFilters(object item)
+    {
+        if (item is not VehicleLicenseRow license)
+        {
+            return false;
+        }
+
+        return TextFilterMatches(LicenseFilterPlate, license.PlateNumber)
+            && TextFilterMatches(LicenseFilterModel, license.Model)
+            && TextFilterMatches(LicenseFilterYear, license.Year.ToString(CultureInfo.InvariantCulture))
+            && TextFilterMatches(LicenseFilterChassis, license.ChassisNumber)
+            && TextFilterMatches(LicenseFilterEngine, license.EngineNumber)
+            && TextFilterMatches(LicenseFilterOilInterval, license.OilChangeIntervalKm.ToString("0.##", CultureInfo.InvariantCulture))
+            && TextFilterMatches(LicenseFilterType, license.RegistrationType)
+            && DateFilterMatches(LicenseFilterStartDate, license.RegistrationStartDate)
+            && DateFilterMatches(LicenseFilterEndDate, license.RegistrationExpiryDate)
+            && TextFilterMatches(LicenseFilterStatus, license.Status)
+            && TextFilterMatches(LicenseFilterAlert, license.ExpiryAlert);
+    }
+
+    private void InsuranceFilter_Changed(object sender, RoutedEventArgs e)
+    {
+        var view = CollectionViewSource.GetDefaultView(InsuranceGrid.ItemsSource);
+        if (view is null)
+        {
+            return;
+        }
+
+        view.Filter = InsuranceRowMatchesFilters;
+        view.Refresh();
+    }
+
+    private bool InsuranceRowMatchesFilters(object item)
+    {
+        if (item is not InsuranceDto insurance)
+        {
+            return false;
+        }
+
+        return TextFilterMatches(InsuranceFilterPlate, insurance.VehiclePlateNumber)
+            && TextFilterMatches(InsuranceFilterModel, insurance.VehicleModel)
+            && TextFilterMatches(InsuranceFilterYear, insurance.VehicleYear.ToString(CultureInfo.InvariantCulture))
+            && TextFilterMatches(InsuranceFilterChassis, insurance.VehicleChassisNumber)
+            && TextFilterMatches(InsuranceFilterEngine, insurance.VehicleEngineNumber)
+            && TextFilterMatches(InsuranceFilterPolicy, insurance.PolicyNumber)
+            && TextFilterMatches(InsuranceFilterCompany, insurance.InsuranceCompany)
+            && TextFilterMatches(InsuranceFilterType, insurance.PolicyType)
+            && DateFilterMatches(InsuranceFilterStartDate, insurance.StartDate)
+            && DateFilterMatches(InsuranceFilterEndDate, insurance.ExpiryDate)
+            && TextFilterMatches(InsuranceFilterPremium, insurance.PremiumAmount.ToString("0.##", CultureInfo.InvariantCulture))
+            && TextFilterMatches(InsuranceFilterCoverage, insurance.CoverageAmount.ToString("0.##", CultureInfo.InvariantCulture))
+            && TextFilterMatches(InsuranceFilterAgent, insurance.AgentName)
+            && TextFilterMatches(InsuranceFilterAgentPhone, insurance.AgentPhoneNumber)
+            && TextFilterMatches(InsuranceFilterStatus, insurance.Status)
+            && TextFilterMatches(InsuranceFilterAlert, insurance.ExpiryAlert);
+    }
+
+    private void TreasuryFilter_Changed(object sender, RoutedEventArgs e)
+    {
+        var view = CollectionViewSource.GetDefaultView(TreasuryGrid.ItemsSource);
+        if (view is null)
+        {
+            return;
+        }
+
+        view.Filter = TreasuryRowMatchesFilters;
+        view.Refresh();
+    }
+
+    private bool TreasuryRowMatchesFilters(object item)
+    {
+        if (item is not TreasuryTransactionDto treasury)
+        {
+            return false;
+        }
+
+        return TextFilterMatches(TreasuryFilterId, treasury.Id.ToString(CultureInfo.InvariantCulture))
+            && DateFilterMatches(TreasuryFilterDate, treasury.TransactionDate)
+            && TextFilterMatches(TreasuryFilterType, treasury.TransactionType)
+            && TextFilterMatches(TreasuryFilterAmount, treasury.Amount.ToString("0.##", CultureInfo.InvariantCulture))
+            && TextFilterMatches(TreasuryFilterDescription, treasury.Description)
+            && TextFilterMatches(TreasuryFilterRelatedType, treasury.RelatedEntityType)
+            && TextFilterMatches(TreasuryFilterRelatedId, treasury.RelatedEntityId?.ToString(CultureInfo.InvariantCulture))
+            && TextFilterMatches(TreasuryFilterPayment, treasury.PaymentMethod)
+            && TextFilterMatches(TreasuryFilterNotes, treasury.Notes);
+    }
+
+    private void CustodyFilter_Changed(object sender, RoutedEventArgs e)
+    {
+        var view = CollectionViewSource.GetDefaultView(CustodyGrid.ItemsSource);
+        if (view is null)
+        {
+            return;
+        }
+
+        view.Filter = CustodyRowMatchesFilters;
+        view.Refresh();
+    }
+
+    private bool CustodyRowMatchesFilters(object item)
+    {
+        if (item is not CustodyDto custody)
+        {
+            return false;
+        }
+
+        return TextFilterMatches(CustodyFilterId, custody.Id.ToString(CultureInfo.InvariantCulture))
+            && TextFilterMatches(CustodyFilterPlate, custody.VehiclePlateNumber)
+            && TextFilterMatches(CustodyFilterNumber, custody.CustodyNumber)
+            && TextFilterMatches(CustodyFilterCustodian, custody.CustodianName)
+            && TextFilterMatches(CustodyFilterPosition, custody.CustodianPosition)
+            && DateFilterMatches(CustodyFilterHandoverDate, custody.HandoverDate)
+            && DateFilterMatches(CustodyFilterReturnDate, custody.ReturnDate)
+            && TextFilterMatches(CustodyFilterStatus, custody.Status)
+            && TextFilterMatches(CustodyFilterRating, custody.VehicleConditionRating.ToString("0.##", CultureInfo.InvariantCulture))
+            && TextFilterMatches(CustodyFilterNotes, custody.Notes);
+    }
+
+    private static bool TextFilterMatches(TextBox? filter, string? value)
+    {
+        var text = filter?.Text?.Trim();
+        return string.IsNullOrWhiteSpace(text)
+            || (value ?? string.Empty).Contains(text, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool DateFilterMatches(DatePicker? filter, DateTime? value)
+    {
+        return filter?.SelectedDate is not DateTime selectedDate
+            || value?.Date == selectedDate.Date;
+    }
+
+    private FrameworkElement CreateReportColumnHeader(string columnName)
+    {
+        var panel = new StackPanel
+        {
+            Orientation = Orientation.Vertical,
+            HorizontalAlignment = HorizontalAlignment.Stretch
+        };
+
+        panel.Children.Add(new TextBlock
+        {
+            Text = columnName,
+            HorizontalAlignment = HorizontalAlignment.Center,
+            FontWeight = FontWeights.Bold,
+            Margin = new Thickness(0, 0, 0, 8)
+        });
+
+        var filter = new TextBox
+        {
+            Tag = columnName,
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+            Style = (Style)FindResource("FilterTextBoxStyle")
+        };
+        AutomationProperties.SetAutomationId(filter, $"ReportFilter_{columnName}");
+        filter.TextChanged += ReportColumnFilter_Changed;
+        panel.Children.Add(filter);
+
+        return panel;
+    }
+
+    private void ReportColumnFilter_Changed(object sender, TextChangedEventArgs e)
+    {
+        if (sender is not TextBox filter || filter.Tag is not string columnName)
+        {
+            return;
+        }
+
+        var value = filter.Text.Trim();
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            _reportColumnFilters.Remove(columnName);
+        }
+        else
+        {
+            _reportColumnFilters[columnName] = value;
+        }
+
+        ApplyReportColumnFilters();
+    }
+
+    private void ApplyReportColumnFilters()
+    {
+        if (ReportsGrid.ItemsSource is not DataView view || view.Table is null)
+        {
+            return;
+        }
+
+        var filters = _reportColumnFilters
+            .Where(filter => !string.IsNullOrWhiteSpace(filter.Value) && view.Table.Columns.Contains(filter.Key))
+            .Select(filter => $"Convert({EscapeDataColumnName(filter.Key)}, 'System.String') LIKE '%{EscapeDataViewLikeValue(filter.Value)}%'")
+            .ToList();
+
+        try
+        {
+            view.RowFilter = string.Join(" AND ", filters);
+        }
+        catch (EvaluateException)
+        {
+            view.RowFilter = string.Empty;
+        }
+        catch (SyntaxErrorException)
+        {
+            view.RowFilter = string.Empty;
+        }
+    }
+
+    private static string EscapeDataColumnName(string columnName) => $"[{columnName.Replace("]", "\\]")}]";
+
+    private static string EscapeDataViewLikeValue(string value) => value
+        .Replace("'", "''")
+        .Replace("[", "[[]")
+        .Replace("%", "[%]")
+        .Replace("*", "[*]");
+
     private async void RefreshTripsButton_Click(object sender, RoutedEventArgs e) => await RunSafeAsync(LoadTripsAsync);
     private async void AddTripButton_Click(object sender, RoutedEventArgs e)
     {
-        var selectedVehicleId = Selected<TripDto>(TripsGrid)?.VehicleId;
-        var window = new TripEntryWindow(_vehicles, _drivers, _employees, selectedVehicleId)
+        var lookupDataLoaded = false;
+        await RunSafeAsync(async () =>
+        {
+            await LoadVehiclesAsync();
+            await LoadDriversAsync();
+            await LoadEmployeesAsync();
+            lookupDataLoaded = true;
+        });
+
+        if (!lookupDataLoaded)
+        {
+            return;
+        }
+
+        var window = new TripEntryWindow(_vehicles.ToList(), _drivers.ToList(), _employees.ToList())
         {
             Owner = this
         };
@@ -1785,91 +2880,106 @@ public partial class MainWindow : Window
             await _tripService.SaveAsync(window.TripForm);
             await LoadVehiclesAsync();
             await LoadTripsAsync();
+            await LoadOilChangesAsync();
             await LoadDashboardAsync();
             await LoadNotificationsAsync();
         });
     }
 
     private async void DeleteTripButton_Click(object sender, RoutedEventArgs e) =>
-        await RunSafeAsync(() => DeleteSelectedAsync(TripsGrid, _trips, x => x.Id, _tripService.DeleteAsync, LoadTripsAsync));
+        await RunSafeAsync(() =>
+        {
+            SelectTripFromSender(sender);
+            return DeleteSelectedAsync(TripsGrid, _trips, x => x.Id, _tripService.DeleteAsync, LoadTripsAsync);
+        });
 
-    private void PrintTripsButton_Click(object sender, RoutedEventArgs e)
+    private async void AddFuelForSelectedTripButton_Click(object sender, RoutedEventArgs e) => await RunSafeAsync(() =>
     {
+        var trip = Selected<TripDto>(TripsGrid);
+        if (trip is null)
+        {
+            SelectTabByTag("Fuel");
+            Dispatcher.BeginInvoke(new Action(() => AddFuelButton_Click(sender, e)));
+            return Task.CompletedTask;
+        }
+
+        Dispatcher.BeginInvoke(new Action(() => OpenFuelEntry(BuildFuelDraftForTrip(trip))));
+        return Task.CompletedTask;
+    });
+
+    private async void AddOilForSelectedTripVehicleButton_Click(object sender, RoutedEventArgs e) => await RunSafeAsync(() =>
+    {
+        var trip = Selected<TripDto>(TripsGrid)
+            ?? throw new InvalidOperationException("اختر تشغيلة من الجدول قبل تسجيل الزيت.");
+
+        var vehicle = _vehicles.FirstOrDefault(v => v.Id == trip.VehicleId)
+            ?? throw new InvalidOperationException("العربية المرتبطة بالتشغيلة غير موجودة في بيانات المركبات.");
+
+        var currentMileage = trip.EndMileage ?? trip.StartMileage;
+        if (currentMileage <= 0)
+        {
+            currentMileage = vehicle.CurrentMileage;
+        }
+
+        var interval = vehicle.OilChangeIntervalKm > 0 ? vehicle.OilChangeIntervalKm : 10000;
+        Dispatcher.BeginInvoke(new Action(() => OpenOilChangeEntry(new OilChangeDto
+        {
+            VehicleId = vehicle.Id,
+            VehiclePlateNumber = vehicle.PlateNumber,
+            ChangeDate = DateTime.Today,
+            OdometerAtChange = currentMileage,
+            OilChangeIntervalKm = interval,
+            CurrentVehicleMileage = currentMileage,
+            NextOilChangeOdometer = currentMileage + interval,
+            RemainingKm = interval,
+            OilAlert = "لا يوجد إنذار",
+            Status = "Completed"
+        })));
+
+        return Task.CompletedTask;
+    });
+
+    private async void PrintTripsButton_Click(object sender, RoutedEventArgs e)
+    {
+        ReportDataDto? report = null;
         try
         {
-            var pd = new PrintDialog();
-            if (pd.ShowDialog() != true) return;
-
-            var flowDoc = new FlowDocument
-            {
-                ColumnWidth = pd.PrintableAreaWidth,
-                PageWidth = pd.PrintableAreaWidth,
-                PageHeight = pd.PrintableAreaHeight,
-                PagePadding = new Thickness(30),
-                FontFamily = new FontFamily("Cairo, Arial, Tahoma")
-            };
-
-            var title = new Paragraph(new Run("سجل التشغيلات"))
-            {
-                FontSize = 24,
-                FontWeight = FontWeights.Bold,
-                TextAlignment = TextAlignment.Center,
-                Margin = new Thickness(0, 0, 0, 20)
-            };
-            flowDoc.Blocks.Add(title);
-
-            var table = new Table { CellSpacing = 0, BorderBrush = Brushes.Black, BorderThickness = new Thickness(1) };
-            int columnsCount = 10;
-            for (int i = 0; i < columnsCount; i++) table.Columns.Add(new TableColumn());
-
-            var headerGroup = new TableRowGroup();
-            var headerRow = new TableRow { Background = Brushes.LightGray, FontWeight = FontWeights.Bold };
-            string[] headers = { "سيريال", "التاريخ", "السيارة", "من/إلى", "اسم السائق", "الموصي", "المشرف", "الغرض", "الحالة", "المسافة" };
-
-            foreach (var h in headers)
-            {
-                headerRow.Cells.Add(new TableCell(new Paragraph(new Run(h)) { TextAlignment = TextAlignment.Center, Padding = new Thickness(5) }) { BorderBrush = Brushes.Black, BorderThickness = new Thickness(1) });
-            }
-            headerGroup.Rows.Add(headerRow);
-            table.RowGroups.Add(headerGroup);
-
-            var dataGroup = new TableRowGroup();
+            Mouse.OverrideCursor = Cursors.Wait;
+            await LoadFuelAsync();
+            await LoadTripsAsync();
             var view = CollectionViewSource.GetDefaultView(TripsGrid.ItemsSource);
-            if (view != null)
-            {
-                foreach (TripDto trip in view)
-                {
-                    var row = new TableRow();
-                    row.Cells.Add(new TableCell(new Paragraph(new Run(trip.Id.ToString()))) { BorderBrush = Brushes.Black, BorderThickness = new Thickness(1), Padding = new Thickness(5), TextAlignment = TextAlignment.Center });
-                    row.Cells.Add(new TableCell(new Paragraph(new Run(trip.StartDate.ToString("yyyy-MM-dd")))) { BorderBrush = Brushes.Black, BorderThickness = new Thickness(1), Padding = new Thickness(5), TextAlignment = TextAlignment.Center });
-                    row.Cells.Add(new TableCell(new Paragraph(new Run(trip.VehiclePlateNumber ?? ""))) { BorderBrush = Brushes.Black, BorderThickness = new Thickness(1), Padding = new Thickness(5), TextAlignment = TextAlignment.Center });
-                    row.Cells.Add(new TableCell(new Paragraph(new Run($"{trip.StartLocation} - {trip.EndLocation}"))) { BorderBrush = Brushes.Black, BorderThickness = new Thickness(1), Padding = new Thickness(5), TextAlignment = TextAlignment.Center });
-                    row.Cells.Add(new TableCell(new Paragraph(new Run(trip.DriverName ?? ""))) { BorderBrush = Brushes.Black, BorderThickness = new Thickness(1), Padding = new Thickness(5), TextAlignment = TextAlignment.Center });
-                    row.Cells.Add(new TableCell(new Paragraph(new Run(trip.RequesterName ?? ""))) { BorderBrush = Brushes.Black, BorderThickness = new Thickness(1), Padding = new Thickness(5), TextAlignment = TextAlignment.Center });
-                    row.Cells.Add(new TableCell(new Paragraph(new Run(trip.SupervisorName ?? ""))) { BorderBrush = Brushes.Black, BorderThickness = new Thickness(1), Padding = new Thickness(5), TextAlignment = TextAlignment.Center });
-                    row.Cells.Add(new TableCell(new Paragraph(new Run(trip.Purpose ?? ""))) { BorderBrush = Brushes.Black, BorderThickness = new Thickness(1), Padding = new Thickness(5), TextAlignment = TextAlignment.Center });
-                    row.Cells.Add(new TableCell(new Paragraph(new Run(trip.Status ?? ""))) { BorderBrush = Brushes.Black, BorderThickness = new Thickness(1), Padding = new Thickness(5), TextAlignment = TextAlignment.Center });
-                    row.Cells.Add(new TableCell(new Paragraph(new Run(trip.Distance.ToString("0.##")))) { BorderBrush = Brushes.Black, BorderThickness = new Thickness(1), Padding = new Thickness(5), TextAlignment = TextAlignment.Center });
-                    dataGroup.Rows.Add(row);
-                }
-            }
-            table.RowGroups.Add(dataGroup);
-            flowDoc.Blocks.Add(table);
+            var trips = view is null
+                ? _trips.ToList()
+                : view.Cast<object>().OfType<TripDto>().ToList();
 
-            pd.PrintDocument(((IDocumentPaginatorSource)flowDoc).DocumentPaginator, "تقرير التشغيلات");
+            report = BuildTripsReportSnapshot(trips, "تقرير التشغيلات");
         }
         catch (Exception ex)
         {
-            MessageBox.Show($"عذراً، حدث خطأ أثناء الطباعة: {ex.Message}", "خطأ في الطباعة", MessageBoxButton.OK, MessageBoxImage.Error);
+            MessageBox.Show($"لم يتم تنفيذ العملية:\n{ex.Message}", "تنبيه واضح", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+        finally
+        {
+            Mouse.OverrideCursor = null;
+        }
+
+        if (report is not null)
+        {
+            OpenReportPreview(report);
         }
     }
 
-    private async void CloseTripButton_Click(object sender, RoutedEventArgs e) => await RunSafeAsync(async () =>
+    private async void CloseTripButton_Click(object sender, RoutedEventArgs e)
     {
-        var trip = Selected<TripDto>(TripsGrid)
-            ?? throw new InvalidOperationException("اختر تشغيلة أولًا.");
+        var trip = SelectTripFromSender(sender);
+        if (trip is null)
+        {
+            MessageBox.Show("اختر تشغيلة أولًا.", "تنبيه", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
 
-        var window = new TripCloseWindow(trip)
+        var vehicle = _vehicles.FirstOrDefault(v => v.Id == trip.VehicleId);
+        var window = new TripCloseWindow(trip, vehicle)
         {
             Owner = this
         };
@@ -1879,16 +2989,20 @@ public partial class MainWindow : Window
             return;
         }
 
-        await _tripService.SaveAsync(window.TripForm);
-        await LoadVehiclesAsync();
-        await LoadTripsAsync();
-        await LoadDashboardAsync();
-        await LoadNotificationsAsync();
-    });
+        await RunSafeAsync(async () =>
+        {
+            await _tripService.SaveAsync(window.TripForm);
+            await LoadVehiclesAsync();
+            await LoadTripsAsync();
+            await LoadOilChangesAsync();
+            await LoadDashboardAsync();
+            await LoadNotificationsAsync();
+        });
+    }
 
     private void ShowTripFormButton_Click(object sender, RoutedEventArgs e)
     {
-        var trip = (sender as FrameworkElement)?.DataContext as TripDto ?? Selected<TripDto>(TripsGrid);
+        var trip = SelectTripFromSender(sender);
         if (trip is null)
         {
             MessageBox.Show("اختر تشغيلة أولًا.", "تنبيه", MessageBoxButton.OK, MessageBoxImage.Information);
@@ -1903,87 +3017,239 @@ public partial class MainWindow : Window
         window.ShowDialog();
     }
 
-    private void ShowVehicleLicenseFormButton_Click(object sender, RoutedEventArgs e)
+    private TripDto? SelectTripFromSender(object sender)
+    {
+        var trip = (sender as FrameworkElement)?.DataContext as TripDto ?? Selected<TripDto>(TripsGrid);
+        if (trip is null)
+        {
+            return null;
+        }
+
+        TripsGrid.SelectedItem = trip;
+        TripsGrid.ScrollIntoView(trip);
+        return trip;
+    }
+
+    private FuelTransactionDto? SelectFuelFromSender(object sender)
+    {
+        var item = (sender as FrameworkElement)?.DataContext as FuelTransactionDto ?? Selected<FuelTransactionDto>(FuelGrid);
+        if (item is null)
+        {
+            return null;
+        }
+
+        FuelGrid.SelectedItem = item;
+        FuelGrid.ScrollIntoView(item);
+        return item;
+    }
+
+    private OilChangeDto? SelectOilChangeFromSender(object sender)
+    {
+        var item = (sender as FrameworkElement)?.DataContext as OilChangeDto ?? Selected<OilChangeDto>(OilChangesGrid);
+        if (item is null)
+        {
+            return null;
+        }
+
+        OilChangesGrid.SelectedItem = item;
+        OilChangesGrid.ScrollIntoView(item);
+        return item;
+    }
+
+    private VehicleLicenseRow? SelectVehicleLicenseFromSender(object sender)
     {
         var item = (sender as FrameworkElement)?.DataContext as VehicleLicenseRow ?? Selected<VehicleLicenseRow>(LicensesGrid);
+        if (item is null)
+        {
+            return null;
+        }
+
+        LicensesGrid.SelectedItem = item;
+        LicensesGrid.ScrollIntoView(item);
+        return item;
+    }
+
+    private InsuranceDto? SelectInsuranceFromSender(object sender)
+    {
+        var item = (sender as FrameworkElement)?.DataContext as InsuranceDto ?? Selected<InsuranceDto>(InsuranceGrid);
+        if (item is null)
+        {
+            return null;
+        }
+
+        InsuranceGrid.SelectedItem = item;
+        InsuranceGrid.ScrollIntoView(item);
+        return item;
+    }
+
+    private TreasuryTransactionDto? SelectTreasuryFromSender(object sender)
+    {
+        var item = (sender as FrameworkElement)?.DataContext as TreasuryTransactionDto ?? Selected<TreasuryTransactionDto>(TreasuryGrid);
+        if (item is null)
+        {
+            return null;
+        }
+
+        TreasuryGrid.SelectedItem = item;
+        TreasuryGrid.ScrollIntoView(item);
+        return item;
+    }
+
+    private CustodyDto? SelectCustodyFromSender(object sender)
+    {
+        var item = (sender as FrameworkElement)?.DataContext as CustodyDto ?? Selected<CustodyDto>(CustodyGrid);
+        if (item is null)
+        {
+            return null;
+        }
+
+        CustodyGrid.SelectedItem = item;
+        CustodyGrid.ScrollIntoView(item);
+        return item;
+    }
+
+    private void ShowVehicleLicenseFormButton_Click(object sender, RoutedEventArgs e)
+    {
+        var item = SelectVehicleLicenseFromSender(sender);
         if (item is null)
         {
             MessageBox.Show("اختر ترخيص عربية أولًا.", "تنبيه", MessageBoxButton.OK, MessageBoxImage.Information);
             return;
         }
 
-        var vehicle = _vehicles.FirstOrDefault(v => v.Id == item.VehicleId);
-        var window = new A5DocumentWindow(
-            "نموذج ترخيص عربية",
-            $"رقم العربية: {ValueOrDash(item.PlateNumber)}",
-            new[]
-            {
-                Section("بيانات الترخيص",
-                    Row("بداية الترخيص", item.RegistrationStartDate),
-                    Row("نهاية الترخيص", item.RegistrationExpiryDate),
-                    Row("الحالة", item.Status),
-                    Row("الإنذار", item.ExpiryAlert)),
-                Section("بيانات العربية",
-                    Row("رقم العربية", item.PlateNumber),
-                    Row("الموديل", item.Model),
-                    Row("نوع العربية", vehicle?.VehicleType),
-                    Row("سنة الصنع", vehicle?.Year),
-                    Row("رقم الشاسيه", vehicle?.ChassisNumber),
-                    Row("رقم الموتور", vehicle?.EngineNumber))
-            },
-            _settings)
-        {
-            Owner = this
-        };
-
-        window.ShowDialog();
+        OpenReportPreview(BuildVehicleLicensesReportSnapshot(new[] { item }, $"ترخيص العربية {ValueOrDash(item.PlateNumber)}"));
     }
+
+    private void PrintAllLicensesButton_Click(object sender, RoutedEventArgs e) =>
+        OpenReportPreview(BuildVehicleLicensesReportSnapshot(GetVisibleLicenseRows(), "تقرير التراخيص"));
 
     private void ShowInsuranceFormButton_Click(object sender, RoutedEventArgs e)
     {
-        var item = (sender as FrameworkElement)?.DataContext as InsuranceDto ?? Selected<InsuranceDto>(InsuranceGrid);
+        var item = SelectInsuranceFromSender(sender);
         if (item is null)
         {
             MessageBox.Show("اختر وثيقة تأمين أولًا.", "تنبيه", MessageBoxButton.OK, MessageBoxImage.Information);
             return;
         }
 
-        var vehicle = _vehicles.FirstOrDefault(v => v.Id == item.VehicleId);
-        var window = new A5DocumentWindow(
-            "نموذج تأمين عربية",
-            $"رقم العربية: {ValueOrDash(item.VehiclePlateNumber, vehicle?.PlateNumber)}",
-            new[]
-            {
-                Section("بيانات الوثيقة",
-                    Row("رقم الوثيقة", item.PolicyNumber),
-                    Row("شركة التأمين", item.InsuranceCompany),
-                    Row("نوع الوثيقة", item.PolicyType),
-                    Row("الحالة", item.Status),
-                    Row("الإنذار", item.ExpiryAlert)),
-                Section("المدة والقيمة",
-                    Row("بداية التأمين", item.StartDate),
-                    Row("نهاية التأمين", item.ExpiryDate),
-                    Row("القسط", item.PremiumAmount),
-                    Row("مبلغ التغطية", item.CoverageAmount)),
-                Section("بيانات العربية والتواصل",
-                    Row("رقم العربية", ValueOrDash(item.VehiclePlateNumber, vehicle?.PlateNumber)),
-                    Row("الموديل", vehicle?.Model),
-                    Row("مندوب التأمين", item.AgentName),
-                    Row("هاتف المندوب", item.AgentPhoneNumber),
-                    Row("ملاحظات", ValueOrDash(item.CoverageDetails, item.Notes)))
-            },
-            _settings)
+        OpenReportPreview(BuildInsuranceReportSnapshot(new[] { item }, $"تأمين العربية {ValueOrDash(item.VehiclePlateNumber)}"));
+    }
+
+    private void PrintAllInsuranceButton_Click(object sender, RoutedEventArgs e) =>
+        OpenReportPreview(BuildInsuranceReportSnapshot(GetVisibleInsuranceRows(), "تقرير التأمينات"));
+
+    private async void RefreshFuelButton_Click(object sender, RoutedEventArgs e) => await RunSafeAsync(LoadFuelAsync);
+    private void AddFuelButton_Click(object sender, RoutedEventArgs e)
+    {
+        OpenFuelEntry(BuildFuelDraft());
+    }
+
+    private FuelTransactionDto BuildFuelDraft()
+    {
+        var vehicle = _vehicles.FirstOrDefault();
+        return new FuelTransactionDto
+        {
+            VehicleId = vehicle?.Id ?? 0,
+            VehiclePlateNumber = vehicle?.PlateNumber ?? string.Empty,
+            TransactionDate = DateTime.Today,
+            FuelType = "بنزين"
+        };
+    }
+
+    private FuelTransactionDto BuildFuelDraftForTrip(TripDto trip)
+    {
+        SelectTabByTag("Fuel");
+        return new FuelTransactionDto
+        {
+            VehicleId = trip.VehicleId,
+            VehiclePlateNumber = trip.VehiclePlateNumber,
+            TripId = trip.Id,
+            TransactionDate = (trip.EndDate ?? trip.StartDate).Date,
+            FuelType = "بنزين",
+            Odometer = trip.EndMileage ?? trip.StartMileage
+        };
+    }
+
+    private async void OpenFuelEntry(FuelTransactionDto source)
+    {
+        SelectTabByTag("Fuel");
+        var window = new FuelEntryWindow(_vehicles, _trips, source)
         {
             Owner = this
         };
 
-        window.ShowDialog();
+        if (window.ShowDialog() != true || window.FuelForm is null)
+        {
+            return;
+        }
+
+        await RunSafeAsync(async () =>
+        {
+            await _fuelService.SaveAsync(window.FuelForm);
+            await LoadFuelAsync();
+            await LoadTripsAsync();
+            await LoadVehiclesAsync();
+            await LoadOilChangesAsync();
+            await LoadTreasuryAsync();
+            await LoadDashboardAsync();
+            await LoadNotificationsAsync();
+        });
     }
 
-    private async void RefreshFuelButton_Click(object sender, RoutedEventArgs e) => await RunSafeAsync(LoadFuelAsync);
-    private void AddFuelButton_Click(object sender, RoutedEventArgs e) => AddNewItem(_fuel, FuelGrid, new FuelTransactionDto { VehicleId = _vehicles.FirstOrDefault()?.Id ?? 0, TransactionDate = DateTime.Today, FuelType = "Gasoline" });
-    private async void SaveFuelButton_Click(object sender, RoutedEventArgs e) => await RunSafeAsync(async () => { var item = Selected<FuelTransactionDto>(FuelGrid) ?? throw new InvalidOperationException("اختر سجل وقود أولًا."); await _fuelService.SaveAsync(ToForm(item)); await LoadFuelAsync(); await LoadVehiclesAsync(); await LoadTreasuryAsync(); await LoadDashboardAsync(); });
-    private async void DeleteFuelButton_Click(object sender, RoutedEventArgs e) => await RunSafeAsync(async () => { await DeleteSelectedAsync(FuelGrid, _fuel, x => x.Id, _fuelService.DeleteAsync, LoadFuelAsync); await LoadTreasuryAsync(); });
+    private void SaveFuelButton_Click(object sender, RoutedEventArgs e)
+    {
+        var item = SelectFuelFromSender(sender);
+        if (item is null)
+        {
+            MessageBox.Show("اختر سجل وقود أولًا.", "تنبيه", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        OpenFuelEntry(item);
+    }
+
+    private async void DeleteFuelButton_Click(object sender, RoutedEventArgs e) => await RunSafeAsync(async () =>
+    {
+        SelectFuelFromSender(sender);
+        await DeleteSelectedAsync(FuelGrid, _fuel, x => x.Id, _fuelService.DeleteAsync, LoadFuelAsync);
+        await LoadTripsAsync();
+        await LoadTreasuryAsync();
+        await LoadDashboardAsync();
+    });
+
+    private void PrintAllFuelButton_Click(object sender, RoutedEventArgs e)
+    {
+        var rows = GetVisibleFuelRows();
+        if (rows.Count == 0)
+        {
+            MessageBox.Show("لا توجد سجلات بنزين ظاهرة للطباعة.", "تنبيه", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        OpenReportPreview(BuildFuelReportSnapshot(rows, "تقرير بنزين كل العربيات"));
+    }
+
+    private void PrintSelectedVehicleFuelButton_Click(object sender, RoutedEventArgs e)
+    {
+        var selected = Selected<FuelTransactionDto>(FuelGrid);
+        if (selected is null)
+        {
+            MessageBox.Show("اختر سجل بنزين أولًا لطباعة بنزين العربية الخاصة به.", "تنبيه", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        var rows = GetVisibleFuelRows()
+            .Where(fuel => fuel.VehicleId == selected.VehicleId)
+            .ToList();
+
+        if (rows.Count == 0)
+        {
+            MessageBox.Show("لا توجد سجلات بنزين ظاهرة لهذه العربية.", "تنبيه", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        OpenReportPreview(BuildFuelReportSnapshot(rows, $"تقرير بنزين العربية {selected.VehiclePlateNumber}"));
+    }
 
     private async void RefreshExpensesButton_Click(object sender, RoutedEventArgs e) => await RunSafeAsync(LoadExpensesAsync);
     private void AddExpenseButton_Click(object sender, RoutedEventArgs e) => AddNewItem(_expenses, ExpensesGrid, new ExpenseDto { VehicleId = _vehicles.FirstOrDefault()?.Id ?? 0, ExpenseDate = DateTime.Today, Status = "Pending" });
@@ -1991,14 +3257,132 @@ public partial class MainWindow : Window
     private async void DeleteExpenseButton_Click(object sender, RoutedEventArgs e) => await RunSafeAsync(async () => { await DeleteSelectedAsync(ExpensesGrid, _expenses, x => x.Id, _expenseService.DeleteAsync, LoadExpensesAsync); await LoadTreasuryAsync(); });
 
     private async void RefreshOilChangesButton_Click(object sender, RoutedEventArgs e) => await RunSafeAsync(LoadOilChangesAsync);
-    private void AddOilChangeButton_Click(object sender, RoutedEventArgs e) => AddNewItem(_oilChanges, OilChangesGrid, new OilChangeDto { VehicleId = _vehicles.FirstOrDefault()?.Id ?? 0, ChangeDate = DateTime.Today, OdometerAtChange = 0, NextOilChangeOdometer = 10000, Status = "Scheduled" });
-    private async void SaveOilChangeButton_Click(object sender, RoutedEventArgs e) => await RunSafeAsync(async () => { var item = Selected<OilChangeDto>(OilChangesGrid) ?? throw new InvalidOperationException("اختر سجل زيت أولًا."); await _oilChangeService.SaveAsync(ToForm(item)); await LoadOilChangesAsync(); await LoadVehiclesAsync(); await LoadDashboardAsync(); });
-    private async void DeleteOilChangeButton_Click(object sender, RoutedEventArgs e) => await RunSafeAsync(() => DeleteSelectedAsync(OilChangesGrid, _oilChanges, x => x.Id, _oilChangeService.DeleteAsync, LoadOilChangesAsync));
+    private void AddOilChangeButton_Click(object sender, RoutedEventArgs e)
+    {
+        var vehicle = _vehicles.FirstOrDefault();
+        var odometerAtChange = vehicle?.CurrentMileage ?? 0;
+        var interval = vehicle?.OilChangeIntervalKm > 0 ? vehicle.OilChangeIntervalKm : 10000;
+        OpenOilChangeEntry(new OilChangeDto
+        {
+            VehicleId = vehicle?.Id ?? 0,
+            VehiclePlateNumber = vehicle?.PlateNumber ?? string.Empty,
+            ChangeDate = DateTime.Today,
+            OdometerAtChange = odometerAtChange,
+            OilChangeIntervalKm = interval,
+            CurrentVehicleMileage = odometerAtChange,
+            NextOilChangeOdometer = odometerAtChange + interval,
+            RemainingKm = interval,
+            OilAlert = "لا يوجد إنذار",
+            Status = "Completed"
+        });
+    }
+
+    private async void OpenOilChangeEntry(OilChangeDto source)
+    {
+        SelectTabByTag("OilChanges");
+        var window = new OilChangeEntryWindow(_vehicles, source)
+        {
+            Owner = this
+        };
+
+        if (window.ShowDialog() != true || window.OilChangeForm is null)
+        {
+            return;
+        }
+
+        await RunSafeAsync(async () =>
+        {
+            await _oilChangeService.SaveAsync(window.OilChangeForm);
+            await LoadOilChangesAsync();
+            await LoadVehiclesAsync();
+            await LoadDashboardAsync();
+            await LoadNotificationsAsync();
+        });
+    }
+
+    private void SaveOilChangeButton_Click(object sender, RoutedEventArgs e)
+    {
+        var item = SelectOilChangeFromSender(sender);
+        if (item is null)
+        {
+            MessageBox.Show("اختر سجل زيت أولًا.", "تنبيه", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        OpenOilChangeEntry(item);
+    }
+
+    private async void DeleteOilChangeButton_Click(object sender, RoutedEventArgs e) => await RunSafeAsync(() =>
+    {
+        SelectOilChangeFromSender(sender);
+        return DeleteSelectedAsync(OilChangesGrid, _oilChanges, x => x.Id, _oilChangeService.DeleteAsync, async () =>
+        {
+            await LoadOilChangesAsync();
+            await LoadDashboardAsync();
+            await LoadNotificationsAsync();
+        });
+    });
 
     private async void RefreshTreasuryButton_Click(object sender, RoutedEventArgs e) => await RunSafeAsync(LoadTreasuryAsync);
-    private void AddTreasuryButton_Click(object sender, RoutedEventArgs e) => AddNewItem(_treasuryTransactions, TreasuryGrid, new TreasuryTransactionDto { TransactionDate = DateTime.Today, TransactionType = "إيراد", PaymentMethod = "نقدي" });
-    private async void SaveTreasuryButton_Click(object sender, RoutedEventArgs e) => await RunSafeAsync(async () => { var item = Selected<TreasuryTransactionDto>(TreasuryGrid) ?? throw new InvalidOperationException("اختر حركة خزينة أولًا."); await _treasuryService.SaveAsync(ToForm(item)); await LoadTreasuryAsync(); await LoadDashboardAsync(); });
-    private async void DeleteTreasuryButton_Click(object sender, RoutedEventArgs e) => await RunSafeAsync(() => DeleteSelectedAsync(TreasuryGrid, _treasuryTransactions, x => x.Id, _treasuryService.DeleteAsync, LoadTreasuryAsync));
+    private async void AddTreasuryButton_Click(object sender, RoutedEventArgs e)
+    {
+        var window = new TreasuryEntryWindow(new TreasuryTransactionDto
+        {
+            TransactionDate = DateTime.Today,
+            TransactionType = "إيراد",
+            PaymentMethod = "نقدي"
+        })
+        {
+            Owner = this
+        };
+
+        if (window.ShowDialog() != true || window.TreasuryForm is null)
+        {
+            return;
+        }
+
+        await RunSafeAsync(async () =>
+        {
+            await _treasuryService.SaveAsync(window.TreasuryForm);
+            await LoadTreasuryAsync();
+            await LoadDashboardAsync();
+            await LoadNotificationsAsync();
+        });
+    }
+
+    private async void SaveTreasuryButton_Click(object sender, RoutedEventArgs e)
+    {
+        var item = SelectTreasuryFromSender(sender);
+        if (item is null)
+        {
+            MessageBox.Show("اختر حركة خزينة أولًا.", "تنبيه", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        var window = new TreasuryEntryWindow(item)
+        {
+            Owner = this
+        };
+
+        if (window.ShowDialog() != true || window.TreasuryForm is null)
+        {
+            return;
+        }
+
+        await RunSafeAsync(async () =>
+        {
+            await _treasuryService.SaveAsync(window.TreasuryForm);
+            await LoadTreasuryAsync();
+            await LoadDashboardAsync();
+            await LoadNotificationsAsync();
+        });
+    }
+
+    private async void DeleteTreasuryButton_Click(object sender, RoutedEventArgs e) => await RunSafeAsync(() =>
+    {
+        SelectTreasuryFromSender(sender);
+        return DeleteSelectedAsync(TreasuryGrid, _treasuryTransactions, x => x.Id, _treasuryService.DeleteAsync, LoadTreasuryAsync);
+    });
 
     private async void RefreshLicensesButton_Click(object sender, RoutedEventArgs e) => await RunSafeAsync(async () =>
     {
@@ -2006,19 +3390,54 @@ public partial class MainWindow : Window
         await LoadLicensesAsync();
     });
 
-    private void AddVehicleFromLicenseButton_Click(object sender, RoutedEventArgs e) =>
-        AddNewItem(_vehicleLicenses, LicensesGrid, new VehicleLicenseRow
+    private async void AddVehicleFromLicenseButton_Click(object sender, RoutedEventArgs e)
+    {
+        var draft = new VehicleLicenseRow
         {
+            Year = DateTime.Today.Year,
+            OilChangeIntervalKm = 10000,
+            RegistrationType = "ترخيص",
             RegistrationStartDate = DateTime.Today,
             RegistrationExpiryDate = DateTime.Today.AddYears(1)
-        });
+        };
 
-    private async void SaveVehicleLicenseButton_Click(object sender, RoutedEventArgs e) => await RunSafeAsync(async () =>
+        var window = new VehicleLicenseEntryWindow(draft, RegistrationTypes)
+        {
+            Owner = this
+        };
+
+        if (window.ShowDialog() != true)
+        {
+            return;
+        }
+
+        await RunSafeAsync(async () => await SaveVehicleLicenseRowAsync(window.LicenseRow));
+    }
+
+    private async void SaveVehicleLicenseButton_Click(object sender, RoutedEventArgs e)
     {
-        CommitGridEdit(LicensesGrid);
-        var item = Selected<VehicleLicenseRow>(LicensesGrid)
-            ?? throw new InvalidOperationException("اختر ترخيص عربية أولًا.");
+        var item = SelectVehicleLicenseFromSender(sender);
+        if (item is null)
+        {
+            MessageBox.Show("اختر ترخيص عربية أولًا.", "تنبيه", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
 
+        var window = new VehicleLicenseEntryWindow(item, RegistrationTypes)
+        {
+            Owner = this
+        };
+
+        if (window.ShowDialog() != true)
+        {
+            return;
+        }
+
+        await RunSafeAsync(async () => await SaveVehicleLicenseRowAsync(window.LicenseRow));
+    }
+
+    private async Task SaveVehicleLicenseRowAsync(VehicleLicenseRow item)
+    {
         if (string.IsNullOrWhiteSpace(item.PlateNumber))
         {
             throw new InvalidOperationException("رقم العربية مطلوب قبل حفظ الترخيص.");
@@ -2031,6 +3450,16 @@ public partial class MainWindow : Window
             throw new InvalidOperationException("تاريخ نهاية الترخيص يجب أن يكون بعد تاريخ البداية.");
         }
 
+        if (item.Year is < 1900 or > 2100)
+        {
+            throw new InvalidOperationException("سنة الصنع يجب أن تكون رقمًا صحيحًا بين 1900 و2100.");
+        }
+
+        if (item.OilChangeIntervalKm <= 0)
+        {
+            throw new InvalidOperationException("قيمة تغيير الزيت كل كام كم يجب أن تكون أكبر من صفر.");
+        }
+
         var vehicle = item.VehicleId == 0
             ? null
             : _vehicles.FirstOrDefault(v => v.Id == item.VehicleId)
@@ -2041,11 +3470,11 @@ public partial class MainWindow : Window
         await LoadLicensesAsync();
         await LoadDashboardAsync();
         await LoadNotificationsAsync();
-    });
+    }
 
     private async void DeleteVehicleFromLicenseButton_Click(object sender, RoutedEventArgs e) => await RunSafeAsync(async () =>
     {
-        var item = Selected<VehicleLicenseRow>(LicensesGrid)
+        var item = SelectVehicleLicenseFromSender(sender)
             ?? throw new InvalidOperationException("اختر عربية أولًا.");
 
         if (item.VehicleId == 0)
@@ -2068,7 +3497,7 @@ public partial class MainWindow : Window
 
     private async void ClearVehicleLicenseButton_Click(object sender, RoutedEventArgs e) => await RunSafeAsync(async () =>
     {
-        var item = Selected<VehicleLicenseRow>(LicensesGrid)
+        var item = SelectVehicleLicenseFromSender(sender)
             ?? throw new InvalidOperationException("اختر ترخيص عربية أولًا.");
 
         var vehicle = _vehicles.FirstOrDefault(v => v.Id == item.VehicleId)
@@ -2076,6 +3505,7 @@ public partial class MainWindow : Window
 
         vehicle.RegistrationStartDate = null;
         vehicle.RegistrationExpiryDate = null;
+        vehicle.RegistrationType = "ترخيص";
         await _vehicleService.SaveAsync(ToForm(vehicle));
         await LoadVehiclesAsync();
         await LoadLicensesAsync();
@@ -2083,21 +3513,117 @@ public partial class MainWindow : Window
         await LoadNotificationsAsync();
     });
 
-    private async void RefreshInsuranceButton_Click(object sender, RoutedEventArgs e) => await RunSafeAsync(LoadInsuranceAsync);
-    private void AddInsuranceButton_Click(object sender, RoutedEventArgs e) => AddNewItem(_insurance, InsuranceGrid, new InsuranceDto { VehicleId = _vehicles.FirstOrDefault()?.Id ?? 0, StartDate = DateTime.Today, ExpiryDate = DateTime.Today.AddYears(1), Status = "Active" });
-    private async void SaveInsuranceButton_Click(object sender, RoutedEventArgs e) => await RunSafeAsync(async () =>
+    private void OpenInsuranceTabButton_Click(object sender, RoutedEventArgs e) => SelectTabByTag("Insurance");
+
+    private async void AddInsuranceForSelectedLicenseButton_Click(object sender, RoutedEventArgs e)
     {
-        CommitGridEdit(InsuranceGrid);
-        var item = Selected<InsuranceDto>(InsuranceGrid) ?? throw new InvalidOperationException("اختر وثيقة تأمين أولًا.");
-        EnsureVehicleExists(item.VehicleId, "وثيقة التأمين");
-        await _insuranceService.SaveAsync(ToForm(item));
-        await LoadInsuranceAsync();
-        await LoadDashboardAsync();
+        var item = Selected<VehicleLicenseRow>(LicensesGrid);
+        if (item is null)
+        {
+            MessageBox.Show("اختر عربية من جدول التراخيص قبل إضافة التأمين.", "تنبيه", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        var vehicle = _vehicles.FirstOrDefault(v => v.Id == item.VehicleId);
+        if (vehicle is null)
+        {
+            MessageBox.Show("احفظ العربية أولًا قبل إضافة وثيقة التأمين.", "تنبيه", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        var window = new InsuranceEntryWindow(_vehicles, BuildInsuranceDraft(vehicle))
+        {
+            Owner = this
+        };
+
+        if (window.ShowDialog() != true)
+        {
+            return;
+        }
+
+        await RunSafeAsync(async () =>
+        {
+            await _insuranceService.SaveAsync(ToForm(window.Insurance));
+            await LoadInsuranceAsync();
+            await LoadDashboardAsync();
+            await LoadNotificationsAsync();
+            SelectTabByTag("Insurance");
+        });
+    }
+
+    private async void RefreshInsuranceButton_Click(object sender, RoutedEventArgs e) => await RunSafeAsync(LoadInsuranceAsync);
+    private async void AddInsuranceButton_Click(object sender, RoutedEventArgs e)
+    {
+        var vehicle = _vehicles.FirstOrDefault();
+        var window = new InsuranceEntryWindow(_vehicles, BuildInsuranceDraft(vehicle))
+        {
+            Owner = this
+        };
+
+        if (window.ShowDialog() != true)
+        {
+            return;
+        }
+
+        await RunSafeAsync(async () =>
+        {
+            await _insuranceService.SaveAsync(ToForm(window.Insurance));
+            await LoadInsuranceAsync();
+            await LoadDashboardAsync();
+            await LoadNotificationsAsync();
+        });
+    }
+
+    private static InsuranceDto BuildInsuranceDraft(VehicleDto? vehicle) => new()
+    {
+        VehicleId = vehicle?.Id ?? 0,
+        VehiclePlateNumber = vehicle?.PlateNumber ?? string.Empty,
+        VehicleModel = vehicle?.Model ?? string.Empty,
+        VehicleYear = vehicle?.Year ?? 0,
+        VehicleChassisNumber = vehicle?.ChassisNumber ?? string.Empty,
+        VehicleEngineNumber = vehicle?.EngineNumber ?? string.Empty,
+        PolicyType = "تأمين حوادث",
+        StartDate = DateTime.Today,
+        ExpiryDate = DateTime.Today.AddYears(1),
+        Status = "Active"
+    };
+
+    private async void SaveInsuranceButton_Click(object sender, RoutedEventArgs e)
+    {
+        var item = SelectInsuranceFromSender(sender);
+        if (item is null)
+        {
+            MessageBox.Show("اختر وثيقة تأمين أولًا.", "تنبيه", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        var window = new InsuranceEntryWindow(_vehicles, item)
+        {
+            Owner = this
+        };
+
+        if (window.ShowDialog() != true)
+        {
+            return;
+        }
+
+        await RunSafeAsync(async () =>
+        {
+            EnsureVehicleExists(window.Insurance.VehicleId, "وثيقة التأمين");
+            await _insuranceService.SaveAsync(ToForm(window.Insurance));
+            await LoadInsuranceAsync();
+            await LoadDashboardAsync();
+            await LoadNotificationsAsync();
+        });
+    }
+    private async void DeleteInsuranceButton_Click(object sender, RoutedEventArgs e) => await RunSafeAsync(() =>
+    {
+        SelectInsuranceFromSender(sender);
+        return DeleteSelectedAsync(InsuranceGrid, _insurance, x => x.Id, _insuranceService.DeleteAsync, LoadInsuranceAsync);
     });
-    private async void DeleteInsuranceButton_Click(object sender, RoutedEventArgs e) => await RunSafeAsync(() => DeleteSelectedAsync(InsuranceGrid, _insurance, x => x.Id, _insuranceService.DeleteAsync, LoadInsuranceAsync));
     private async void AttachInsuranceDocumentButton_Click(object sender, RoutedEventArgs e) => await RunSafeAsync(async () =>
     {
-        var item = Selected<InsuranceDto>(InsuranceGrid) ?? throw new InvalidOperationException("اختر وثيقة تأمين أولًا.");
+        var item = SelectInsuranceFromSender(sender) ?? throw new InvalidOperationException("اختر وثيقة تأمين أولًا.");
         var filePath = PickDocumentPath();
         if (string.IsNullOrWhiteSpace(filePath))
         {
@@ -2110,19 +3636,66 @@ public partial class MainWindow : Window
     });
 
     private async void RefreshCustodyButton_Click(object sender, RoutedEventArgs e) => await RunSafeAsync(LoadCustodyAsync);
-    private void AddCustodyButton_Click(object sender, RoutedEventArgs e) => AddNewItem(_custodies, CustodyGrid, new CustodyDto { VehicleId = _vehicles.FirstOrDefault()?.Id ?? 0, HandoverDate = DateTime.Today, Status = "Active", VehicleConditionRating = 5 });
-    private async void SaveCustodyButton_Click(object sender, RoutedEventArgs e) => await RunSafeAsync(async () =>
+    private async void AddCustodyButton_Click(object sender, RoutedEventArgs e)
     {
-        CommitGridEdit(CustodyGrid);
-        var item = Selected<CustodyDto>(CustodyGrid) ?? throw new InvalidOperationException("اختر سجل عهدة أولًا.");
-        EnsureVehicleExists(item.VehicleId, "سجل العهدة");
-        await _custodyService.SaveAsync(ToForm(item));
-        await LoadCustodyAsync();
+        var selectedVehicleId = Selected<CustodyDto>(CustodyGrid)?.VehicleId;
+        var window = new CustodyEntryWindow(_vehicles, selectedVehicleId)
+        {
+            Owner = this
+        };
+
+        if (window.ShowDialog() != true || window.CustodyForm is null)
+        {
+            return;
+        }
+
+        await RunSafeAsync(async () =>
+        {
+            await _custodyService.SaveAsync(window.CustodyForm);
+            await LoadCustodyAsync();
+            await LoadDashboardAsync();
+            await LoadNotificationsAsync();
+        });
+    }
+
+    private async void SaveCustodyButton_Click(object sender, RoutedEventArgs e)
+    {
+        var item = SelectCustodyFromSender(sender);
+        if (item is null)
+        {
+            MessageBox.Show("اختر سجل عهدة أولًا.", "تنبيه", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        var window = new CustodyEntryWindow(_vehicles, item.VehicleId, item)
+        {
+            Owner = this
+        };
+
+        if (window.ShowDialog() != true || window.CustodyForm is null)
+        {
+            return;
+        }
+
+        await RunSafeAsync(async () =>
+        {
+            EnsureVehicleExists(window.CustodyForm.VehicleId, "سجل العهدة");
+            await _custodyService.SaveAsync(window.CustodyForm);
+            await LoadCustodyAsync();
+            await LoadDashboardAsync();
+            await LoadNotificationsAsync();
+        });
+    }
+
+    private async void DeleteCustodyButton_Click(object sender, RoutedEventArgs e) => await RunSafeAsync(() =>
+    {
+        SelectCustodyFromSender(sender);
+        return DeleteSelectedAsync(CustodyGrid, _custodies, x => x.Id, _custodyService.DeleteAsync, LoadCustodyAsync);
     });
-    private async void DeleteCustodyButton_Click(object sender, RoutedEventArgs e) => await RunSafeAsync(() => DeleteSelectedAsync(CustodyGrid, _custodies, x => x.Id, _custodyService.DeleteAsync, LoadCustodyAsync));
+
     private async void AttachCustodyDocumentButton_Click(object sender, RoutedEventArgs e) => await RunSafeAsync(async () =>
     {
-        var item = Selected<CustodyDto>(CustodyGrid) ?? throw new InvalidOperationException("اختر سجل عهدة أولًا.");
+        var item = SelectCustodyFromSender(sender) ?? throw new InvalidOperationException("اختر سجل عهدة أولًا.");
         var filePath = PickDocumentPath();
         if (string.IsNullOrWhiteSpace(filePath))
         {
@@ -2186,29 +3759,9 @@ public partial class MainWindow : Window
         await GenerateCurrentReportAsync();
     });
 
-    private async void ShowReportA5Button_Click(object sender, RoutedEventArgs e) => await RunSafeAsync(async () =>
-    {
-        var selectedRow = _currentReport is null ? null : ReportsGrid.SelectedItem as DataRowView;
-        var report = await GenerateCurrentReportAsync();
-        OpenReportA5(report, selectedRow);
-    });
+    private async void ShowReportA5Button_Click(object sender, RoutedEventArgs e) => await OpenCurrentReportPreviewAsync();
 
-    private async void ShowReportRowA5Button_Click(object sender, RoutedEventArgs e) => await RunSafeAsync(async () =>
-    {
-        var selectedRow = (sender as FrameworkElement)?.DataContext as DataRowView ?? ReportsGrid.SelectedItem as DataRowView;
-        if (_currentReport is null)
-        {
-            await GenerateCurrentReportAsync();
-            selectedRow = ReportsGrid.SelectedItem as DataRowView;
-        }
-
-        if (selectedRow is null)
-        {
-            throw new InvalidOperationException("اختر سجل تقرير أولًا.");
-        }
-
-        OpenReportA5(_currentReport!, selectedRow);
-    });
+    private async void ShowReportRowA5Button_Click(object sender, RoutedEventArgs e) => await OpenSelectedReportRowPreviewAsync(sender);
 
     private void DeleteReportButton_Click(object sender, RoutedEventArgs e)
     {
@@ -2218,18 +3771,25 @@ public partial class MainWindow : Window
             return;
         }
 
+        if ((sender as FrameworkElement)?.DataContext is DataRowView rowFromAction)
+        {
+            ReportsGrid.SelectedItem = rowFromAction;
+            ReportsGrid.ScrollIntoView(rowFromAction);
+        }
+
         if (ReportsGrid.SelectedItem is DataRowView selectedRow)
         {
             var table = selectedRow.Row.Table;
             selectedRow.Row.Delete();
             table?.AcceptChanges();
+            ReportsGrid.SelectedItem = null;
         }
         else
         {
             ReportsGrid.ItemsSource = null;
+            _currentReport = null;
+            _reportColumnFilters.Clear();
         }
-
-        _currentReport = null;
     }
 
     private async void ExportReportCsvButton_Click(object sender, RoutedEventArgs e) => await RunSafeAsync(async () =>
@@ -2270,21 +3830,79 @@ public partial class MainWindow : Window
         MessageBox.Show("تم تصدير التقرير Excel بنجاح.", "تم", MessageBoxButton.OK, MessageBoxImage.Information);
     });
 
-    private async void PrintReportPdfButton_Click(object sender, RoutedEventArgs e) => await RunSafeAsync(async () =>
+    private async void PrintReportPdfButton_Click(object sender, RoutedEventArgs e) => await OpenCurrentReportPreviewAsync();
+
+    private async Task OpenCurrentReportPreviewAsync()
     {
-        var report = await GenerateCurrentReportAsync();
-        var printDialog = new PrintDialog();
-        if (printDialog.ShowDialog() != true)
+        ReportDataDto? report = null;
+        try
         {
-            return;
+            Mouse.OverrideCursor = Cursors.Wait;
+            if (_currentReport is null || ReportsGrid.ItemsSource is not DataView)
+            {
+                await GenerateCurrentReportAsync();
+            }
+
+            report = BuildDisplayedReportSnapshot(_currentReport!);
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"لم يتم تنفيذ العملية:\n{ex.Message}", "تنبيه واضح", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+        finally
+        {
+            Mouse.OverrideCursor = null;
         }
 
-        var document = BuildReportDocument(report);
-        document.PageWidth = printDialog.PrintableAreaWidth;
-        document.PageHeight = printDialog.PrintableAreaHeight;
-        document.PagePadding = new Thickness(36);
-        printDialog.PrintDocument(((IDocumentPaginatorSource)document).DocumentPaginator, report.ReportTitle);
-    });
+        if (report is not null)
+        {
+            OpenReportPreview(report);
+        }
+    }
+
+    private async Task OpenSelectedReportRowPreviewAsync(object sender)
+    {
+        ReportDataDto? report = null;
+        try
+        {
+            Mouse.OverrideCursor = Cursors.Wait;
+            if (_currentReport is null || ReportsGrid.ItemsSource is not DataView)
+            {
+                await GenerateCurrentReportAsync();
+            }
+
+            var selectedRow = (sender as FrameworkElement)?.DataContext as DataRowView ?? ReportsGrid.SelectedItem as DataRowView;
+            if (selectedRow is null)
+            {
+                throw new InvalidOperationException("اختر سجلًا من التقرير أولًا.");
+            }
+
+            report = BuildSelectedReportRowSnapshot(_currentReport!, selectedRow);
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"لم يتم تنفيذ العملية:\n{ex.Message}", "تنبيه واضح", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+        finally
+        {
+            Mouse.OverrideCursor = null;
+        }
+
+        if (report is not null)
+        {
+            OpenReportPreview(report);
+        }
+    }
+
+    private void OpenReportPreview(ReportDataDto report)
+    {
+        Mouse.OverrideCursor = null;
+        var window = new ReportPreviewWindow(report.ReportTitle, BuildReportDocument(report))
+        {
+            Owner = this
+        };
+        window.ShowDialog();
+    }
 
     private void OpenReportA5(ReportDataDto report, DataRowView? selectedRow)
     {
@@ -2306,17 +3924,106 @@ public partial class MainWindow : Window
 
     private async Task<ReportDataDto> GenerateCurrentReportAsync()
     {
-        var report = await _reportingService.GenerateReportAsync(BuildCurrentReportFilter());
+        _reportColumnFilters.Clear();
+        var filter = BuildCurrentReportFilter();
+        await RefreshReportSourceAsync(filter.ReportType);
+        var report = BuildCurrentTableReportSnapshot(filter);
         _currentReport = report;
         ReportsGrid.ItemsSource = ToDataTable(report).DefaultView;
         return report;
+    }
+
+    private async Task RefreshReportSourceAsync(string reportType)
+    {
+        var normalized = (reportType ?? string.Empty).Trim().ToLowerInvariant();
+        switch (normalized)
+        {
+            case "vehicletrips":
+            case "alltrips":
+                await LoadTripsAsync();
+                break;
+            case "fuel":
+                await LoadFuelAsync();
+                break;
+            case "vehiclelicenses":
+                await LoadVehiclesAsync();
+                await LoadLicensesAsync();
+                break;
+            case "insurance":
+                await LoadInsuranceAsync();
+                break;
+            case "contracts":
+                await LoadContractsAsync();
+                break;
+            case "maintenance":
+                await LoadMaintenanceAsync();
+                break;
+            case "oilchanges":
+                await LoadOilChangesAsync();
+                break;
+            case "treasury":
+                await LoadTreasuryAsync();
+                break;
+            case "vehicles":
+            default:
+                await LoadVehiclesAsync();
+                break;
+        }
+    }
+
+    private ReportDataDto BuildCurrentTableReportSnapshot(ReportFilterDto filter)
+    {
+        var reportType = (filter.ReportType ?? string.Empty).Trim().ToLowerInvariant();
+        return reportType switch
+        {
+            "vehicletrips" => BuildTripsReportSnapshot(
+                _trips.Where(trip =>
+                        (!filter.VehicleId.HasValue || trip.VehicleId == filter.VehicleId.Value) &&
+                        ReportDateMatches(trip.StartDate, filter))
+                    .ToList(),
+                GetSelectedVehicleReportTitle()),
+            "alltrips" => BuildTripsReportSnapshot(
+                _trips.Where(trip => ReportDateMatches(trip.StartDate, filter)).ToList(),
+                "تقرير جميع التشغيلات"),
+            "fuel" => BuildFuelReportSnapshot(_fuel.Where(fuel =>
+                    (!filter.VehicleId.HasValue || fuel.VehicleId == filter.VehicleId.Value) &&
+                    ReportDateMatches(fuel.TransactionDate, filter))),
+            "vehiclelicenses" => BuildVehicleLicensesReportSnapshot(_vehicleLicenses.Where(license =>
+                ReportDateMatches(license.RegistrationExpiryDate, filter)), "تقرير تراخيص العربيات"),
+            "insurance" => BuildInsuranceReportSnapshot(_insurance.Where(insurance =>
+                ReportDateMatches(insurance.ExpiryDate, filter)), "تقرير التأمينات"),
+            "contracts" => BuildContractsReportSnapshot(_contracts.Where(contract =>
+                ReportDateMatches(contract.StartDate, filter) || ReportDateMatches(contract.EndDate, filter))),
+            "maintenance" => BuildMaintenanceReportSnapshot(_maintenance.Where(maintenance =>
+                ReportDateMatches(maintenance.RequestDate, filter))),
+            "oilchanges" => BuildOilChangesReportSnapshot(_oilChanges.Where(oil =>
+                ReportDateMatches(oil.ChangeDate, filter))),
+            "treasury" => BuildTreasuryReportSnapshot(_treasuryTransactions.Where(transaction =>
+                ReportDateMatches(transaction.TransactionDate, filter))),
+            "vehicles" or _ => BuildVehiclesReportSnapshot(_vehicles.Where(vehicle =>
+                ReportDateMatches(vehicle.PurchaseDate, filter)))
+        };
+    }
+
+    private string GetSelectedVehicleReportTitle()
+    {
+        var vehicleName = ReportVehicleComboBox.SelectedItem is VehicleDto vehicle
+            ? vehicle.PlateNumber
+            : string.Empty;
+
+        return string.IsNullOrWhiteSpace(vehicleName)
+            ? "تقرير تشغيلات العربيات"
+            : $"تقرير تشغيلات العربية {vehicleName}";
     }
 
     private ReportFilterDto BuildCurrentReportFilter()
     {
         var selectedItem = ReportTypeComboBox.SelectedItem as ComboBoxItem;
         var reportType = selectedItem?.Tag?.ToString() ?? "vehicles";
-        int? vehicleId = ReportVehicleComboBox.SelectedValue is int selectedVehicleId
+        var usesVehicleFilter =
+            string.Equals(reportType, "vehicletrips", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(reportType, "fuel", StringComparison.OrdinalIgnoreCase);
+        int? vehicleId = usesVehicleFilter && ReportVehicleComboBox.SelectedValue is int selectedVehicleId
             ? selectedVehicleId
             : null;
 
@@ -2332,7 +4039,14 @@ public partial class MainWindow : Window
     private void ReportTypeComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
         _currentReport = null;
+        _reportColumnFilters.Clear();
         UpdateReportVehicleFilterVisibility();
+    }
+
+    private void ClearReportVehicleFilterButton_Click(object sender, RoutedEventArgs e)
+    {
+        ReportVehicleComboBox.SelectedItem = null;
+        ReportVehicleComboBox.SelectedValue = null;
     }
 
     private void UpdateReportVehicleFilterVisibility()
@@ -2344,7 +4058,9 @@ public partial class MainWindow : Window
 
         var selectedItem = ReportTypeComboBox.SelectedItem as ComboBoxItem;
         var reportType = selectedItem?.Tag?.ToString();
-        ReportVehicleFilterPanel.Visibility = string.Equals(reportType, "vehicletrips", StringComparison.OrdinalIgnoreCase)
+        ReportVehicleFilterPanel.Visibility =
+            string.Equals(reportType, "vehicletrips", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(reportType, "fuel", StringComparison.OrdinalIgnoreCase)
             ? Visibility.Visible
             : Visibility.Collapsed;
     }

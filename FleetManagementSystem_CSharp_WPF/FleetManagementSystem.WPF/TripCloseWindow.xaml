@@ -3,9 +3,9 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="إغلاق / تعديل التشغيلة"
         Width="760"
-        Height="650"
+        Height="590"
         MinWidth="680"
-        MinHeight="560"
+        MinHeight="520"
         WindowStartupLocation="CenterOwner"
         ResizeMode="CanResize"
         FlowDirection="RightToLeft"
@@ -94,6 +94,8 @@
                         <RowDefinition Height="Auto" />
                         <RowDefinition Height="Auto" />
                         <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
                     </Grid.RowDefinitions>
 
                     <StackPanel Margin="0,0,12,14">
@@ -107,6 +109,8 @@
                         <TextBlock Text="عداد البداية" Style="{StaticResource TripCloseLabelStyle}" />
                         <TextBox x:Name="StartMileageTextBox"
                                  IsReadOnly="True"
+                                 TextChanged="MileageTextBox_TextChanged"
+                                 ToolTip="يتم أخذه تلقائيًا من عداد العربية وقت فتح التشغيلة"
                                  Style="{StaticResource TripCloseInputStyle}" />
                     </StackPanel>
 
@@ -130,7 +134,7 @@
                     <StackPanel Grid.Row="1" Grid.Column="1" Margin="0,0,0,14">
                         <TextBlock Text="عداد النهاية" Style="{StaticResource TripCloseLabelStyle}" />
                         <TextBox x:Name="EndMileageTextBox"
-                                 TextChanged="EndMileageTextBox_TextChanged"
+                                 TextChanged="MileageTextBox_TextChanged"
                                  Style="{StaticResource TripCloseInputStyle}" />
                     </StackPanel>
 
@@ -143,18 +147,14 @@
                     </StackPanel>
 
                     <StackPanel Grid.Row="2" Grid.Column="1" Margin="0,0,0,14">
-                        <TextBlock Text="تكلفة التشغيلة" Style="{StaticResource TripCloseLabelStyle}" />
-                        <TextBox x:Name="TripCostTextBox"
-                                 Style="{StaticResource TripCloseInputStyle}" />
+                        <TextBlock Text="عداد العربية الحالي" Style="{StaticResource TripCloseLabelStyle}" />
+                        <TextBox x:Name="VehicleCurrentMileageTextBox"
+                                 Style="{StaticResource TripCloseInputStyle}"
+                                 IsReadOnly="True"
+                                 ToolTip="آخر عداد محفوظ للعربية من التشغيلات أو البنزين أو الزيت" />
                     </StackPanel>
 
                     <StackPanel Grid.Row="3" Margin="0,0,12,14">
-                        <TextBlock Text="الوقود المستهلك" Style="{StaticResource TripCloseLabelStyle}" />
-                        <TextBox x:Name="FuelConsumedTextBox"
-                                 Style="{StaticResource TripCloseInputStyle}" />
-                    </StackPanel>
-
-                    <StackPanel Grid.Row="3" Grid.Column="1" Margin="0,0,0,14">
                         <TextBlock Text="حالة التشغيلة" Style="{StaticResource TripCloseLabelStyle}" />
                         <ComboBox x:Name="StatusComboBox"
                                   Height="40">
@@ -163,7 +163,37 @@
                         </ComboBox>
                     </StackPanel>
 
-                    <StackPanel Grid.Row="4" Grid.ColumnSpan="2" Margin="0,0,0,14">
+                    <Border Grid.Row="3"
+                            Grid.Column="1"
+                            Background="#F7FAFC"
+                            BorderBrush="#D7E0E8"
+                            BorderThickness="1"
+                            CornerRadius="10"
+                            Padding="12"
+                            Margin="0,0,0,14">
+                        <TextBlock Text="اكتب عداد النهاية من قراءة العربية عند الرجوع. النظام لن يسمح بعداد نهاية أقل من البداية أو تاريخ إغلاق قبل بداية التشغيلة."
+                                   Foreground="{StaticResource TripCloseTextBrush}"
+                                   FontSize="13"
+                                   FontWeight="SemiBold"
+                                   TextWrapping="Wrap"/>
+                    </Border>
+
+                    <Border Grid.Row="4"
+                            Grid.ColumnSpan="2"
+                            Background="#EAF2F7"
+                            BorderBrush="#C9DAE4"
+                            BorderThickness="1"
+                            CornerRadius="10"
+                            Padding="12"
+                            Margin="0,0,0,14">
+                        <TextBlock Text="البنزين والتكلفة يتم تسجيلهم من زر تسجيل بنزين في صفحة التشغيلات، ويتم حساب بنزين مسجل وتكلفة البنزين تلقائيًا من سجلات البنزين."
+                                   Foreground="{StaticResource TripCloseTextBrush}"
+                                   FontSize="13"
+                                   FontWeight="SemiBold"
+                                   TextWrapping="Wrap"/>
+                    </Border>
+
+                    <StackPanel Grid.Row="5" Grid.ColumnSpan="2" Margin="0,0,0,14">
                         <TextBlock Text="ملاحظات" Style="{StaticResource TripCloseLabelStyle}" />
                         <TextBox x:Name="NotesTextBox"
                                  Height="92"
@@ -175,7 +205,7 @@
                     </StackPanel>
 
                     <TextBlock x:Name="ValidationTextBlock"
-                               Grid.Row="5"
+                               Grid.Row="6"
                                Grid.ColumnSpan="2"
                                Foreground="#B42318"
                                TextWrapping="Wrap" />

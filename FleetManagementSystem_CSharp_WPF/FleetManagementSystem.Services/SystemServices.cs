@@ -109,11 +109,13 @@ public sealed class DataBootstrapService(FleetDbContext context) : IDataBootstra
     private async Task EnsureOperationalSchemaAsync()
     {
         await EnsureColumnAsync("Vehicles", "RegistrationStartDate", GetNullableDateColumnDefinition());
+        await EnsureColumnAsync("Vehicles", "RegistrationType", GetRegistrationTypeColumnDefinition());
         await EnsureColumnAsync("Vehicles", "AccidentInsuranceDetails", GetInsuranceDetailsColumnDefinition());
         await EnsureColumnAsync("Vehicles", "SocialInsuranceDetails", GetInsuranceDetailsColumnDefinition());
         await EnsureColumnAsync("Trips", "RequesterEmployeeId", GetNullableIntColumnDefinition());
         await EnsureColumnAsync("Trips", "RequesterNameText", GetRequesterNameColumnDefinition());
         await EnsureColumnAsync("Trips", "SupervisorEmployeeId", GetNullableIntColumnDefinition());
+        await EnsureColumnAsync("FuelTransactions", "TripId", GetNullableIntColumnDefinition());
 
         if (await HasColumnAsync("Trips", "EmployeeId") && await HasColumnAsync("Trips", "RequesterEmployeeId"))
         {
@@ -235,6 +237,9 @@ public sealed class DataBootstrapService(FleetDbContext context) : IDataBootstra
 
     private string GetRequesterNameColumnDefinition() =>
         _context.Database.IsSqlite() ? "TEXT NOT NULL DEFAULT ''" : "VARCHAR(255) NOT NULL DEFAULT ''";
+
+    private string GetRegistrationTypeColumnDefinition() =>
+        _context.Database.IsSqlite() ? "TEXT NOT NULL DEFAULT 'ترخيص'" : "VARCHAR(30) NOT NULL DEFAULT 'ترخيص'";
 
     private async Task SeedDemoOperationsAsync()
     {
@@ -385,6 +390,95 @@ public sealed class DataBootstrapService(FleetDbContext context) : IDataBootstra
                     Position = "مشرف",
                     PhoneNumber = "01000000024",
                     Status = "Active"
+                });
+        }
+
+        var vehiclesWithoutRegistrationType = await _context.Vehicles
+            .Where(vehicle => string.IsNullOrWhiteSpace(vehicle.RegistrationType))
+            .ToListAsync();
+        foreach (var vehicle in vehiclesWithoutRegistrationType)
+        {
+            vehicle.RegistrationType = "ترخيص";
+        }
+
+        await _context.SaveChangesAsync();
+
+        var seededVehicles = await _context.Vehicles
+            .OrderBy(v => v.Id)
+            .Take(3)
+            .ToListAsync();
+        var seededEmployees = await _context.Employees
+            .OrderBy(e => e.Id)
+            .Take(4)
+            .ToListAsync();
+
+        if (!await _context.Insurances.AnyAsync() && seededVehicles.Count > 0)
+        {
+            var policies = seededVehicles.Select((vehicle, index) =>
+            {
+                var policyNumber = $"AH-DEMO-{index + 1:000}";
+                var expiryDate = index switch
+                {
+                    0 => DateTime.Today.AddDays(20),
+                    1 => DateTime.Today.AddMonths(3),
+                    _ => DateTime.Today.AddDays(-5)
+                };
+
+                vehicle.AccidentInsuranceDetails = $"تأمين حوادث رقم {policyNumber} حتى {expiryDate:yyyy-MM-dd}";
+
+                return new Insurance
+                {
+                    VehicleId = vehicle.Id,
+                    PolicyNumber = policyNumber,
+                    InsuranceCompany = index switch
+                    {
+                        0 => "مصر للتأمين",
+                        1 => "قناة السويس للتأمين",
+                        _ => "المهندس للتأمين"
+                    },
+                    PolicyType = "تأمين حوادث",
+                    StartDate = DateTime.Today.AddMonths(-11 + index),
+                    ExpiryDate = expiryDate,
+                    PremiumAmount = 3500 + (index * 450),
+                    CoverageAmount = 250000,
+                    CoverageDetails = "تغطية حوادث ومسؤولية مدنية",
+                    AgentName = "مسؤول التأمين",
+                    AgentPhoneNumber = $"0100000003{index + 1}",
+                    Status = ServiceHelpers.InsuranceStatus(expiryDate),
+                    Notes = "بيانات تجريبية قابلة للتعديل"
+                };
+            });
+
+            _context.Insurances.AddRange(policies);
+        }
+
+        if (!await _context.Custodies.AnyAsync() && seededVehicles.Count > 0 && seededEmployees.Count > 0)
+        {
+            _context.Custodies.AddRange(
+                new Custody
+                {
+                    VehicleId = seededVehicles[0].Id,
+                    EmployeeId = seededEmployees[0].Id,
+                    CustodyNumber = "CU-DEMO-001",
+                    CustodianName = seededEmployees[0].FullName,
+                    CustodianPosition = seededEmployees[0].Position,
+                    HandoverDate = DateTime.Today.AddDays(-14),
+                    Status = "Active",
+                    VehicleConditionRating = 8,
+                    Notes = "عهدة تشغيل يومية"
+                },
+                new Custody
+                {
+                    VehicleId = seededVehicles[Math.Min(1, seededVehicles.Count - 1)].Id,
+                    EmployeeId = seededEmployees[Math.Min(1, seededEmployees.Count - 1)].Id,
+                    CustodyNumber = "CU-DEMO-002",
+                    CustodianName = seededEmployees[Math.Min(1, seededEmployees.Count - 1)].FullName,
+                    CustodianPosition = seededEmployees[Math.Min(1, seededEmployees.Count - 1)].Position,
+                    HandoverDate = DateTime.Today.AddDays(-30),
+                    ReturnDate = DateTime.Today.AddDays(-3),
+                    Status = "Returned",
+                    VehicleConditionRating = 7,
+                    Notes = "عهدة مرتجعة بعد مأمورية"
                 });
         }
 
@@ -772,6 +866,7 @@ public sealed class SettingsService(FleetDbContext context, IAuditService auditS
 
 public sealed class ReportingService(FleetDbContext context) : IReportingService
 {
+    private const int VehicleRegistrationAlertDays = 60;
     private readonly FleetDbContext _context = context;
 
     public async Task<DashboardMetricsDto> GetDashboardMetricsAsync()
@@ -783,9 +878,7 @@ public sealed class ReportingService(FleetDbContext context) : IReportingService
             .ToListAsync())
             .Sum(x => ServiceHelpers.IsTreasuryIncome(x.TransactionType) ? x.Amount : -x.Amount);
         var today = DateTime.Today;
-        var oilChangesDue = await _context.OilChanges
-            .Include(x => x.Vehicle)
-            .CountAsync(x => x.Vehicle != null && x.Vehicle.Mileage >= x.NextOilChangeOdometer - ServiceHelpers.DefaultOilAlertThresholdKm);
+        var oilChangesDue = await CountOilAlertsAsync();
 
         var metrics = new DashboardMetricsDto
         {
@@ -801,9 +894,9 @@ public sealed class ReportingService(FleetDbContext context) : IReportingService
             TripsToday = await _context.Trips.CountAsync(t => t.StartDate.Date == today),
             OpenMaintenanceRequests = await _context.MaintenanceRequests.CountAsync(m => m.Status != "Completed" && m.Status != "مكتمل"),
             CompletedMaintenanceRequests = await _context.MaintenanceRequests.CountAsync(m => m.Status == "Completed" || m.Status == "مكتمل"),
-            VehicleLicensesExpiring = await _context.Vehicles.CountAsync(v => v.RegistrationExpiryDate.HasValue && v.RegistrationExpiryDate.Value <= today.AddDays(30)),
+            VehicleLicensesExpiring = await _context.Vehicles.CountAsync(v => v.RegistrationExpiryDate.HasValue && v.RegistrationExpiryDate.Value <= today.AddDays(VehicleRegistrationAlertDays)),
             DriversWithExpiringLicenses = await _context.Licenses.CountAsync(l => l.ExpiryDate >= DateTime.Today && l.ExpiryDate <= DateTime.Today.AddDays(30)),
-            InsurancePoliciesExpiring = await _context.Insurances.CountAsync(i => i.ExpiryDate <= DateTime.Today.AddDays(30)),
+            InsurancePoliciesExpiring = await _context.Insurances.CountAsync(i => i.ExpiryDate <= DateTime.Today.AddDays(60)),
             OilChangesDue = oilChangesDue,
             TotalExpenses = totalExpenses,
             TotalFuelCost = totalFuelCost,
@@ -859,7 +952,7 @@ public sealed class ReportingService(FleetDbContext context) : IReportingService
         }));
 
         var expiringVehicleRegistrations = await _context.Vehicles
-            .Where(v => v.RegistrationExpiryDate.HasValue && v.RegistrationExpiryDate.Value <= now.AddDays(30))
+            .Where(v => v.RegistrationExpiryDate.HasValue && v.RegistrationExpiryDate.Value <= now.AddDays(VehicleRegistrationAlertDays))
             .OrderBy(v => v.RegistrationExpiryDate)
             .Take(10)
             .ToListAsync();
@@ -880,7 +973,7 @@ public sealed class ReportingService(FleetDbContext context) : IReportingService
 
         var expiringInsurance = await _context.Insurances
             .Include(i => i.Vehicle)
-            .Where(i => i.ExpiryDate <= now.AddDays(30))
+            .Where(i => i.ExpiryDate <= now.AddDays(60))
             .OrderBy(i => i.ExpiryDate)
             .Take(10)
             .ToListAsync();
@@ -899,26 +992,23 @@ public sealed class ReportingService(FleetDbContext context) : IReportingService
             CreatedAt = i.UpdatedAt
         }));
 
-        var dueOilChanges = await _context.OilChanges
-            .Include(x => x.Vehicle)
-            .Where(x => x.Vehicle != null && x.Vehicle.Mileage >= x.NextOilChangeOdometer - ServiceHelpers.DefaultOilAlertThresholdKm)
+        var dueOilChanges = await GetLatestOilChangesWithVehiclesAsync();
+        alerts.AddRange(dueOilChanges
+            .Where(x => x.Vehicle is not null && GetRemainingOilKm(x) <= ServiceHelpers.DefaultOilAlertThresholdKm)
+            .OrderBy(GetRemainingOilKm)
+            .Take(10)
+            .Select(BuildOilChangeAlert));
+
+        var vehiclesMissingOilChange = await _context.Vehicles
+            .Include(v => v.OilChanges)
+            .Where(v => !v.OilChanges.Any() && v.OilChangeIntervalKm > 0)
             .ToListAsync();
 
-        dueOilChanges = dueOilChanges
-            .OrderBy(x => x.NextOilChangeOdometer)
+        alerts.AddRange(vehiclesMissingOilChange
+            .Where(v => v.OilChangeIntervalKm - v.Mileage <= ServiceHelpers.DefaultOilAlertThresholdKm)
+            .OrderBy(v => v.OilChangeIntervalKm - v.Mileage)
             .Take(10)
-            .ToList();
-
-        alerts.AddRange(dueOilChanges.Select(x => new AlertDto
-        {
-            Id = x.Id,
-            Type = "Warning",
-            Title = "تغيير زيت مستحق",
-            Message = $"المركبة {x.Vehicle?.PlateNumber} اقتربت من موعد تغيير الزيت التالي عند {x.NextOilChangeOdometer:0} كم.",
-            RelatedEntityType = "OilChange",
-            RelatedEntityId = x.Id,
-            CreatedAt = x.UpdatedAt
-        }));
+            .Select(BuildMissingOilChangeAlert));
 
         var openMaintenance = await _context.MaintenanceRequests
             .Include(m => m.Vehicle)
@@ -968,7 +1058,12 @@ public sealed class ReportingService(FleetDbContext context) : IReportingService
     {
         if (!alert.DueDate.HasValue)
         {
-            return 3;
+            return alert.Type switch
+            {
+                "Critical" or "Error" => 0,
+                "Warning" => 1,
+                _ => 3
+            };
         }
 
         var days = (alert.DueDate.Value.Date - today).Days;
@@ -977,6 +1072,98 @@ public sealed class ReportingService(FleetDbContext context) : IReportingService
             < 0 => 0,
             <= 7 => 1,
             _ => 2
+        };
+    }
+
+    private async Task<List<OilChange>> GetLatestOilChangesWithVehiclesAsync()
+    {
+        var oilChanges = await _context.OilChanges
+            .Include(x => x.Vehicle)
+            .ToListAsync();
+
+        return oilChanges
+            .Where(x => x.Vehicle is not null)
+            .GroupBy(x => x.VehicleId)
+            .Select(group => group
+                .OrderByDescending(x => x.ChangeDate)
+                .ThenByDescending(x => x.OdometerAtChange)
+                .ThenByDescending(x => x.Id)
+                .First())
+            .ToList();
+    }
+
+    private async Task<int> CountOilAlertsAsync()
+    {
+        var latestOilChanges = await GetLatestOilChangesWithVehiclesAsync();
+        var dueFromRecordedOil = latestOilChanges.Count(x => GetRemainingOilKm(x) <= ServiceHelpers.DefaultOilAlertThresholdKm);
+
+        var vehiclesWithoutOilChange = await _context.Vehicles
+            .Include(v => v.OilChanges)
+            .Where(v => !v.OilChanges.Any() && v.OilChangeIntervalKm > 0)
+            .ToListAsync();
+
+        return dueFromRecordedOil + vehiclesWithoutOilChange.Count(v => v.OilChangeIntervalKm - v.Mileage <= ServiceHelpers.DefaultOilAlertThresholdKm);
+    }
+
+    private async Task<Dictionary<int, (decimal Quantity, decimal TotalCost)>> GetFuelTotalsByVehicleAsync(DateTime? startDate, DateTime? endExclusive)
+    {
+        var query = _context.FuelTransactions.AsQueryable();
+
+        if (startDate.HasValue)
+        {
+            query = query.Where(f => f.TransactionDate >= startDate.Value);
+        }
+
+        if (endExclusive.HasValue)
+        {
+            query = query.Where(f => f.TransactionDate < endExclusive.Value);
+        }
+
+        var fuelRows = await query
+            .Select(f => new { f.VehicleId, f.Quantity, f.TotalCost })
+            .ToListAsync();
+
+        return fuelRows
+            .GroupBy(f => f.VehicleId)
+            .ToDictionary(
+                group => group.Key,
+                group => (Quantity: group.Sum(f => f.Quantity), TotalCost: group.Sum(f => f.TotalCost)));
+    }
+
+    private static decimal GetRemainingOilKm(OilChange oilChange) =>
+        oilChange.Vehicle is null ? decimal.MaxValue : oilChange.NextOilChangeOdometer - oilChange.Vehicle.Mileage;
+
+    private static AlertDto BuildOilChangeAlert(OilChange oilChange)
+    {
+        var remainingKm = GetRemainingOilKm(oilChange);
+        return new AlertDto
+        {
+            Id = oilChange.Id,
+            Type = remainingKm < 0 ? "Critical" : "Warning",
+            Title = remainingKm < 0 ? "تغيير زيت متأخر" : "تغيير زيت قريب",
+            Message = remainingKm < 0
+                ? $"العربية {oilChange.Vehicle?.PlateNumber} تعدت موعد تغيير الزيت بـ {Math.Abs(remainingKm):0} كم. آخر تغيير كان عند {oilChange.OdometerAtChange:0} كم."
+                : $"العربية {oilChange.Vehicle?.PlateNumber} متبقي لها {remainingKm:0} كم على تغيير الزيت. آخر تغيير كان عند {oilChange.OdometerAtChange:0} كم.",
+            RelatedEntityType = "OilChange",
+            RelatedEntityId = oilChange.Id,
+            CreatedAt = oilChange.UpdatedAt
+        };
+    }
+
+    private static AlertDto BuildMissingOilChangeAlert(Vehicle vehicle)
+    {
+        var remainingKm = vehicle.OilChangeIntervalKm - vehicle.Mileage;
+        return new AlertDto
+        {
+            Id = vehicle.Id,
+            Type = remainingKm < 0 ? "Critical" : "Warning",
+            Title = remainingKm < 0 ? "لا يوجد سجل زيت والسيارة تعدت الدورية" : "لا يوجد سجل تغيير زيت",
+            Message = remainingKm < 0
+                ? $"العربية {vehicle.PlateNumber} لا يوجد لها سجل تغيير زيت وتعدت الدورية المسجلة بـ {Math.Abs(remainingKm):0} كم."
+                : $"العربية {vehicle.PlateNumber} لا يوجد لها سجل تغيير زيت ومتبقي لها {remainingKm:0} كم حسب الدورية المسجلة.",
+            RelatedEntityType = "OilChange",
+            RelatedEntityId = vehicle.Id,
+            CreatedAt = vehicle.UpdatedAt
         };
     }
 
@@ -1006,9 +1193,58 @@ public sealed class ReportingService(FleetDbContext context) : IReportingService
             throw new InvalidOperationException("تاريخ نهاية التقرير يجب أن يكون بعد تاريخ البداية.");
         }
 
-        if (reportType == "vehicletrips")
+        if (reportType == "vehicletrips" || reportType == "alltrips")
         {
             return await GenerateVehicleTripsReportAsync(filter);
+        }
+
+        if (reportType == "fuel")
+        {
+            var query = _context.FuelTransactions
+                .Include(f => f.Vehicle)
+                .Include(f => f.Trip)
+                .AsQueryable();
+
+            if (filter.VehicleId.HasValue)
+            {
+                query = query.Where(f => f.VehicleId == filter.VehicleId.Value);
+            }
+
+            if (startDate.HasValue)
+            {
+                query = query.Where(f => f.TransactionDate >= startDate.Value);
+            }
+
+            if (endExclusive.HasValue)
+            {
+                query = query.Where(f => f.TransactionDate < endExclusive.Value);
+            }
+
+            var fuelTransactions = await query
+                .OrderByDescending(f => f.TransactionDate)
+                .ThenByDescending(f => f.Id)
+                .ToListAsync();
+
+            return new ReportDataDto
+            {
+                ReportTitle = "تقرير البنزين",
+                GeneratedDate = DateTime.UtcNow,
+                GeneratedBy = "System",
+                Columns = new List<string> { "التاريخ", "رقم السيارة", "رقم التشغيلة", "نوع الوقود", "عدد اللترات", "سعر اللتر", "إجمالي البنزين", "محطة البنزين", "عداد التموين", "من الخزينة" },
+                Data = fuelTransactions.Select(f => new Dictionary<string, object>
+                {
+                    ["التاريخ"] = f.TransactionDate,
+                    ["رقم السيارة"] = f.Vehicle?.PlateNumber ?? string.Empty,
+                    ["رقم التشغيلة"] = f.TripId?.ToString() ?? string.Empty,
+                    ["نوع الوقود"] = f.FuelType,
+                    ["عدد اللترات"] = f.Quantity,
+                    ["سعر اللتر"] = f.UnitPrice,
+                    ["إجمالي البنزين"] = f.TotalCost,
+                    ["محطة البنزين"] = f.FuelStation,
+                    ["عداد التموين"] = f.Odometer ?? 0,
+                    ["من الخزينة"] = f.PaidFromTreasury ? "نعم" : "لا"
+                }).ToList()
+            };
         }
 
         if (reportType == "vehiclelicenses")
@@ -1033,11 +1269,16 @@ public sealed class ReportingService(FleetDbContext context) : IReportingService
                 ReportTitle = "تقرير تراخيص العربيات",
                 GeneratedDate = DateTime.UtcNow,
                 GeneratedBy = "System",
-                Columns = new List<string> { "رقم السيارة", "الموديل", "بداية الترخيص", "نهاية الترخيص", "الحالة", "الإنذار" },
+                Columns = new List<string> { "رقم السيارة", "الموديل", "سنة الصنع", "رقم الشاسيه", "رقم الموتور", "تغيير الزيت كل كام كم", "نوع الرخصة", "بداية الترخيص", "نهاية الترخيص", "الحالة", "الإنذار" },
                 Data = vehicles.Select(v => new Dictionary<string, object>
                 {
                     ["رقم السيارة"] = v.PlateNumber,
                     ["الموديل"] = v.Model,
+                    ["سنة الصنع"] = v.Year,
+                    ["رقم الشاسيه"] = v.ChassisNumber,
+                    ["رقم الموتور"] = v.EngineNumber,
+                    ["تغيير الزيت كل كام كم"] = v.OilChangeIntervalKm,
+                    ["نوع الرخصة"] = string.IsNullOrWhiteSpace(v.RegistrationType) ? "ترخيص" : v.RegistrationType,
                     ["بداية الترخيص"] = v.RegistrationStartDate?.ToString("yyyy-MM-dd") ?? string.Empty,
                     ["نهاية الترخيص"] = v.RegistrationExpiryDate?.ToString("yyyy-MM-dd") ?? string.Empty,
                     ["الحالة"] = VehicleLicenseStatus(v.RegistrationExpiryDate),
@@ -1071,10 +1312,14 @@ public sealed class ReportingService(FleetDbContext context) : IReportingService
                 ReportTitle = "تقرير التأمينات",
                 GeneratedDate = DateTime.UtcNow,
                 GeneratedBy = "System",
-                Columns = new List<string> { "رقم السيارة", "رقم الوثيقة", "شركة التأمين", "نوع الوثيقة", "بداية التأمين", "نهاية التأمين", "القسط", "الحالة", "الإنذار" },
+                Columns = new List<string> { "رقم السيارة", "الموديل", "سنة الصنع", "رقم الشاسيه", "رقم الموتور", "رقم الوثيقة", "شركة التأمين", "نوع الوثيقة", "بداية التأمين", "نهاية التأمين", "القسط", "الحالة", "الإنذار" },
                 Data = insurance.Select(i => new Dictionary<string, object>
                 {
                     ["رقم السيارة"] = i.Vehicle?.PlateNumber ?? string.Empty,
+                    ["الموديل"] = i.Vehicle?.Model ?? string.Empty,
+                    ["سنة الصنع"] = i.Vehicle?.Year ?? 0,
+                    ["رقم الشاسيه"] = i.Vehicle?.ChassisNumber ?? string.Empty,
+                    ["رقم الموتور"] = i.Vehicle?.EngineNumber ?? string.Empty,
                     ["رقم الوثيقة"] = i.PolicyNumber,
                     ["شركة التأمين"] = i.InsuranceCompany,
                     ["نوع الوثيقة"] = i.PolicyType,
@@ -1189,13 +1434,18 @@ public sealed class ReportingService(FleetDbContext context) : IReportingService
                 ReportTitle = "تقرير الزيوت",
                 GeneratedDate = DateTime.UtcNow,
                 GeneratedBy = "System",
-                Columns = new List<string> { "رقم السيارة", "تاريخ التغيير", "عداد التغيير", "تغيير الزيت القادم", "الحالة", "التكلفة" },
+                Columns = new List<string> { "رقم السيارة", "تاريخ التغيير", "عداد التغيير", "تغيير الزيت كل كام كم", "عداد العربية الحالي", "المقطوع منذ آخر تغيير", "تغيير الزيت القادم", "المتبقي كم", "الإنذار", "الحالة", "التكلفة" },
                 Data = oilChanges.Select(x => new Dictionary<string, object>
                 {
                     ["رقم السيارة"] = x.Vehicle?.PlateNumber ?? string.Empty,
                     ["تاريخ التغيير"] = x.ChangeDate,
                     ["عداد التغيير"] = x.OdometerAtChange,
+                    ["تغيير الزيت كل كام كم"] = x.Vehicle?.OilChangeIntervalKm ?? 0,
+                    ["عداد العربية الحالي"] = x.Vehicle?.Mileage ?? 0,
+                    ["المقطوع منذ آخر تغيير"] = x.Vehicle is null ? 0 : Math.Max(0, x.Vehicle.Mileage - x.OdometerAtChange),
                     ["تغيير الزيت القادم"] = x.NextOilChangeOdometer,
+                    ["المتبقي كم"] = x.Vehicle is null ? 0 : x.NextOilChangeOdometer - x.Vehicle.Mileage,
+                    ["الإنذار"] = x.Vehicle is null ? "غير مرتبط بعربية" : ServiceHelpers.BuildOilAlert(x.NextOilChangeOdometer - x.Vehicle.Mileage),
                     ["الحالة"] = ServiceHelpers.StatusDisplay(x.Status),
                     ["التكلفة"] = x.Cost
                 }).ToList()
@@ -1255,12 +1505,14 @@ public sealed class ReportingService(FleetDbContext context) : IReportingService
             .OrderByDescending(v => v.CreatedAt)
             .ToListAsync();
 
+        var vehicleFuelTotals = await GetFuelTotalsByVehicleAsync(startDate, endExclusive);
+
         return new ReportDataDto
         {
             ReportTitle = "تقرير المركبات",
             GeneratedDate = DateTime.UtcNow,
             GeneratedBy = "System",
-            Columns = new List<string> { "رقم السيارة", "نوع العربية", "الموديل", "السنة", "الحالة", "العداد" },
+            Columns = new List<string> { "رقم السيارة", "نوع العربية", "الموديل", "السنة", "الحالة", "العداد", "كمية البنزين", "إجمالي البنزين" },
             Data = allVehicles.Select(v => new Dictionary<string, object>
             {
                 ["رقم السيارة"] = v.PlateNumber,
@@ -1268,7 +1520,9 @@ public sealed class ReportingService(FleetDbContext context) : IReportingService
                 ["الموديل"] = v.Model,
                 ["السنة"] = v.Year,
                 ["الحالة"] = ServiceHelpers.StatusDisplay(v.Status),
-                ["العداد"] = v.Mileage
+                ["العداد"] = v.Mileage,
+                ["كمية البنزين"] = vehicleFuelTotals.TryGetValue(v.Id, out var fuelTotals) ? fuelTotals.Quantity : 0,
+                ["إجمالي البنزين"] = vehicleFuelTotals.TryGetValue(v.Id, out fuelTotals) ? fuelTotals.TotalCost : 0
             }).ToList()
         };
 
@@ -1284,7 +1538,7 @@ public sealed class ReportingService(FleetDbContext context) : IReportingService
                 return "منتهي";
             }
 
-            return expiryDate.Value.Date <= DateTime.Today.AddDays(30) ? "قارب الانتهاء" : "ساري";
+            return expiryDate.Value.Date <= DateTime.Today.AddDays(VehicleRegistrationAlertDays) ? "قارب الانتهاء" : "ساري";
         }
 
         static string VehicleLicenseAlert(DateTime? expiryDate)
@@ -1298,7 +1552,7 @@ public sealed class ReportingService(FleetDbContext context) : IReportingService
             return days switch
             {
                 < 0 => "الترخيص منتهي",
-                <= 30 => $"يحتاج تجديد خلال {days} يوم",
+                <= VehicleRegistrationAlertDays => $"يحتاج تجديد خلال {days} يوم",
                 _ => "لا يوجد إنذار"
             };
         }
@@ -1309,7 +1563,7 @@ public sealed class ReportingService(FleetDbContext context) : IReportingService
             return days switch
             {
                 < 0 => "التأمين منتهي",
-                <= 30 => $"يحتاج تجديد خلال {days} يوم",
+                <= 60 => $"يحتاج تجديد خلال {days} يوم",
                 _ => "لا يوجد إنذار"
             };
         }
@@ -1317,6 +1571,7 @@ public sealed class ReportingService(FleetDbContext context) : IReportingService
 
     private async Task<ReportDataDto> GenerateVehicleTripsReportAsync(ReportFilterDto filter)
     {
+        var isAllTripsReport = string.Equals(filter.ReportType, "alltrips", StringComparison.OrdinalIgnoreCase);
         var query = _context.Trips
             .Include(t => t.Vehicle)
             .Include(t => t.Driver)
@@ -1324,7 +1579,7 @@ public sealed class ReportingService(FleetDbContext context) : IReportingService
             .Include(t => t.SupervisorEmployee)
             .AsQueryable();
 
-        if (filter.VehicleId.HasValue)
+        if (filter.VehicleId.HasValue && !isAllTripsReport)
         {
             query = query.Where(t => t.VehicleId == filter.VehicleId.Value);
         }
@@ -1352,42 +1607,85 @@ public sealed class ReportingService(FleetDbContext context) : IReportingService
             .ToListAsync();
 
         var vehicleName = selectedVehiclePlateNumber ?? trips.FirstOrDefault()?.Vehicle?.PlateNumber;
+        var vehicleIds = trips.Select(t => t.VehicleId).Distinct().ToList();
+        var fuelTransactions = vehicleIds.Count == 0
+            ? new List<FuelTransaction>()
+            : await _context.FuelTransactions
+                .Where(f => vehicleIds.Contains(f.VehicleId))
+                .ToListAsync();
 
         return new ReportDataDto
         {
-            ReportTitle = string.IsNullOrWhiteSpace(vehicleName)
+            ReportTitle = isAllTripsReport
+                ? "تقرير جميع التشغيلات"
+                : string.IsNullOrWhiteSpace(vehicleName)
                 ? "تقرير تشغيلات العربيات"
                 : $"تقرير تشغيلات العربية {vehicleName}",
             GeneratedDate = DateTime.UtcNow,
             GeneratedBy = "System",
             Columns = new List<string>
             {
+                "سيريال",
                 "التاريخ",
+                "النهاية",
                 "رقم السيارة",
+                "من",
+                "إلى",
                 "السائق",
                 "الموصي",
                 "المشرف",
-                "من",
-                "إلى",
                 "الغرض",
                 "الحالة",
-                "المسافة"
+                "المسافة",
+                "بنزين مسجل",
+                "تكلفة البنزين",
+                "ملاحظات"
             },
-            Data = trips.Select(t => new Dictionary<string, object>
+            Data = trips.Select((t, index) => new Dictionary<string, object>
             {
+                ["سيريال"] = index + 1,
                 ["التاريخ"] = t.StartDate,
+                ["النهاية"] = t.EndDate ?? (object)string.Empty,
                 ["رقم السيارة"] = t.Vehicle?.PlateNumber ?? string.Empty,
+                ["من"] = t.StartLocation,
+                ["إلى"] = t.EndLocation,
                 ["السائق"] = t.Driver?.FullName ?? string.Empty,
                 ["الموصي"] = string.IsNullOrWhiteSpace(t.RequesterNameText)
                     ? t.RequesterEmployee?.FullName ?? string.Empty
                     : t.RequesterNameText,
                 ["المشرف"] = t.SupervisorEmployee?.FullName ?? string.Empty,
-                ["من"] = t.StartLocation,
-                ["إلى"] = t.EndLocation,
                 ["الغرض"] = t.Purpose,
                 ["الحالة"] = t.Status,
-                ["المسافة"] = t.Distance
+                ["المسافة"] = t.Distance,
+                ["بنزين مسجل"] = GetTripFuelQuantity(t, fuelTransactions),
+                ["تكلفة البنزين"] = GetTripFuelCost(t, fuelTransactions),
+                ["ملاحظات"] = t.Notes
             }).ToList()
         };
+    }
+
+    private static decimal GetTripFuelQuantity(Trip trip, IEnumerable<FuelTransaction> fuelTransactions)
+    {
+        var linkedFuel = GetTripFuelTransactions(trip, fuelTransactions).ToList();
+        return linkedFuel.Sum(f => f.Quantity);
+    }
+
+    private static decimal GetTripFuelCost(Trip trip, IEnumerable<FuelTransaction> fuelTransactions)
+    {
+        var linkedFuel = GetTripFuelTransactions(trip, fuelTransactions).ToList();
+        return linkedFuel.Sum(f => f.TotalCost);
+    }
+
+    private static IEnumerable<FuelTransaction> GetTripFuelTransactions(Trip trip, IEnumerable<FuelTransaction> fuelTransactions)
+    {
+        var tripStartDate = trip.StartDate.Date;
+        var tripEndDate = (trip.EndDate ?? DateTime.Today).Date;
+
+        return fuelTransactions.Where(f =>
+            f.TripId == trip.Id ||
+            (!f.TripId.HasValue &&
+             f.VehicleId == trip.VehicleId &&
+             f.TransactionDate.Date >= tripStartDate &&
+             f.TransactionDate.Date <= tripEndDate));
     }
 }

@@ -497,7 +497,7 @@
                     <DataGrid.Columns>
                         <DataGridTextColumn Header="المركبة" Binding="{Binding VehiclePlateNumber}" Width="120"/>
                         <DataGridTextColumn Header="التاريخ" Binding="{Binding TransactionDate, StringFormat='yyyy-MM-dd'}" Width="120"/>
-                        <DataGridTextColumn Header="الكمية" Binding="{Binding Quantity, StringFormat='{0:N2} L'}" Width="100"/>
+                        <DataGridTextColumn Header="عدد اللترات" Binding="{Binding Quantity, StringFormat='{0:N2} L'}" Width="120"/>
                         <DataGridTextColumn Header="السعر" Binding="{Binding UnitPrice, StringFormat='SAR {0:N2}'}" Width="100"/>
                         <DataGridTextColumn Header="الإجمالي" Binding="{Binding TotalCost, StringFormat='SAR {0:N2}'}" Width="100"/>
                         <DataGridTextColumn Header="المسافة" Binding="{Binding Mileage, StringFormat='{0:N0} km'}" Width="100"/>
@@ -633,4 +633,3 @@
         </StackPanel>
     </Grid>
 </UserControl>
-

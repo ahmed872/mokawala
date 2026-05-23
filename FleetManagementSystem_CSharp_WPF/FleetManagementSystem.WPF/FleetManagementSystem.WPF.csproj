@@ -62,6 +62,34 @@
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>
     </Page>
+    <Page Include="FuelEntryWindow.xaml">
+      <Generator>MSBuild:Compile</Generator>
+      <SubType>Designer</SubType>
+    </Page>
+    <Page Include="OilChangeEntryWindow.xaml">
+      <Generator>MSBuild:Compile</Generator>
+      <SubType>Designer</SubType>
+    </Page>
+    <Page Include="CustodyEntryWindow.xaml">
+      <Generator>MSBuild:Compile</Generator>
+      <SubType>Designer</SubType>
+    </Page>
+    <Page Include="TreasuryEntryWindow.xaml">
+      <Generator>MSBuild:Compile</Generator>
+      <SubType>Designer</SubType>
+    </Page>
+    <Page Include="VehicleLicenseEntryWindow.xaml">
+      <Generator>MSBuild:Compile</Generator>
+      <SubType>Designer</SubType>
+    </Page>
+    <Page Include="InsuranceEntryWindow.xaml">
+      <Generator>MSBuild:Compile</Generator>
+      <SubType>Designer</SubType>
+    </Page>
+    <Page Include="ReportPreviewWindow.xaml">
+      <Generator>MSBuild:Compile</Generator>
+      <SubType>Designer</SubType>
+    </Page>
     <Page Include="MainWindow.xaml">
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>
@@ -90,9 +118,31 @@
     <Compile Include="TripPermitWindow.xaml.cs">
       <DependentUpon>TripPermitWindow.xaml</DependentUpon>
     </Compile>
+    <Compile Include="FuelEntryWindow.xaml.cs">
+      <DependentUpon>FuelEntryWindow.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="OilChangeEntryWindow.xaml.cs">
+      <DependentUpon>OilChangeEntryWindow.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="CustodyEntryWindow.xaml.cs">
+      <DependentUpon>CustodyEntryWindow.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="TreasuryEntryWindow.xaml.cs">
+      <DependentUpon>TreasuryEntryWindow.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="VehicleLicenseEntryWindow.xaml.cs">
+      <DependentUpon>VehicleLicenseEntryWindow.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="InsuranceEntryWindow.xaml.cs">
+      <DependentUpon>InsuranceEntryWindow.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="ReportPreviewWindow.xaml.cs">
+      <DependentUpon>ReportPreviewWindow.xaml</DependentUpon>
+    </Compile>
     <Compile Include="MainWindow.xaml.cs">
       <DependentUpon>MainWindow.xaml</DependentUpon>
     </Compile>
+    <Compile Include="Converters\Converters.cs" />
     <Compile Include="Printing\DirectPrintHelper.cs" />
     <Compile Include="Infrastructure\ClientConnectionProfile.cs" />
     <Compile Include="Infrastructure\ConnectionSettingsStore.cs" />

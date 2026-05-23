@@ -18,6 +18,11 @@ namespace FleetManagementSystem.Data.Configurations
                 .HasForeignKey(ft => ft.VehicleId)
                 .OnDelete(DeleteBehavior.Restrict);
 
+            builder.HasOne(ft => ft.Trip)
+                .WithMany(t => t.FuelTransactions)
+                .HasForeignKey(ft => ft.TripId)
+                .OnDelete(DeleteBehavior.SetNull);
+
             builder.HasOne(ft => ft.TreasuryTransaction)
                 .WithMany(t => t.FuelTransactions)
                 .HasForeignKey(ft => ft.TreasuryTransactionId)

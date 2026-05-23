@@ -47,7 +47,7 @@ internal static class ServiceHelpers
             return "Expired";
         }
 
-        if (expiryDate.Date <= DateTime.Today.AddDays(30))
+        if (expiryDate.Date <= DateTime.Today.AddDays(60))
         {
             return "Expiring";
         }
@@ -132,6 +132,9 @@ internal static class ServiceHelpers
             "closed" or "completed" => "مغلق",
             "pending" => "معلق",
             "scheduled" or "planned" => "مجدول",
+            "duesoon" => "قريب",
+            "due" => "مستحق",
+            "overdue" => "متأخر",
             "inprogress" or "intrip" or "in trip" => "جاري",
             "maintenance" => "صيانة",
             "returned" => "مرتجع",
@@ -174,8 +177,13 @@ internal static class ServiceHelpers
         };
     }
 
-    public static VehicleDto ToDto(this Vehicle entity) =>
-        new()
+    public static VehicleDto ToDto(this Vehicle entity)
+    {
+        var latestInsurance = entity.InsurancePolicies?
+            .OrderByDescending(policy => policy.ExpiryDate)
+            .FirstOrDefault(policy => !string.IsNullOrWhiteSpace(policy.PolicyNumber));
+
+        return new VehicleDto
         {
             Id = entity.Id,
             PlateNumber = entity.PlateNumber,
@@ -192,14 +200,18 @@ internal static class ServiceHelpers
             AssignedTo = entity.AssignedTo,
             PurchaseDate = entity.PurchaseDate ?? DateTime.Today,
             PurchasePrice = entity.PurchasePrice,
+            RegistrationType = string.IsNullOrWhiteSpace(entity.RegistrationType) ? "ترخيص" : entity.RegistrationType,
             RegistrationStartDate = entity.RegistrationStartDate,
             RegistrationExpiryDate = entity.RegistrationExpiryDate,
-            AccidentInsuranceDetails = entity.AccidentInsuranceDetails,
+            AccidentInsuranceDetails = latestInsurance is null
+                ? entity.AccidentInsuranceDetails
+                : $"{latestInsurance.PolicyType} رقم {latestInsurance.PolicyNumber} - {latestInsurance.InsuranceCompany} حتى {latestInsurance.ExpiryDate:yyyy-MM-dd}",
             SocialInsuranceDetails = entity.SocialInsuranceDetails,
             OilChangeIntervalKm = entity.OilChangeIntervalKm,
             MaintenanceIntervalKm = entity.MaintenanceIntervalKm,
             Notes = entity.Notes
         };
+    }
 
     public static ContractDto ToDto(this Contract entity) =>
         new()
@@ -313,6 +325,10 @@ internal static class ServiceHelpers
             Id = entity.Id,
             VehicleId = entity.VehicleId,
             VehiclePlateNumber = entity.Vehicle?.PlateNumber ?? string.Empty,
+            TripId = entity.TripId,
+            TripSummary = entity.Trip is null
+                ? string.Empty
+                : $"{entity.Trip.Id} - {entity.Trip.Vehicle?.PlateNumber ?? entity.Vehicle?.PlateNumber ?? string.Empty} - {entity.Trip.StartDate:yyyy-MM-dd HH:mm}",
             TransactionDate = entity.TransactionDate,
             FuelType = entity.FuelType,
             Quantity = entity.Quantity,
@@ -343,8 +359,14 @@ internal static class ServiceHelpers
             Notes = entity.Notes
         };
 
-    public static OilChangeDto ToDto(this OilChange entity) =>
-        new()
+    public static OilChangeDto ToDto(this OilChange entity)
+    {
+        var currentMileage = entity.Vehicle?.Mileage ?? 0;
+        var kmSinceOilChange = entity.Vehicle is null ? 0 : Math.Max(0, currentMileage - entity.OdometerAtChange);
+        var remainingKm = entity.NextOilChangeOdometer - currentMileage;
+        var isDue = entity.Vehicle is not null && remainingKm <= DefaultOilAlertThresholdKm;
+
+        return new OilChangeDto
         {
             Id = entity.Id,
             VehicleId = entity.VehicleId,
@@ -355,10 +377,31 @@ internal static class ServiceHelpers
             Quantity = entity.Quantity,
             Cost = entity.Cost,
             NextOilChangeOdometer = entity.NextOilChangeOdometer,
+            CurrentVehicleMileage = currentMileage,
+            OilChangeIntervalKm = entity.Vehicle?.OilChangeIntervalKm ?? 0,
+            KmSinceOilChange = kmSinceOilChange,
+            RemainingKm = remainingKm,
+            OilAlert = BuildOilAlert(remainingKm),
             Status = entity.Status,
-            IsDue = entity.Vehicle is not null && entity.Vehicle.Mileage >= entity.NextOilChangeOdometer - DefaultOilAlertThresholdKm,
+            IsDue = isDue,
             Notes = entity.Notes
         };
+    }
+
+    public static string BuildOilAlert(decimal remainingKm)
+    {
+        if (remainingKm < 0)
+        {
+            return $"تغيير الزيت متأخر بـ {Math.Abs(remainingKm):0} كم";
+        }
+
+        if (remainingKm <= DefaultOilAlertThresholdKm)
+        {
+            return $"متبقي {remainingKm:0} كم على تغيير الزيت";
+        }
+
+        return "لا يوجد إنذار";
+    }
 
     public static TreasuryTransactionDto ToDto(this TreasuryTransaction entity) =>
         new()
@@ -395,6 +438,10 @@ internal static class ServiceHelpers
             Id = entity.Id,
             VehicleId = entity.VehicleId,
             VehiclePlateNumber = entity.Vehicle?.PlateNumber ?? string.Empty,
+            VehicleModel = entity.Vehicle?.Model ?? string.Empty,
+            VehicleYear = entity.Vehicle?.Year ?? 0,
+            VehicleChassisNumber = entity.Vehicle?.ChassisNumber ?? string.Empty,
+            VehicleEngineNumber = entity.Vehicle?.EngineNumber ?? string.Empty,
             PolicyNumber = entity.PolicyNumber,
             InsuranceCompany = entity.InsuranceCompany,
             PolicyType = entity.PolicyType,

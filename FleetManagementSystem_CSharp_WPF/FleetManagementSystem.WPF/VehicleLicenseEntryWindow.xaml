@@ -1,0 +1,147 @@
+<Window x:Class="FleetManagementSystem.WPF.VehicleLicenseEntryWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="بيانات ترخيص العربية"
+        Width="680"
+        SizeToContent="Height"
+        MinHeight="520"
+        WindowStartupLocation="CenterOwner"
+        FlowDirection="RightToLeft"
+        Background="{StaticResource SurfaceBrush}"
+        FontFamily="Cairo, Segoe UI, Tahoma">
+    <Border Margin="22"
+            Padding="24"
+            Background="White"
+            BorderBrush="{StaticResource BorderBrush}"
+            BorderThickness="1"
+            CornerRadius="12">
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+
+            <StackPanel>
+                <TextBlock Text="بيانات ترخيص العربية"
+                           FontSize="22"
+                           FontWeight="Bold"
+                           Foreground="{StaticResource TextBrush}"/>
+                <TextBlock Margin="0,6,0,18"
+                           Text="أدخل بيانات العربية والترخيص من نموذج واحد حتى يتم ربطها مباشرة ببيانات المركبة."
+                           Foreground="{StaticResource MutedBrush}"
+                           TextWrapping="Wrap"/>
+            </StackPanel>
+
+            <Grid Grid.Row="1">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+
+                <StackPanel Margin="0,0,10,12">
+                    <TextBlock Text="رقم العربية"/>
+                    <TextBox Style="{StaticResource AppTextBoxStyle}"
+                             Text="{Binding LicenseRow.PlateNumber, UpdateSourceTrigger=PropertyChanged}"/>
+                </StackPanel>
+
+                <StackPanel Grid.Column="1"
+                            Margin="10,0,0,12">
+                    <TextBlock Text="الموديل"/>
+                    <TextBox Style="{StaticResource AppTextBoxStyle}"
+                             Text="{Binding LicenseRow.Model, UpdateSourceTrigger=PropertyChanged}"/>
+                </StackPanel>
+
+                <StackPanel Grid.Row="1"
+                            Margin="0,0,10,12">
+                    <TextBlock Text="سنة الصنع"/>
+                    <TextBox Style="{StaticResource AppTextBoxStyle}"
+                             Text="{Binding LicenseRow.Year, UpdateSourceTrigger=PropertyChanged}"/>
+                </StackPanel>
+
+                <StackPanel Grid.Row="1"
+                            Grid.Column="1"
+                            Margin="10,0,0,12">
+                    <TextBlock Text="نوع الرخصة"/>
+                    <ComboBox Height="40"
+                              ItemsSource="{Binding RegistrationTypes}"
+                              SelectedItem="{Binding LicenseRow.RegistrationType, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                              Style="{StaticResource AppComboBoxStyle}"/>
+                </StackPanel>
+
+                <StackPanel Grid.Row="2"
+                            Margin="0,0,10,12">
+                    <TextBlock Text="رقم الشاسيه"/>
+                    <TextBox Style="{StaticResource AppTextBoxStyle}"
+                             Text="{Binding LicenseRow.ChassisNumber, UpdateSourceTrigger=PropertyChanged}"/>
+                </StackPanel>
+
+                <StackPanel Grid.Row="2"
+                            Grid.Column="1"
+                            Margin="10,0,0,12">
+                    <TextBlock Text="رقم الموتور"/>
+                    <TextBox Style="{StaticResource AppTextBoxStyle}"
+                             Text="{Binding LicenseRow.EngineNumber, UpdateSourceTrigger=PropertyChanged}"/>
+                </StackPanel>
+
+                <StackPanel Grid.Row="3"
+                            Margin="0,0,10,12">
+                    <TextBlock Text="تغيير الزيت كل كام كم"/>
+                    <TextBox Style="{StaticResource AppTextBoxStyle}"
+                             ToolTip="مثال: 5000 أو 7000 حسب نوع العربية والزيت"
+                             Text="{Binding LicenseRow.OilChangeIntervalKm, UpdateSourceTrigger=PropertyChanged}"/>
+                </StackPanel>
+
+                <StackPanel Grid.Row="3"
+                            Grid.Column="1"
+                            Margin="10,0,0,12">
+                    <TextBlock Text="بداية الترخيص"/>
+                    <DatePicker Height="40"
+                                SelectedDate="{Binding LicenseRow.RegistrationStartDate, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                Language="ar-EG"/>
+                </StackPanel>
+
+                <StackPanel Grid.Row="4"
+                            Margin="0,0,10,12">
+                    <TextBlock Text="نهاية الترخيص"/>
+                    <DatePicker Height="40"
+                                SelectedDate="{Binding LicenseRow.RegistrationExpiryDate, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                Language="ar-EG"/>
+                </StackPanel>
+
+                <Border Grid.Row="5"
+                        Grid.ColumnSpan="2"
+                        Background="{StaticResource SurfaceAltBrush}"
+                        BorderBrush="{StaticResource BorderBrush}"
+                        BorderThickness="1"
+                        CornerRadius="10"
+                        Padding="12">
+                    <TextBlock Text="{Binding LicenseRow.ExpiryAlert}"
+                               Foreground="{StaticResource TextBrush}"
+                               FontWeight="SemiBold"/>
+                </Border>
+            </Grid>
+
+            <StackPanel Grid.Row="2"
+                        Orientation="Horizontal"
+                        HorizontalAlignment="Left"
+                        Margin="0,20,0,0">
+                <Button Style="{StaticResource PrimaryButtonStyle}"
+                        MinWidth="120"
+                        Click="SaveButton_Click">حفظ</Button>
+                <Button Style="{StaticResource SecondaryButtonStyle}"
+                        MinWidth="110"
+                        Margin="10,0,0,0"
+                        Click="CancelButton_Click">إلغاء</Button>
+            </StackPanel>
+        </Grid>
+    </Border>
+</Window>

@@ -148,7 +148,7 @@ public class OperationalScenarioTests
             }),
             new("Unused vehicle can be deleted", async (h, n) =>
             {
-                var vehicle = await CreateVehicleAsync(h, n);
+                var vehicle = await CreateVehicleAsync(h, n, withInsuranceDetails: false);
                 await h.VehicleService.DeleteAsync(vehicle.Id);
                 Assert.Null(await h.VehicleService.GetByIdAsync(vehicle.Id));
             }),
@@ -549,11 +549,12 @@ public class OperationalScenarioTests
                 form.CompletionDate = DateTime.Today.AddDays(-1);
                 await AssertInvalidOperationAsync(() => h.MaintenanceService.SaveAsync(form), "الإكمال");
             }),
-            new("Open maintenance blocks trip", async (h, n) =>
+            new("Open maintenance does not block trip", async (h, n) =>
             {
                 var prereq = await CreateTripPrerequisitesAsync(h, n);
                 await h.MaintenanceService.SaveAsync(NewMaintenanceForm(h, n, prereq.Vehicle.Id, status: "Open"));
-                await AssertInvalidOperationAsync(() => h.TripService.SaveAsync(NewTripForm(prereq.Vehicle, prereq.Driver, prereq.Supervisor, n)), "صيانة مفتوح");
+                var trip = await h.TripService.SaveAsync(NewTripForm(prereq.Vehicle, prereq.Driver, prereq.Supervisor, n));
+                Assert.True(trip.Id > 0);
             }),
             new("Closed maintenance allows trip", async (h, n) =>
             {
@@ -575,15 +576,28 @@ public class OperationalScenarioTests
                 Assert.True(oil.Id > 0);
                 Assert.Equal(1800, (await h.VehicleService.GetByIdAsync(vehicle.Id))?.CurrentMileage);
             }),
-            new("Oil change next odometer must be higher", async (h, n) =>
+            new("Oil change next odometer is calculated from vehicle interval", async (h, n) =>
             {
                 var vehicle = await CreateVehicleAsync(h, n);
-                await AssertInvalidOperationAsync(() => h.OilChangeService.SaveAsync(new OilChangeFormDto { VehicleId = vehicle.Id, ChangeDate = DateTime.Today, OdometerAtChange = 2000, NextOilChangeOdometer = 1999 }), "العداد القادم");
+                var oil = await h.OilChangeService.SaveAsync(new OilChangeFormDto { VehicleId = vehicle.Id, ChangeDate = DateTime.Today, OdometerAtChange = 2000, OilType = "5W30", Quantity = 5, Cost = 800, NextOilChangeOdometer = 1999 });
+                Assert.Equal(12000, oil.NextOilChangeOdometer);
             }),
             new("Oil due metric counts approaching vehicle", async (h, n) =>
             {
-                var vehicle = await CreateVehicleAsync(h, n, currentMileage: 9600);
+                var vehicle = await CreateVehicleAsync(h, n, currentMileage: 5000);
                 await h.OilChangeService.SaveAsync(new OilChangeFormDto { VehicleId = vehicle.Id, ChangeDate = DateTime.Today, OdometerAtChange = 5000, OilType = "5W30", Quantity = 5, Cost = 800, NextOilChangeOdometer = 10000 });
+                var vehicleAfterOil = (await h.VehicleService.GetByIdAsync(vehicle.Id))!;
+                var form = NewVehicleForm(h, n, currentMileage: 14600);
+                form.Id = vehicleAfterOil.Id;
+                form.PlateNumber = vehicleAfterOil.PlateNumber;
+                form.VehicleTypeId = vehicleAfterOil.VehicleTypeId;
+                form.Model = vehicleAfterOil.Model;
+                form.Year = vehicleAfterOil.Year;
+                form.ChassisNumber = vehicleAfterOil.ChassisNumber;
+                form.EngineNumber = vehicleAfterOil.EngineNumber;
+                form.RegistrationStartDate = vehicleAfterOil.RegistrationStartDate;
+                form.RegistrationExpiryDate = vehicleAfterOil.RegistrationExpiryDate;
+                await h.VehicleService.SaveAsync(form);
                 Assert.True((await h.ReportingService.GetDashboardMetricsAsync()).OilChangesDue >= 1);
             }),
             new("Oil report filters by change date", async (h, n) =>
@@ -591,6 +605,7 @@ public class OperationalScenarioTests
                 var vehicle = await CreateVehicleAsync(h, n);
                 await h.OilChangeService.SaveAsync(new OilChangeFormDto { VehicleId = vehicle.Id, ChangeDate = DateTime.Today, OdometerAtChange = 1500, OilType = "5W30", Quantity = 5, Cost = 800, NextOilChangeOdometer = 10000 });
                 var report = await h.ReportingService.GenerateReportAsync(new ReportFilterDto { ReportType = "oilchanges", StartDate = DateTime.Today, EndDate = DateTime.Today });
+                Assert.Contains("المقطوع منذ آخر تغيير", report.Columns);
                 Assert.Contains(report.Data, row => row["رقم السيارة"].ToString() == vehicle.PlateNumber);
             }),
             new("Insurance create persists", async (h, n) =>
@@ -685,10 +700,15 @@ public class OperationalScenarioTests
             }),
             new("Fuel paid from treasury creates linked transaction", async (h, n) =>
             {
-                var vehicle = await CreateVehicleAsync(h, n);
-                var fuel = await h.FuelService.SaveAsync(new FuelTransactionFormDto { VehicleId = vehicle.Id, TransactionDate = DateTime.Today, FuelType = "بنزين", Quantity = 40, UnitPrice = 15, Odometer = 1300, PaidFromTreasury = true });
+                var bundle = await CreateTripAsync(h, n, closed: true);
+                var fuel = await h.FuelService.SaveAsync(new FuelTransactionFormDto { VehicleId = bundle.Vehicle.Id, TripId = bundle.Trip.Id, TransactionDate = DateTime.Today, FuelType = "بنزين", Quantity = 40, UnitPrice = 15, Odometer = 1300, PaidFromTreasury = true });
                 Assert.NotNull(fuel.TreasuryTransactionId);
                 Assert.Contains(await h.TreasuryService.GetAllAsync(), x => x.Id == fuel.TreasuryTransactionId && x.TransactionType == "صرف");
+                var fuelReport = await h.ReportingService.GenerateReportAsync(new ReportFilterDto { ReportType = "fuel", StartDate = DateTime.Today, EndDate = DateTime.Today, VehicleId = bundle.Vehicle.Id });
+                Assert.Contains(fuelReport.Data, row => row["إجمالي البنزين"].ToString() == "600");
+                var tripsReport = await h.ReportingService.GenerateReportAsync(new ReportFilterDto { ReportType = "alltrips", StartDate = DateTime.Today, EndDate = DateTime.Today });
+                Assert.Contains(tripsReport.Data, row => row["تكلفة البنزين"].ToString() == "600");
+                await AssertInvalidOperationAsync(() => h.TripService.DeleteAsync(bundle.Trip.Id), "سجل بنزين");
             }),
             new("Fuel delete removes linked treasury transaction", async (h, n) =>
             {
@@ -737,8 +757,16 @@ public class OperationalScenarioTests
             Notes = "سيناريو اختبار"
         };
 
-    private static async Task<VehicleDto> CreateVehicleAsync(ScenarioHarness h, int scenario, string suffix = "V", string status = "Available", decimal currentMileage = 1000, DateTime? registrationExpiry = null, bool withInsuranceDetails = true) =>
-        await h.VehicleService.SaveAsync(NewVehicleForm(h, scenario, suffix, status, currentMileage, registrationExpiry, withInsuranceDetails));
+    private static async Task<VehicleDto> CreateVehicleAsync(ScenarioHarness h, int scenario, string suffix = "V", string status = "Available", decimal currentMileage = 1000, DateTime? registrationExpiry = null, bool withInsuranceDetails = true)
+    {
+        var vehicle = await h.VehicleService.SaveAsync(NewVehicleForm(h, scenario, suffix, status, currentMileage, registrationExpiry, withInsuranceDetails));
+        if (withInsuranceDetails)
+        {
+            await h.InsuranceService.SaveAsync(NewInsuranceForm(scenario, vehicle.Id, $"AUTO-{suffix}"));
+        }
+
+        return vehicle;
+    }
 
     private static VehicleFormDto VehicleForm(VehicleDto dto) =>
         new()
@@ -913,7 +941,7 @@ public class OperationalScenarioTests
 
     private static async Task<InsuranceDto> CreateInsuranceAsync(ScenarioHarness h, int scenario, DateTime? expiry = null)
     {
-        var vehicle = await CreateVehicleAsync(h, scenario);
+        var vehicle = await CreateVehicleAsync(h, scenario, withInsuranceDetails: false);
         return await h.InsuranceService.SaveAsync(NewInsuranceForm(scenario, vehicle.Id, expiry: expiry));
     }
 

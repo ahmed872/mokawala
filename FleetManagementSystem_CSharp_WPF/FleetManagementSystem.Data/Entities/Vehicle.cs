@@ -19,6 +19,7 @@ namespace FleetManagementSystem.Data.Entities
         public decimal Mileage { get; set; }
         public DateTime? PurchaseDate { get; set; }
         public decimal PurchasePrice { get; set; }
+        public string RegistrationType { get; set; } = "ترخيص";
         public DateTime? RegistrationStartDate { get; set; }
         public DateTime? RegistrationExpiryDate { get; set; }
         public string AccidentInsuranceDetails { get; set; } = string.Empty;

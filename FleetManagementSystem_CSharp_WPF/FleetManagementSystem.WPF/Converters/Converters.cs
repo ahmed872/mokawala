@@ -6,6 +6,7 @@
 using System;
 using System.Globalization;
 using System.Windows;
+using System.Windows.Controls;
 using System.Windows.Data;
 using System.Windows.Media.Imaging;
 
@@ -120,7 +121,7 @@ namespace FleetManagementSystem.WPF.Converters
 
             var enumType = value.GetType();
             if (!enumType.IsEnum)
-                return value.ToString();
+                return value.ToString() ?? string.Empty;
 
             var enumValue = (Enum)value;
             var fieldInfo = enumType.GetField(enumValue.ToString());
@@ -166,7 +167,7 @@ namespace FleetManagementSystem.WPF.Converters
             {
                 return result;
             }
-            return null;
+            return DependencyProperty.UnsetValue;
         }
     }
 
@@ -188,7 +189,7 @@ namespace FleetManagementSystem.WPF.Converters
                 image.Freeze();
                 return image;
             }
-            return null;
+            return DependencyProperty.UnsetValue;
         }
 
         public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
@@ -205,10 +206,10 @@ namespace FleetManagementSystem.WPF.Converters
     {
         public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
         {
-            if (value is DateTime? nullableDateTime && nullableDateTime.HasValue)
+            if (value is DateTime nullableDateTime)
             {
                 string format = parameter as string ?? "dd/MM/yyyy";
-                return nullableDateTime.Value.ToString(format, culture);
+                return nullableDateTime.ToString(format, culture);
             }
             return string.Empty;
         }
@@ -219,7 +220,7 @@ namespace FleetManagementSystem.WPF.Converters
             {
                 return (DateTime?)result;
             }
-            return null;
+            return DependencyProperty.UnsetValue;
         }
     }
 
@@ -271,6 +272,25 @@ namespace FleetManagementSystem.WPF.Converters
                 return result;
             }
             return 0;
+        }
+    }
+
+    public class VisibleRowNumberConverter : IMultiValueConverter
+    {
+        public object Convert(object[] values, Type targetType, object parameter, CultureInfo culture)
+        {
+            if (values.Length < 2 || values[0] is not ItemCollection items || values[1] is null)
+            {
+                return string.Empty;
+            }
+
+            var index = items.IndexOf(values[1]);
+            return index >= 0 ? (index + 1).ToString(culture) : string.Empty;
+        }
+
+        public object[] ConvertBack(object value, Type[] targetTypes, object parameter, CultureInfo culture)
+        {
+            throw new NotImplementedException();
         }
     }
 

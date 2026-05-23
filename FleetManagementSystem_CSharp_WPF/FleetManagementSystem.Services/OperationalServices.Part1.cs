@@ -13,7 +13,10 @@ public sealed class VehicleService(FleetDbContext context, IAuditService auditSe
 
     public async Task<List<VehicleDto>> GetAllAsync(string? search = null)
     {
-        var query = _context.Vehicles.Include(v => v.VehicleType).AsQueryable();
+        var query = _context.Vehicles
+            .Include(v => v.VehicleType)
+            .Include(v => v.InsurancePolicies)
+            .AsQueryable();
 
         if (!string.IsNullOrWhiteSpace(search))
         {
@@ -32,6 +35,7 @@ public sealed class VehicleService(FleetDbContext context, IAuditService auditSe
     {
         var entity = await _context.Vehicles
             .Include(v => v.VehicleType)
+            .Include(v => v.InsurancePolicies)
             .FirstOrDefaultAsync(v => v.Id == id);
 
         return entity?.ToDto();
@@ -51,7 +55,7 @@ public sealed class VehicleService(FleetDbContext context, IAuditService auditSe
 
         if (dto.OilChangeIntervalKm <= 0 || dto.MaintenanceIntervalKm <= 0)
         {
-            throw new InvalidOperationException("دورية الزيت والصيانة يجب أن تكون أكبر من صفر.");
+            throw new InvalidOperationException("قيمة تغيير الزيت كل كام كم ودورية الصيانة يجب أن تكون أكبر من صفر.");
         }
 
         if (dto.RegistrationStartDate.HasValue &&
@@ -119,6 +123,7 @@ public sealed class VehicleService(FleetDbContext context, IAuditService auditSe
         entity.AssignedTo = ServiceHelpers.Clean(dto.AssignedTo);
         entity.PurchaseDate = dto.PurchaseDate == default ? null : dto.PurchaseDate;
         entity.PurchasePrice = dto.PurchasePrice;
+        entity.RegistrationType = string.IsNullOrWhiteSpace(dto.RegistrationType) ? "ترخيص" : ServiceHelpers.Clean(dto.RegistrationType);
         entity.RegistrationStartDate = ServiceHelpers.OrNull(dto.RegistrationStartDate);
         entity.RegistrationExpiryDate = ServiceHelpers.OrNull(dto.RegistrationExpiryDate);
         entity.AccidentInsuranceDetails = ServiceHelpers.Clean(dto.AccidentInsuranceDetails);
@@ -417,6 +422,16 @@ public sealed class DriverService(FleetDbContext context, IAuditService auditSer
             throw new InvalidOperationException("اسم السائق مطلوب.");
         }
 
+        if (string.IsNullOrWhiteSpace(dto.LicenseNumber))
+        {
+            throw new InvalidOperationException("رقم رخصة السائق مطلوب.");
+        }
+
+        if (dto.LicenseExpiryDate == default)
+        {
+            throw new InvalidOperationException("تاريخ انتهاء رخصة السائق مطلوب.");
+        }
+
         var duplicate = await _context.Drivers.FirstOrDefaultAsync(d => d.Id != dto.Id && d.LicenseNumber == dto.LicenseNumber.Trim());
         if (duplicate is not null)
         {
@@ -688,9 +703,16 @@ public sealed class TripService(FleetDbContext context, IAuditService auditServi
         }
 
         var effectiveStartMileage = dto.StartMileage > 0 ? dto.StartMileage : vehicle.Mileage;
+        if (dto.Id == 0 && effectiveStartMileage < vehicle.Mileage)
+        {
+            throw new InvalidOperationException(
+                $"عداد بداية التشغيلة ({effectiveStartMileage:0.##}) أقل من عداد العربية الحالي ({vehicle.Mileage:0.##}). بداية التشغيلة يجب أن تبدأ من عداد العربية الحالي المسجل.");
+        }
+
         if (dto.EndMileage.HasValue && dto.EndMileage.Value < effectiveStartMileage)
         {
-            throw new InvalidOperationException("قراءة العداد النهائية لا يمكن أن تكون أقل من البداية.");
+            throw new InvalidOperationException(
+                $"قراءة العداد النهائية ({dto.EndMileage.Value:0.##}) أقل من عداد البداية ({effectiveStartMileage:0.##}). أدخل قراءة نهاية صحيحة أكبر من أو تساوي عداد البداية.");
         }
 
         var hasVehicleOpenTrip = await _context.Trips.AnyAsync(t =>
@@ -709,37 +731,34 @@ public sealed class TripService(FleetDbContext context, IAuditService auditServi
             throw new InvalidOperationException($"لا يمكن بدء تشغيل جديد للعربية {vehicle.PlateNumber} لأن لديها تشغيلة مفتوحة. أغلق التشغيلة المفتوحة أو احذفها أولًا.");
         }
 
-        var hasOpenMaintenanceForVehicle = await _context.MaintenanceRequests.AnyAsync(m =>
-            m.VehicleId == dto.VehicleId &&
-            (m.Status == "Open" ||
-             m.Status == "InProgress" ||
-             m.Status == "مفتوحة" ||
-             m.Status == "جارية"));
-
-        if (hasOpenMaintenanceForVehicle)
-        {
-            throw new InvalidOperationException($"العربية {vehicle.PlateNumber} عليها طلب صيانة مفتوح، ولا يمكن بدء تشغيلة قبل إغلاق الصيانة.");
-        }
-
         if (ServiceHelpers.IsVehicleInactive(vehicle.Status) && dto.Id == 0)
         {
             throw new InvalidOperationException($"العربية {vehicle.PlateNumber} حالتها '{vehicle.Status}' وليست صالحة للتشغيل. عدل الحالة من شاشة المركبات أولًا.");
         }
 
-        if (vehicle.RegistrationExpiryDate.HasValue && vehicle.RegistrationExpiryDate.Value.Date < DateTime.Today)
+        if (!vehicle.RegistrationStartDate.HasValue || !vehicle.RegistrationExpiryDate.HasValue)
+        {
+            throw new InvalidOperationException($"لا يمكن تشغيل العربية {vehicle.PlateNumber} قبل تسجيل ترخيص ساري له بداية ونهاية في شاشة التراخيص.");
+        }
+
+        if (vehicle.RegistrationStartDate.Value.Date > DateTime.Today)
+        {
+            throw new InvalidOperationException($"لا يمكن تشغيل العربية {vehicle.PlateNumber} لأن الترخيص يبدأ بتاريخ {vehicle.RegistrationStartDate:yyyy-MM-dd}.");
+        }
+
+        if (vehicle.RegistrationExpiryDate.Value.Date < DateTime.Today)
         {
             throw new InvalidOperationException($"لا يمكن تشغيل العربية {vehicle.PlateNumber} لأن الترخيص منتهي بتاريخ {vehicle.RegistrationExpiryDate:yyyy-MM-dd}.");
         }
 
         var hasActiveInsurance = await _context.Insurances.AnyAsync(i =>
             i.VehicleId == dto.VehicleId &&
+            i.StartDate.Date <= DateTime.Today &&
             i.ExpiryDate.Date >= DateTime.Today);
 
-        if (!hasActiveInsurance &&
-            (string.IsNullOrWhiteSpace(vehicle.AccidentInsuranceDetails) ||
-             string.IsNullOrWhiteSpace(vehicle.SocialInsuranceDetails)))
+        if (!hasActiveInsurance)
         {
-            throw new InvalidOperationException($"لا يمكن تشغيل العربية {vehicle.PlateNumber} قبل تسجيل تأمين ساري أو استكمال بيانات التأمين في شاشة المركبات.");
+            throw new InvalidOperationException($"لا يمكن تشغيل العربية {vehicle.PlateNumber} قبل تسجيل وثيقة تأمين سارية في شاشة التأمينات.");
         }
 
         if (dto.DriverId.HasValue)
@@ -749,12 +768,22 @@ public sealed class TripService(FleetDbContext context, IAuditService auditServi
 
             if (!driver.IsActive)
             {
-                throw new InvalidOperationException("السائق غير مفعل.");
+                throw new InvalidOperationException($"السائق {driver.FullName} غير نشط / غير مفعل. فعّله من شاشة السائقين قبل إسناد تشغيلة له.");
             }
 
-            if (driver.LicenseExpiryDate.HasValue && driver.LicenseExpiryDate.Value.Date < DateTime.Today)
+            if (string.IsNullOrWhiteSpace(driver.LicenseNumber))
             {
-                throw new InvalidOperationException("لا يمكن إسناد رحلة لسائق رخصته منتهية.");
+                throw new InvalidOperationException($"السائق {driver.FullName} لا يوجد له رقم رخصة مسجل. أدخل بيانات الرخصة من شاشة السائقين.");
+            }
+
+            if (!driver.LicenseExpiryDate.HasValue)
+            {
+                throw new InvalidOperationException($"السائق {driver.FullName} لا يوجد له تاريخ انتهاء رخصة مسجل. أدخل تاريخ انتهاء الرخصة من شاشة السائقين.");
+            }
+
+            if (driver.LicenseExpiryDate.Value.Date < DateTime.Today)
+            {
+                throw new InvalidOperationException($"لا يمكن إسناد تشغيلة للسائق {driver.FullName} لأن رخصته منتهية بتاريخ {driver.LicenseExpiryDate:yyyy-MM-dd}.");
             }
         }
 
@@ -819,14 +848,7 @@ public sealed class TripService(FleetDbContext context, IAuditService auditServi
 
         if (isClosing)
         {
-            var hasOpenMaintenance = await _context.MaintenanceRequests.AnyAsync(m =>
-                m.VehicleId == dto.VehicleId &&
-                (m.Status == "Open" ||
-                 m.Status == "InProgress" ||
-                 m.Status == "مفتوحة" ||
-                 m.Status == "جارية"));
-
-            vehicle.Status = hasOpenMaintenance ? "Maintenance" : "Available";
+            vehicle.Status = "Available";
         }
         else
         {
@@ -842,6 +864,12 @@ public sealed class TripService(FleetDbContext context, IAuditService auditServi
     {
         var entity = await _context.Trips.FirstOrDefaultAsync(t => t.Id == id)
             ?? throw new InvalidOperationException("الرحلة غير موجودة.");
+
+        var linkedFuelCount = await _context.FuelTransactions.CountAsync(f => f.TripId == id);
+        if (linkedFuelCount > 0)
+        {
+            throw new InvalidOperationException($"لا يمكن حذف التشغيلة لأنها مرتبطة بعدد {linkedFuelCount} سجل بنزين. احذف سجلات البنزين المرتبطة أولًا أو احتفظ بالتشغيلة للحفاظ على الحسابات.");
+        }
 
         var vehicle = await _context.Vehicles.FirstOrDefaultAsync(v => v.Id == entity.VehicleId);
         var wasOpenTrip =
@@ -870,14 +898,7 @@ public sealed class TripService(FleetDbContext context, IAuditService auditServi
 
             if (!hasAnotherOpenTrip)
             {
-                var hasOpenMaintenance = await _context.MaintenanceRequests.AnyAsync(m =>
-                    m.VehicleId == vehicle.Id &&
-                    (m.Status == "Open" ||
-                     m.Status == "InProgress" ||
-                     m.Status == "مفتوحة" ||
-                     m.Status == "جارية"));
-
-                vehicle.Status = hasOpenMaintenance ? "Maintenance" : "Available";
+                vehicle.Status = "Available";
                 vehicle.UpdatedAt = DateTime.UtcNow;
                 await _context.SaveChangesAsync();
             }

@@ -6,6 +6,7 @@ namespace FleetManagementSystem.Data.Entities
     {
         public int Id { get; set; }
         public int VehicleId { get; set; }
+        public int? TripId { get; set; }
         public DateTime TransactionDate { get; set; }
         public string FuelType { get; set; } = string.Empty;
         public decimal Quantity { get; set; }
@@ -21,6 +22,7 @@ namespace FleetManagementSystem.Data.Entities
 
         // Foreign keys
         public Vehicle? Vehicle { get; set; }
+        public Trip? Trip { get; set; }
         public TreasuryTransaction? TreasuryTransaction { get; set; }
     }
 }

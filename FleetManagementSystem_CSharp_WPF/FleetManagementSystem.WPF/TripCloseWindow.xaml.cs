@@ -8,28 +8,29 @@ namespace FleetManagementSystem.WPF;
 public partial class TripCloseWindow : Window
 {
     private readonly TripDto _trip;
+    private readonly VehicleDto? _vehicle;
 
     public TripFormDto? TripForm { get; private set; }
 
-    public TripCloseWindow(TripDto trip)
+    public TripCloseWindow(TripDto trip, VehicleDto? vehicle = null)
     {
         InitializeComponent();
         _trip = trip;
+        _vehicle = vehicle;
 
         TripSummaryTextBlock.Text = $"العربية: {ValueOrDash(trip.VehiclePlateNumber)} - السائق: {ValueOrDash(trip.DriverName)} - المسار: {ValueOrDash(trip.StartLocation)} إلى {ValueOrDash(trip.EndLocation)}";
         StartDateTextBox.Text = trip.StartDate.ToString("yyyy-MM-dd HH:mm");
         StartMileageTextBox.Text = trip.StartMileage.ToString("0.##");
+        VehicleCurrentMileageTextBox.Text = (_vehicle?.CurrentMileage ?? trip.EndMileage ?? trip.StartMileage).ToString("0.##");
 
         var endDate = trip.EndDate ?? DateTime.Now;
         EndDatePicker.SelectedDate = endDate.Date;
         EndTimeTextBox.Text = endDate.ToString("HH:mm");
         EndMileageTextBox.Text = trip.EndMileage?.ToString("0.##") ?? trip.StartMileage.ToString("0.##");
         UpdateDistanceFromMileage();
-        TripCostTextBox.Text = trip.TripCost.ToString("0.##");
-        FuelConsumedTextBox.Text = trip.FuelConsumed.ToString("0.##");
         NotesTextBox.Text = trip.Notes;
 
-        StatusComboBox.SelectedIndex = IsClosed(trip) ? 0 : 1;
+        StatusComboBox.SelectedIndex = 0;
     }
 
     private void SaveButton_Click(object sender, RoutedEventArgs e)
@@ -47,42 +48,36 @@ public partial class TripCloseWindow : Window
             return;
         }
 
+        if (!TryParseDecimal(StartMileageTextBox.Text, out var startMileage))
+        {
+            ShowValidation("عداد البداية يجب أن يكون رقمًا صحيحًا.");
+            return;
+        }
+
         if (!TryParseDecimal(EndMileageTextBox.Text, out var endMileage))
         {
             ShowValidation("عداد النهاية يجب أن يكون رقمًا صحيحًا.");
             return;
         }
 
-        if (endMileage < _trip.StartMileage)
+        if (startMileage < 0 || endMileage < 0)
         {
-            ShowValidation("عداد النهاية لا يمكن أن يكون أقل من عداد البداية.");
+            ShowValidation("قراءات العداد لا يمكن أن تكون سالبة.");
             return;
         }
 
-        if (!TryParseDecimal(TripCostTextBox.Text, out var tripCost))
+        if (endMileage < startMileage)
         {
-            ShowValidation("تكلفة التشغيلة يجب أن تكون رقمًا.");
-            return;
-        }
-
-        if (!TryParseDecimal(FuelConsumedTextBox.Text, out var fuelConsumed))
-        {
-            ShowValidation("الوقود المستهلك يجب أن يكون رقمًا.");
-            return;
-        }
-
-        if (tripCost < 0 || fuelConsumed < 0)
-        {
-            ShowValidation("التكلفة والوقود لا يمكن أن تكون قيمًا سالبة.");
+            ShowValidation($"عداد النهاية ({endMileage:0.##}) أقل من عداد البداية ({startMileage:0.##}). اكتب قراءة عداد النهاية كما هي عند رجوع العربية، ولا يمكن أن تكون أقل من بداية التشغيلة.");
             return;
         }
 
         var status = (StatusComboBox.SelectedItem as ComboBoxItem)?.Tag?.ToString() ?? "Closed";
         var endDate = status == "Closed" ? selectedDate.Date.Add(selectedTime) : (DateTime?)null;
-        var distance = status == "Closed" ? endMileage - _trip.StartMileage : 0;
+        var distance = status == "Closed" ? endMileage - startMileage : 0;
         if (endDate.HasValue && endDate.Value < _trip.StartDate)
         {
-            ShowValidation("تاريخ الإغلاق لا يمكن أن يكون قبل بداية التشغيلة.");
+            ShowValidation($"تاريخ الإغلاق ({endDate:yyyy-MM-dd HH:mm}) قبل بداية التشغيلة ({_trip.StartDate:yyyy-MM-dd HH:mm}). اختر تاريخ ووقت إغلاق بعد بداية التشغيلة.");
             return;
         }
 
@@ -98,20 +93,20 @@ public partial class TripCloseWindow : Window
             EndDate = endDate,
             StartLocation = _trip.StartLocation,
             EndLocation = _trip.EndLocation,
-            StartMileage = _trip.StartMileage,
+            StartMileage = startMileage,
             EndMileage = status == "Closed" ? endMileage : null,
             Distance = distance,
             Purpose = _trip.Purpose,
             Status = status,
-            FuelConsumed = fuelConsumed,
-            TripCost = tripCost,
+            FuelConsumed = _trip.FuelConsumed,
+            TripCost = _trip.TripCost,
             Notes = NotesTextBox.Text.Trim()
         };
 
         DialogResult = true;
     }
 
-    private void EndMileageTextBox_TextChanged(object sender, TextChangedEventArgs e) => UpdateDistanceFromMileage();
+    private void MileageTextBox_TextChanged(object sender, TextChangedEventArgs e) => UpdateDistanceFromMileage();
 
     private void UpdateDistanceFromMileage()
     {
@@ -120,8 +115,12 @@ public partial class TripCloseWindow : Window
             return;
         }
 
-        DistanceTextBox.Text = TryParseDecimal(EndMileageTextBox.Text, out var endMileage) && endMileage >= _trip.StartMileage
-            ? (endMileage - _trip.StartMileage).ToString("0.##")
+        DistanceTextBox.Text =
+            TryParseDecimal(StartMileageTextBox.Text, out var startMileage) &&
+            TryParseDecimal(EndMileageTextBox.Text, out var endMileage) &&
+            startMileage >= 0 &&
+            endMileage >= startMileage
+            ? (endMileage - startMileage).ToString("0.##")
             : "0";
     }
 

@@ -149,7 +149,7 @@
             
             <!-- Quantity -->
             <StackPanel>
-                <TextBlock Text="الكمية (لتر)" FontWeight="Bold" Margin="0,0,0,5"/>
+                <TextBlock Text="عدد اللترات" FontWeight="Bold" Margin="0,0,0,5"/>
                 <TextBox Text="{Binding Fuel.Quantity, UpdateSourceTrigger=PropertyChanged}"
                          Padding="10" FontSize="12" 
                          Background="{StaticResource InputBackgroundBrush}"/>
@@ -157,7 +157,7 @@
             
             <!-- Unit Price -->
             <StackPanel>
-                <TextBlock Text="سعر الوحدة (ريال)" FontWeight="Bold" Margin="0,0,0,5"/>
+                <TextBlock Text="سعر اللتر" FontWeight="Bold" Margin="0,0,0,5"/>
                 <TextBox Text="{Binding Fuel.UnitPrice, UpdateSourceTrigger=PropertyChanged}"
                          Padding="10" FontSize="12" 
                          Background="{StaticResource InputBackgroundBrush}"/>
@@ -174,7 +174,7 @@
             
             <!-- Station -->
             <StackPanel>
-                <TextBlock Text="محطة الوقود" FontWeight="Bold" Margin="0,0,0,5"/>
+                <TextBlock Text="محطة البنزين" FontWeight="Bold" Margin="0,0,0,5"/>
                 <TextBox Text="{Binding Fuel.Station, UpdateSourceTrigger=PropertyChanged}"
                          Padding="10" FontSize="12" 
                          Background="{StaticResource InputBackgroundBrush}"/>
@@ -182,7 +182,7 @@
             
             <!-- Mileage -->
             <StackPanel>
-                <TextBlock Text="قراءة العداد (كم)" FontWeight="Bold" Margin="0,0,0,5"/>
+                <TextBlock Text="عداد التموين" FontWeight="Bold" Margin="0,0,0,5"/>
                 <TextBox Text="{Binding Fuel.Mileage, UpdateSourceTrigger=PropertyChanged}"
                          Padding="10" FontSize="12" 
                          Background="{StaticResource InputBackgroundBrush}"/>
@@ -705,4 +705,3 @@
         </StackPanel>
     </Grid>
 </Window>
-

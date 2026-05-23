@@ -1,6 +1,7 @@
 using FleetManagementSystem.Core.DTOs;
 using System.Globalization;
 using System.Windows;
+using System.Windows.Automation;
 using System.Windows.Controls;
 
 namespace FleetManagementSystem.WPF;
@@ -9,6 +10,7 @@ public partial class TripEntryWindow : Window
 {
     private readonly IReadOnlyList<VehicleDto> _vehicles;
     private readonly IReadOnlyList<EmployeeDto> _supervisors;
+    private int _destinationCounter = 1;
 
     public TripFormDto? TripForm { get; private set; }
 
@@ -54,7 +56,7 @@ public partial class TripEntryWindow : Window
 
     private void SaveButton_Click(object sender, RoutedEventArgs e)
     {
-        var vehicle = VehicleComboBox.SelectedItem as VehicleDto;
+        var vehicle = GetSelectedVehicle();
         var driver = DriverComboBox.SelectedItem as DriverDto;
         var supervisor = SupervisorComboBox.SelectedItem as EmployeeDto;
         var requesterName = RequesterNameTextBox.Text.Trim();
@@ -89,9 +91,10 @@ public partial class TripEntryWindow : Window
             return;
         }
 
-        if (string.IsNullOrWhiteSpace(EndLocationTextBox.Text))
+        var destinations = GetDestinationValues();
+        if (destinations.Count == 0)
         {
-            ShowValidation("اكتب منطقة الوصول.");
+            ShowValidation("اكتب منطقة وصول واحدة على الأقل.");
             return;
         }
 
@@ -120,7 +123,7 @@ public partial class TripEntryWindow : Window
             SupervisorEmployeeId = supervisor.Id,
             StartDate = selectedDate.Date.Add(selectedTime),
             StartLocation = StartLocationTextBox.Text.Trim(),
-            EndLocation = EndLocationTextBox.Text.Trim(),
+            EndLocation = BuildDestinationRoute(destinations),
             Purpose = PurposeTextBox.Text.Trim(),
             StartMileage = vehicle.CurrentMileage,
             Status = "Open"
@@ -129,11 +132,79 @@ public partial class TripEntryWindow : Window
         DialogResult = true;
     }
 
+    private void AddDestinationButton_Click(object sender, RoutedEventArgs e) => AddDestinationRow();
+
+    private void AddDestinationRow(string value = "")
+    {
+        _destinationCounter++;
+
+        var row = new Grid
+        {
+            Margin = new Thickness(0, 8, 0, 0)
+        };
+        row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+
+        var destinationTextBox = new TextBox
+        {
+            Text = value,
+            Style = (Style)FindResource("AppTextBoxStyle"),
+            ToolTip = "اكتب منطقة وصول إضافية"
+        };
+        AutomationProperties.SetAutomationId(destinationTextBox, $"TripDestinationTextBox{_destinationCounter}");
+        AutomationProperties.SetName(destinationTextBox, $"منطقة وصول {_destinationCounter}");
+        Grid.SetColumn(destinationTextBox, 0);
+
+        var removeButton = new Button
+        {
+            Content = "حذف",
+            Height = 36,
+            MinWidth = 70,
+            Padding = new Thickness(12, 4, 12, 4),
+            Margin = new Thickness(8, 0, 0, 0),
+            Style = (Style)FindResource("TripPopupSecondaryButtonStyle")
+        };
+        AutomationProperties.SetAutomationId(removeButton, $"RemoveTripDestinationButton{_destinationCounter}");
+        AutomationProperties.SetName(removeButton, $"حذف منطقة وصول {_destinationCounter}");
+        removeButton.Click += (_, _) => DestinationsPanel.Children.Remove(row);
+        Grid.SetColumn(removeButton, 1);
+
+        row.Children.Add(destinationTextBox);
+        row.Children.Add(removeButton);
+        DestinationsPanel.Children.Add(row);
+        destinationTextBox.Focus();
+    }
+
+    private IReadOnlyList<string> GetDestinationValues()
+    {
+        var values = new List<string>();
+        foreach (var child in DestinationsPanel.Children)
+        {
+            var textBox = child switch
+            {
+                TextBox directTextBox => directTextBox,
+                Grid grid => grid.Children.OfType<TextBox>().FirstOrDefault(),
+                _ => null
+            };
+
+            var value = textBox?.Text.Trim();
+            if (!string.IsNullOrWhiteSpace(value))
+            {
+                values.Add(value);
+            }
+        }
+
+        return values;
+    }
+
+    private static string BuildDestinationRoute(IReadOnlyList<string> destinations) =>
+        string.Join(" ثم ", destinations);
+
     private void CancelButton_Click(object sender, RoutedEventArgs e) => DialogResult = false;
 
     private void UpdateVehicleSummary()
     {
-        var vehicle = VehicleComboBox.SelectedItem as VehicleDto;
+        var vehicle = GetSelectedVehicle();
 
         VehiclePlateTextBlock.Text = vehicle?.PlateNumber ?? "اختر سيارة";
         VehicleTypeTextBlock.Text = vehicle?.VehicleType ?? "—";
@@ -142,6 +213,8 @@ public partial class TripEntryWindow : Window
         VehicleEngineTextBlock.Text = string.IsNullOrWhiteSpace(vehicle?.EngineNumber) ? "—" : vehicle.EngineNumber;
         VehicleRegistrationStartTextBlock.Text = FormatDate(vehicle?.RegistrationStartDate);
         VehicleRegistrationExpiryTextBlock.Text = FormatDate(vehicle?.RegistrationExpiryDate);
+        VehicleCurrentMileageTextBlock.Text = vehicle is null ? "—" : $"{vehicle.CurrentMileage:0.##} كم";
+        VehicleStatusTextBlock.Text = string.IsNullOrWhiteSpace(vehicle?.Status) ? "—" : vehicle.Status;
 
         if (vehicle is null)
         {
@@ -149,9 +222,24 @@ public partial class TripEntryWindow : Window
             return;
         }
 
-        var accident = string.IsNullOrWhiteSpace(vehicle.AccidentInsuranceDetails) ? "حوادث: غير مسجل" : $"حوادث: {vehicle.AccidentInsuranceDetails}";
-        var social = string.IsNullOrWhiteSpace(vehicle.SocialInsuranceDetails) ? "اجتماعي: غير مسجل" : $"اجتماعي: {vehicle.SocialInsuranceDetails}";
-        VehicleInsuranceTextBlock.Text = $"{accident}\n{social}";
+        VehicleInsuranceTextBlock.Text = string.IsNullOrWhiteSpace(vehicle.AccidentInsuranceDetails)
+            ? "تأمين حوادث: غير مسجل"
+            : $"تأمين حوادث: {vehicle.AccidentInsuranceDetails}";
+    }
+
+    private VehicleDto? GetSelectedVehicle()
+    {
+        if (VehicleComboBox.SelectedItem is VehicleDto selectedVehicle)
+        {
+            return selectedVehicle;
+        }
+
+        if (VehicleComboBox.SelectedValue is int vehicleId)
+        {
+            return _vehicles.FirstOrDefault(vehicle => vehicle.Id == vehicleId);
+        }
+
+        return null;
     }
 
     private static bool IsEmployeeActive(EmployeeDto employee)

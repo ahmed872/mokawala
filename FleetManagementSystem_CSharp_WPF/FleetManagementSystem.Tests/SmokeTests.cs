@@ -116,6 +116,7 @@ public class SmokeTests
             OilChangeIntervalKm = 10000,
             MaintenanceIntervalKm = 15000
         });
+        await EnsureActiveInsuranceAsync(harness, vehicle.Id, "TRP-001");
 
         var driver = await harness.DriverService.SaveAsync(new DriverFormDto
         {
@@ -190,6 +191,7 @@ public class SmokeTests
             AccidentInsuranceDetails = "تأمين حوادث 1",
             SocialInsuranceDetails = "تأمين اجتماعي 1"
         });
+        await EnsureActiveInsuranceAsync(harness, firstVehicle.Id, "OPS-001");
 
         var secondVehicle = await harness.VehicleService.SaveAsync(new VehicleFormDto
         {
@@ -205,6 +207,7 @@ public class SmokeTests
             AccidentInsuranceDetails = "تأمين حوادث 2",
             SocialInsuranceDetails = "تأمين اجتماعي 2"
         });
+        await EnsureActiveInsuranceAsync(harness, secondVehicle.Id, "OPS-002");
 
         var driver = await harness.DriverService.SaveAsync(new DriverFormDto
         {
@@ -281,6 +284,7 @@ public class SmokeTests
             OilChangeIntervalKm = 10000,
             MaintenanceIntervalKm = 15000
         });
+        await EnsureActiveInsuranceAsync(harness, vehicle.Id, "STALE-TRIP");
 
         var driver = await harness.DriverService.SaveAsync(new DriverFormDto
         {
@@ -335,6 +339,7 @@ public class SmokeTests
             OilChangeIntervalKm = 10000,
             MaintenanceIntervalKm = 15000
         });
+        await EnsureActiveInsuranceAsync(harness, vehicle.Id, "DIST-001");
 
         var driver = await harness.DriverService.SaveAsync(new DriverFormDto
         {
@@ -422,7 +427,7 @@ public class SmokeTests
             Manufacturer = "Toyota",
             Status = "Available",
             PurchaseDate = DateTime.Today.AddMonths(-2),
-            CurrentMileage = 9600,
+            CurrentMileage = 5000,
             OilChangeIntervalKm = 10000,
             MaintenanceIntervalKm = 15000
         });
@@ -436,6 +441,22 @@ public class SmokeTests
             Quantity = 5,
             Cost = 800,
             NextOilChangeOdometer = 10000
+        });
+
+        var vehicleAfterOil = await harness.VehicleService.GetByIdAsync(vehicle.Id);
+        await harness.VehicleService.SaveAsync(new VehicleFormDto
+        {
+            Id = vehicle.Id,
+            PlateNumber = vehicle.PlateNumber,
+            VehicleTypeId = vehicle.VehicleTypeId,
+            Model = vehicle.Model,
+            Year = vehicle.Year,
+            Manufacturer = vehicle.Manufacturer,
+            Status = vehicleAfterOil?.Status ?? "Available",
+            PurchaseDate = vehicle.PurchaseDate,
+            CurrentMileage = 14600,
+            OilChangeIntervalKm = vehicle.OilChangeIntervalKm,
+            MaintenanceIntervalKm = vehicle.MaintenanceIntervalKm
         });
 
         var metrics = await harness.ReportingService.GetDashboardMetricsAsync();
@@ -492,6 +513,22 @@ public class SmokeTests
         Assert.Contains(report.Data, row => row["رقم الوثيقة"].ToString() == "INS-IN-RANGE");
         Assert.DoesNotContain(report.Data, row => row["رقم الوثيقة"].ToString() == "INS-OUT-RANGE");
     }
+
+    private static Task EnsureActiveInsuranceAsync(TestHarness harness, int vehicleId, string suffix) =>
+        harness.InsuranceService.SaveAsync(new InsuranceFormDto
+        {
+            VehicleId = vehicleId,
+            PolicyNumber = $"INS-{suffix}",
+            InsuranceCompany = "شركة تأمين الاختبار",
+            PolicyType = "تأمين حوادث",
+            StartDate = DateTime.Today.AddMonths(-1),
+            ExpiryDate = DateTime.Today.AddYears(1),
+            PremiumAmount = 1000,
+            CoverageAmount = 100000,
+            CoverageDetails = "تغطية اختبار",
+            AgentName = "مندوب اختبار",
+            AgentPhoneNumber = "01000000000"
+        });
 
     [Fact]
     public async Task AuthenticationService_LocksUserAfterRepeatedBadPasswords()

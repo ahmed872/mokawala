@@ -15,7 +15,9 @@ public sealed class FuelService(FleetDbContext context, IAuditService auditServi
     {
         var items = await _context.FuelTransactions
             .Include(f => f.Vehicle)
+            .Include(f => f.Trip)
             .OrderByDescending(f => f.TransactionDate)
+            .ThenByDescending(f => f.Id)
             .ToListAsync();
 
         return items.Select(f => f.ToDto()).ToList();
@@ -25,6 +27,7 @@ public sealed class FuelService(FleetDbContext context, IAuditService auditServi
     {
         var entity = await _context.FuelTransactions
             .Include(f => f.Vehicle)
+            .Include(f => f.Trip)
             .FirstOrDefaultAsync(f => f.Id == id);
 
         return entity?.ToDto();
@@ -35,14 +38,31 @@ public sealed class FuelService(FleetDbContext context, IAuditService auditServi
         var vehicle = await _context.Vehicles.FirstOrDefaultAsync(v => v.Id == dto.VehicleId)
             ?? throw new InvalidOperationException("المركبة غير موجودة.");
 
+        Trip? trip = null;
+        if (dto.TripId.HasValue)
+        {
+            trip = await _context.Trips.FirstOrDefaultAsync(t => t.Id == dto.TripId.Value)
+                ?? throw new InvalidOperationException("التشغيلة المرتبطة بسجل البنزين غير موجودة.");
+
+            if (trip.VehicleId != dto.VehicleId)
+            {
+                throw new InvalidOperationException("لا يمكن ربط سجل وقود بتشغيلة تخص عربية مختلفة.");
+            }
+        }
+
         if (dto.Quantity <= 0)
         {
-            throw new InvalidOperationException("كمية الوقود يجب أن تكون أكبر من صفر.");
+            throw new InvalidOperationException("عدد لترات البنزين يجب أن يكون أكبر من صفر.");
         }
 
         if (dto.UnitPrice < 0)
         {
-            throw new InvalidOperationException("سعر الوحدة لا يمكن أن يكون سالبًا.");
+            throw new InvalidOperationException("سعر اللتر لا يمكن أن يكون سالبًا.");
+        }
+
+        if (dto.TotalCost < 0)
+        {
+            throw new InvalidOperationException("إجمالي تكلفة البنزين لا يمكن أن يكون سالبًا.");
         }
 
         if (dto.Odometer > 0)
@@ -56,7 +76,7 @@ public sealed class FuelService(FleetDbContext context, IAuditService auditServi
 
             if (lastOdometer.HasValue && dto.Odometer < lastOdometer.Value)
             {
-                throw new InvalidOperationException("قراءة العداد أقل من آخر تسجيل وقود لنفس المركبة.");
+                throw new InvalidOperationException($"عداد التموين ({dto.Odometer:0.##}) أقل من آخر عداد بنزين مسجل لنفس العربية ({lastOdometer.Value:0.##}). راجع قراءة العداد قبل الحفظ.");
             }
         }
 
@@ -70,10 +90,11 @@ public sealed class FuelService(FleetDbContext context, IAuditService auditServi
         else
         {
             entity = await _context.FuelTransactions.FirstOrDefaultAsync(f => f.Id == dto.Id)
-                ?? throw new InvalidOperationException("سجل الوقود غير موجود.");
+                ?? throw new InvalidOperationException("سجل البنزين غير موجود.");
         }
 
         entity.VehicleId = dto.VehicleId;
+        entity.TripId = dto.TripId;
         entity.TransactionDate = ServiceHelpers.OrToday(dto.TransactionDate);
         entity.FuelType = string.IsNullOrWhiteSpace(dto.FuelType) ? "Gasoline" : dto.FuelType;
         entity.Quantity = dto.Quantity;
@@ -142,7 +163,7 @@ public sealed class FuelService(FleetDbContext context, IAuditService auditServi
     public async Task DeleteAsync(int id)
     {
         var entity = await _context.FuelTransactions.FirstOrDefaultAsync(f => f.Id == id)
-            ?? throw new InvalidOperationException("سجل الوقود غير موجود.");
+            ?? throw new InvalidOperationException("سجل البنزين غير موجود.");
 
         if (entity.TreasuryTransactionId.HasValue)
         {
@@ -298,6 +319,7 @@ public sealed class OilChangeService(FleetDbContext context, IAuditService audit
         var items = await _context.OilChanges
             .Include(x => x.Vehicle)
             .OrderByDescending(x => x.ChangeDate)
+            .ThenByDescending(x => x.Id)
             .ToListAsync();
 
         return items.Select(x => x.ToDto()).ToList();
@@ -322,10 +344,47 @@ public sealed class OilChangeService(FleetDbContext context, IAuditService audit
             throw new InvalidOperationException("قراءة العداد لا يمكن أن تكون سالبة.");
         }
 
-        if (dto.NextOilChangeOdometer <= dto.OdometerAtChange)
+        if (dto.Id == 0 && dto.OdometerAtChange < vehicle.Mileage)
         {
-            throw new InvalidOperationException("العداد القادم لتغيير الزيت يجب أن يكون أكبر من العداد الحالي.");
+            throw new InvalidOperationException(
+                $"عداد تغيير الزيت ({dto.OdometerAtChange:0.##}) أقل من عداد العربية الحالي ({vehicle.Mileage:0.##}). سجل التغيير على قراءة العداد الحالية أو قراءة أعلى منها فقط.");
         }
+
+        if (string.IsNullOrWhiteSpace(dto.OilType))
+        {
+            throw new InvalidOperationException("نوع الزيت مطلوب قبل حفظ تغيير الزيت.");
+        }
+
+        if (dto.Quantity <= 0)
+        {
+            throw new InvalidOperationException("كمية الزيت يجب أن تكون أكبر من صفر لتر.");
+        }
+
+        if (dto.Cost < 0)
+        {
+            throw new InvalidOperationException("تكلفة الزيت لا يمكن أن تكون سالبة.");
+        }
+
+        if (vehicle.OilChangeIntervalKm <= 0)
+        {
+            throw new InvalidOperationException("قيمة تغيير الزيت كل كام كم غير مسجلة للعربية. سجل عدد الكيلومترات بين كل تغيير زيت من بيانات العربية أولًا.");
+        }
+
+        var previousOilChanges = await _context.OilChanges
+            .Where(x => x.VehicleId == dto.VehicleId && x.Id != dto.Id)
+            .Select(x => new { x.Id, x.ChangeDate, x.OdometerAtChange })
+            .ToListAsync();
+
+        var latestOilOdometer = previousOilChanges.Count == 0
+            ? null
+            : previousOilChanges.Max(x => (decimal?)x.OdometerAtChange);
+
+        if (latestOilOdometer.HasValue && dto.OdometerAtChange < latestOilOdometer.Value)
+        {
+            throw new InvalidOperationException($"قراءة عداد تغيير الزيت لا يمكن أن تكون أقل من آخر تغيير زيت مسجل لنفس العربية عند {latestOilOdometer.Value:0} كم.");
+        }
+
+        var nextOilChangeOdometer = dto.OdometerAtChange + vehicle.OilChangeIntervalKm;
 
         OilChange entity;
         var action = dto.Id == 0 ? "Create" : "Update";
@@ -346,14 +405,20 @@ public sealed class OilChangeService(FleetDbContext context, IAuditService audit
         entity.OilType = ServiceHelpers.Clean(dto.OilType);
         entity.Quantity = dto.Quantity;
         entity.Cost = dto.Cost;
-        entity.NextOilChangeOdometer = dto.NextOilChangeOdometer;
-        entity.Status = vehicle.Mileage >= dto.NextOilChangeOdometer ? "Due" : string.IsNullOrWhiteSpace(dto.Status) ? "Scheduled" : dto.Status;
+        entity.NextOilChangeOdometer = nextOilChangeOdometer;
+        var effectiveVehicleMileage = Math.Max(vehicle.Mileage, dto.OdometerAtChange);
+        var remainingKm = nextOilChangeOdometer - effectiveVehicleMileage;
+        entity.Status = remainingKm < 0
+            ? "Overdue"
+            : remainingKm <= ServiceHelpers.DefaultOilAlertThresholdKm
+                ? "DueSoon"
+                : string.IsNullOrWhiteSpace(dto.Status) ? "Scheduled" : dto.Status;
         entity.Notes = ServiceHelpers.Clean(dto.Notes);
         entity.UpdatedAt = DateTime.UtcNow;
 
-        if (dto.OdometerAtChange > vehicle.Mileage)
+        if (effectiveVehicleMileage > vehicle.Mileage)
         {
-            vehicle.Mileage = dto.OdometerAtChange;
+            vehicle.Mileage = effectiveVehicleMileage;
             vehicle.UpdatedAt = DateTime.UtcNow;
         }
 
@@ -570,6 +635,21 @@ public sealed class InsuranceService(FleetDbContext context, IAuditService audit
         if (!await _context.Vehicles.AnyAsync(v => v.Id == dto.VehicleId))
         {
             throw new InvalidOperationException("المركبة غير موجودة.");
+        }
+
+        if (string.IsNullOrWhiteSpace(dto.PolicyNumber))
+        {
+            throw new InvalidOperationException("رقم وثيقة التأمين مطلوب.");
+        }
+
+        if (string.IsNullOrWhiteSpace(dto.InsuranceCompany))
+        {
+            throw new InvalidOperationException("شركة التأمين مطلوبة.");
+        }
+
+        if (string.IsNullOrWhiteSpace(dto.PolicyType))
+        {
+            throw new InvalidOperationException("نوع وثيقة التأمين مطلوب.");
         }
 
         if (dto.ExpiryDate.Date < dto.StartDate.Date)

@@ -29,6 +29,7 @@
     <Compile Include="GlobalUsings.cs" />
     <Compile Include="SmokeTests.cs" />
     <Compile Include="OperationalScenarioTests.cs" />
+    <Compile Include="AcceptanceMatrixTests.cs" />
   </ItemGroup>
 
 </Project>

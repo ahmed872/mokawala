@@ -10,6 +10,7 @@ namespace FleetManagementSystem.Data.Configurations
         {
             builder.HasKey(v => v.Id);
             builder.Property(v => v.PlateNumber).IsRequired().HasMaxLength(50);
+            builder.Property(v => v.RegistrationType).HasMaxLength(30);
             builder.Property(v => v.ChassisNumber).HasMaxLength(100);
             builder.Property(v => v.EngineNumber).HasMaxLength(100);
             builder.Property(v => v.AccidentInsuranceDetails).HasMaxLength(500);

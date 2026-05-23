@@ -6,6 +6,10 @@
 # dotenv files
 .env
 
+# Local QA database backups generated during manual verification
+qa-backups/
+**/qa-backups/
+
 # User-specific files
 *.rsuser
 *.suo
