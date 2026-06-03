@@ -610,8 +610,8 @@ public class OperationalScenarioTests
                 var vehicle = await CreateVehicleAsync(h, n);
                 await h.OilChangeService.SaveAsync(new OilChangeFormDto { VehicleId = vehicle.Id, ChangeDate = DateTime.Today, OdometerAtChange = 1500, OilType = "5W30", Quantity = 5, Cost = 800, NextOilChangeOdometer = 10000 });
                 var report = await h.ReportingService.GenerateReportAsync(new ReportFilterDto { ReportType = "oilchanges", StartDate = DateTime.Today, EndDate = DateTime.Today });
-                Assert.Contains("المقطوع منذ آخر تغيير", report.Columns);
-                Assert.Contains(report.Data, row => row["رقم السيارة"].ToString() == vehicle.PlateNumber);
+                Assert.Contains("المقطوع من آخر غيار", report.Columns);
+                Assert.Contains(report.Data, row => row["رقم العربية"].ToString() == vehicle.PlateNumber);
             }),
             new("Insurance create persists", async (h, n) =>
             {

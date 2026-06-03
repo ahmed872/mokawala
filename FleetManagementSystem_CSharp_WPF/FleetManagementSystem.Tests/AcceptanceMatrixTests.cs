@@ -69,9 +69,10 @@ public class AcceptanceMatrixTests
             }
         }
 
-        checks.AddRange(BuildDataChecks(harness, seed));
+        var dataChecks = BuildDataChecks(harness, seed);
+        checks.AddRange(dataChecks);
 
-        Assert.Equal(160, checks.Count);
+        Assert.Equal(expectations.Sum(expectation => expectation.Columns.Count + 6) + dataChecks.Count, checks.Count);
 
         for (var index = 0; index < checks.Count; index++)
         {
@@ -96,7 +97,7 @@ public class AcceptanceMatrixTests
             new("insurance", "تقرير التأمينات", new[] { "رقم السيارة", "الموديل", "سنة الصنع", "رقم الشاسيه", "رقم الموتور", "رقم الوثيقة", "شركة التأمين", "نوع الوثيقة", "بداية التأمين", "نهاية التأمين", "القسط", "الحالة", "الإنذار" }),
             new("contracts", "تقرير العقود", new[] { "رقم العقد", "رقم السيارة", "العميل", "بداية العقد", "نهاية العقد", "قيمة العقد", "المدفوع" }),
             new("maintenance", "تقرير الصيانة", new[] { "رقم السيارة", "نوع الصيانة", "تاريخ الطلب", "الحالة", "التكلفة الفعلية" }),
-            new("oilchanges", "تقرير الزيوت", new[] { "رقم السيارة", "التاريخ", "نوع السجل", "عملية التغيير", "عداد التغيير", "قراءة العداد", "نوع الزيت", "كمية الزيت باللتر", "تكلفة الزيت", "تغيير الزيت كل كام كم", "المقطوع منذ آخر تغيير", "تغيير الزيت القادم", "المتبقي كم", "الإنذار", "الحالة" }),
+            new("oilchanges", "تقرير الزيوت", new[] { "رقم العربية", "آخر عداد غيار زيت", "عداد اليوم", "المقطوع من آخر غيار", "تغيير الزيت كل كام كم", "حالة الإنذار" }),
             new("treasury", "تقرير الخزينة", new[] { "التاريخ", "نوع الحركة", "المبلغ", "الوصف", "مرتبط بـ" })
         };
 
@@ -109,10 +110,11 @@ public class AcceptanceMatrixTests
             new("all trips contains end location", async () => Assert.Contains(await Rows(harness, "alltrips"), r => Text(r, "إلى").Contains("العميل", StringComparison.Ordinal))),
             new("all trips distance", async () => Assert.Contains(await Rows(harness, "alltrips"), r => Number(r, "المسافة") == 300m)),
             new("vehicle trips respects vehicle filter", async () => Assert.All(await Rows(harness, "vehicletrips", seed.Vehicle.Id), r => Assert.Equal(seed.Vehicle.PlateNumber, Text(r, "رقم السيارة")))),
-            new("oil report next odometer", async () => Assert.Contains(await Rows(harness, "oilchanges"), r => Number(r, "تغيير الزيت القادم") == 9800m)),
-            new("oil report current odometer", async () => Assert.Contains(await Rows(harness, "oilchanges"), r => Number(r, "قراءة العداد") == 9600m)),
-            new("oil report remaining km", async () => Assert.Contains(await Rows(harness, "oilchanges"), r => Number(r, "المتبقي كم") == 200m)),
-            new("oil report due alert", async () => Assert.Contains(await Rows(harness, "oilchanges"), r => Text(r, "الإنذار").Contains("متبقي 200", StringComparison.Ordinal))),
+            new("oil report is one summary row per vehicle", async () => Assert.Equal((await harness.VehicleService.GetAllAsync()).Count, (await Rows(harness, "oilchanges")).Count)),
+            new("oil report last oil odometer", async () => Assert.Contains(await Rows(harness, "oilchanges"), r => Number(r, "آخر عداد غيار زيت") == 4800m)),
+            new("oil report current odometer", async () => Assert.Contains(await Rows(harness, "oilchanges"), r => Number(r, "عداد اليوم") == 9600m)),
+            new("oil report driven since last oil change", async () => Assert.Contains(await Rows(harness, "oilchanges"), r => Number(r, "المقطوع من آخر غيار") == 4800m)),
+            new("oil report due alert", async () => Assert.Contains(await Rows(harness, "oilchanges"), r => Text(r, "حالة الإنذار").Contains("متبقي 200", StringComparison.Ordinal))),
             new("insurance report policy", async () => Assert.Contains(await Rows(harness, "insurance"), r => Text(r, "رقم الوثيقة") == "INS-ACC-001")),
             new("insurance report 60 day status", async () => Assert.Contains(await Rows(harness, "insurance"), r => Text(r, "الحالة") == "Expiring")),
             new("insurance report 60 day alert", async () => Assert.Contains(await Rows(harness, "insurance"), r => Text(r, "الإنذار").Contains("45", StringComparison.Ordinal))),

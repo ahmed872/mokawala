@@ -1491,48 +1491,70 @@ public sealed class ReportingService(FleetDbContext context) : IReportingService
 
         if (reportType == "oilchanges")
         {
-            var query = _context.OilChanges
-                .Include(x => x.Vehicle)
+            var query = _context.Vehicles
+                .Include(x => x.OilChanges)
                 .AsQueryable();
 
-            if (startDate.HasValue)
-            {
-                query = query.Where(x => x.ChangeDate >= startDate.Value);
-            }
-
-            if (endExclusive.HasValue)
-            {
-                query = query.Where(x => x.ChangeDate < endExclusive.Value);
-            }
-
-            var oilChanges = await query
-                .OrderByDescending(x => x.ChangeDate)
+            var vehicles = await query
+                .OrderBy(x => x.PlateNumber)
                 .ToListAsync();
+
+            var rows = vehicles
+                .Select(vehicle =>
+                {
+                    var latestOilChange = vehicle.OilChanges
+                        .Where(oil => oil.IsOilChanged)
+                        .OrderByDescending(oil => oil.OdometerAtChange)
+                        .ThenByDescending(oil => oil.ChangeDate)
+                        .ThenByDescending(oil => oil.Id)
+                        .FirstOrDefault();
+                    var latestOdometerReading = vehicle.OilChanges
+                        .Where(oil => oil.CurrentOdometer.HasValue && oil.CurrentOdometer.Value > 0)
+                        .OrderByDescending(oil => oil.CurrentOdometerDate ?? oil.ChangeDate.Date)
+                        .ThenByDescending(oil => oil.ChangeDate)
+                        .ThenByDescending(oil => oil.Id)
+                        .FirstOrDefault();
+                    var summaryDate = latestOdometerReading?.CurrentOdometerDate?.Date
+                        ?? latestOdometerReading?.ChangeDate.Date
+                        ?? latestOilChange?.ChangeDate.Date;
+                    var currentOdometer = latestOdometerReading?.CurrentOdometer > 0
+                        ? latestOdometerReading.CurrentOdometer.Value
+                        : vehicle.Mileage;
+                    var lastOilOdometer = latestOilChange?.OdometerAtChange;
+                    var kmSinceOilChange = lastOilOdometer.HasValue
+                        ? Math.Max(0, currentOdometer - lastOilOdometer.Value)
+                        : (decimal?)null;
+                    var alert = BuildVehicleOilSummaryAlert(vehicle.OilChangeIntervalKm, lastOilOdometer, currentOdometer, kmSinceOilChange);
+
+                    return new
+                    {
+                        SummaryDate = summaryDate,
+                        Data = new Dictionary<string, object>
+                        {
+                            ["رقم العربية"] = vehicle.PlateNumber,
+                            ["آخر عداد غيار زيت"] = lastOilOdometer.HasValue ? lastOilOdometer.Value : string.Empty,
+                            ["عداد اليوم"] = currentOdometer,
+                            ["المقطوع من آخر غيار"] = kmSinceOilChange.HasValue ? kmSinceOilChange.Value : string.Empty,
+                            ["تغيير الزيت كل كام كم"] = vehicle.OilChangeIntervalKm,
+                            ["حالة الإنذار"] = alert
+                        }
+                    };
+                })
+                .Where(row =>
+                    (!startDate.HasValue && !endExclusive.HasValue) ||
+                    (row.SummaryDate.HasValue &&
+                     (!startDate.HasValue || row.SummaryDate.Value >= startDate.Value) &&
+                     (!endExclusive.HasValue || row.SummaryDate.Value < endExclusive.Value)))
+                .Select(row => row.Data)
+                .ToList();
 
             return new ReportDataDto
             {
                 ReportTitle = "تقرير الزيوت",
                 GeneratedDate = DateTime.UtcNow,
                 GeneratedBy = "System",
-                Columns = new List<string> { "رقم السيارة", "التاريخ", "نوع السجل", "عملية التغيير", "عداد التغيير", "قراءة العداد", "نوع الزيت", "كمية الزيت باللتر", "تكلفة الزيت", "تغيير الزيت كل كام كم", "المقطوع منذ آخر تغيير", "تغيير الزيت القادم", "المتبقي كم", "الإنذار", "الحالة" },
-                Data = oilChanges.Select(x => new Dictionary<string, object>
-                {
-                    ["رقم السيارة"] = x.Vehicle?.PlateNumber ?? string.Empty,
-                    ["التاريخ"] = x.ChangeDate,
-                    ["نوع السجل"] = x.IsOilChanged ? "تغيير زيت" : "متابعة يومية",
-                    ["عملية التغيير"] = x.ServiceItems,
-                    ["عداد التغيير"] = x.OdometerAtChange,
-                    ["قراءة العداد"] = x.CurrentOdometer ?? x.Vehicle?.Mileage ?? 0,
-                    ["نوع الزيت"] = x.OilType,
-                    ["كمية الزيت باللتر"] = x.IsOilChanged ? x.Quantity : string.Empty,
-                    ["تكلفة الزيت"] = x.IsOilChanged ? x.Cost : string.Empty,
-                    ["تغيير الزيت كل كام كم"] = x.Vehicle?.OilChangeIntervalKm ?? 0,
-                    ["المقطوع منذ آخر تغيير"] = Math.Max(0, (x.CurrentOdometer ?? x.Vehicle?.Mileage ?? 0) - x.OdometerAtChange),
-                    ["تغيير الزيت القادم"] = x.NextOilChangeOdometer,
-                    ["المتبقي كم"] = x.NextOilChangeOdometer - (x.CurrentOdometer ?? x.Vehicle?.Mileage ?? 0),
-                    ["الإنذار"] = ServiceHelpers.BuildOilAlert(x.NextOilChangeOdometer - (x.CurrentOdometer ?? x.Vehicle?.Mileage ?? 0)),
-                    ["الحالة"] = ServiceHelpers.OilStatusDisplay(x.Status, x.IsOilChanged)
-                }).ToList()
+                Columns = new List<string> { "رقم العربية", "آخر عداد غيار زيت", "عداد اليوم", "المقطوع من آخر غيار", "تغيير الزيت كل كام كم", "حالة الإنذار" },
+                Data = rows
             };
         }
 
@@ -1689,6 +1711,27 @@ public sealed class ReportingService(FleetDbContext context) : IReportingService
                 <= 60 => $"يحتاج تجديد خلال {days} يوم",
                 _ => "لا يوجد إنذار"
             };
+        }
+
+        static string BuildVehicleOilSummaryAlert(decimal oilChangeIntervalKm, decimal? lastOilOdometer, decimal currentOdometer, decimal? kmSinceOilChange)
+        {
+            if (oilChangeIntervalKm <= 0)
+            {
+                return "تغيير الزيت كل كام كم غير مسجلة";
+            }
+
+            if (!lastOilOdometer.HasValue)
+            {
+                return "لا يوجد غيار زيت مسجل";
+            }
+
+            if (currentOdometer < lastOilOdometer.Value)
+            {
+                return "قراءة عداد اليوم أقل من آخر غيار زيت";
+            }
+
+            var remainingKm = oilChangeIntervalKm - (kmSinceOilChange ?? 0);
+            return ServiceHelpers.BuildOilAlert(remainingKm);
         }
     }
 

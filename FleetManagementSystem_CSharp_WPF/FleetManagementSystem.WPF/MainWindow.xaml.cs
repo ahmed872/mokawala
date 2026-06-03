@@ -1788,6 +1788,10 @@ public partial class MainWindow : Window
     private ReportDataDto BuildOilChangesReportSnapshot(IEnumerable<OilChangeDto> oilChanges)
     {
         var rows = oilChanges.ToList();
+        var vehicles = _vehicles
+            .OrderBy(vehicle => vehicle.PlateNumber, StringComparer.CurrentCultureIgnoreCase)
+            .ToList();
+
         return new ReportDataDto
         {
             ReportTitle = "تقرير الزيوت",
@@ -1795,45 +1799,72 @@ public partial class MainWindow : Window
             GeneratedBy = _currentUser?.Username ?? "System",
             Columns = new List<string>
             {
-                "مسلسل",
                 "رقم العربية",
-                "التاريخ",
-                "نوع السجل",
-                "عملية التغيير",
-                "عداد التغيير",
-                "قراءة العداد",
-                "نوع الزيت",
-                "كمية الزيت باللتر",
-                "تكلفة الزيت",
-                "التغيير القادم",
+                "آخر عداد غيار زيت",
+                "عداد اليوم",
+                "المقطوع من آخر غيار",
                 "تغيير الزيت كل كام كم",
-                "المقطوع",
-                "المتبقي",
-                "إنذار الزيت",
-                "الحالة",
-                "ملاحظات"
+                "حالة الإنذار"
             },
-            Data = rows.Select((oil, index) => new Dictionary<string, object>
+            Data = vehicles.Select(vehicle =>
             {
-                ["مسلسل"] = index + 1,
-                ["رقم العربية"] = oil.VehiclePlateNumber,
-                ["التاريخ"] = oil.ChangeDate,
-                ["نوع السجل"] = oil.RecordType,
-                ["عملية التغيير"] = oil.ServiceItems,
-                ["عداد التغيير"] = oil.OdometerAtChange,
-                ["قراءة العداد"] = oil.CurrentOdometer,
-                ["نوع الزيت"] = oil.OilType,
-                ["كمية الزيت باللتر"] = oil.QuantityDisplay,
-                ["تكلفة الزيت"] = oil.CostDisplay,
-                ["التغيير القادم"] = oil.NextOilChangeOdometer,
-                ["تغيير الزيت كل كام كم"] = oil.OilChangeIntervalKm,
-                ["المقطوع"] = oil.KmSinceOilChange,
-                ["المتبقي"] = oil.RemainingKm,
-                ["إنذار الزيت"] = oil.OilAlert,
-                ["الحالة"] = oil.Status,
-                ["ملاحظات"] = oil.Notes
+                var vehicleOilRows = rows
+                    .Where(oil => oil.VehicleId == vehicle.Id)
+                    .ToList();
+                var latestOilChange = vehicleOilRows
+                    .Where(oil => oil.IsOilChanged)
+                    .OrderByDescending(oil => oil.OdometerAtChange)
+                    .ThenByDescending(oil => oil.ChangeDate)
+                    .ThenByDescending(oil => oil.Id)
+                    .FirstOrDefault();
+                var latestOdometerReading = vehicleOilRows
+                    .Where(oil => oil.CurrentOdometer > 0)
+                    .OrderByDescending(oil => oil.CurrentOdometerDate ?? oil.ChangeDate.Date)
+                    .ThenByDescending(oil => oil.ChangeDate)
+                    .ThenByDescending(oil => oil.Id)
+                    .FirstOrDefault();
+
+                var currentOdometer = latestOdometerReading?.CurrentOdometer > 0
+                    ? latestOdometerReading.CurrentOdometer
+                    : vehicle.CurrentMileage;
+                var lastOilOdometer = latestOilChange?.OdometerAtChange;
+                var kmSinceOilChange = lastOilOdometer.HasValue
+                    ? Math.Max(0, currentOdometer - lastOilOdometer.Value)
+                    : (decimal?)null;
+                var alert = BuildVehicleOilSummaryAlert(vehicle, lastOilOdometer, currentOdometer, kmSinceOilChange);
+
+                return new Dictionary<string, object>
+                {
+                    ["رقم العربية"] = vehicle.PlateNumber,
+                    ["آخر عداد غيار زيت"] = lastOilOdometer.HasValue ? lastOilOdometer.Value : string.Empty,
+                    ["عداد اليوم"] = currentOdometer,
+                    ["المقطوع من آخر غيار"] = kmSinceOilChange.HasValue ? kmSinceOilChange.Value : string.Empty,
+                    ["تغيير الزيت كل كام كم"] = vehicle.OilChangeIntervalKm,
+                    ["حالة الإنذار"] = alert
+                };
             }).ToList()
         };
+    }
+
+    private static string BuildVehicleOilSummaryAlert(VehicleDto vehicle, decimal? lastOilOdometer, decimal currentOdometer, decimal? kmSinceOilChange)
+    {
+        if (vehicle.OilChangeIntervalKm <= 0)
+        {
+            return "تغيير الزيت كل كام كم غير مسجلة";
+        }
+
+        if (!lastOilOdometer.HasValue)
+        {
+            return "لا يوجد غيار زيت مسجل";
+        }
+
+        if (currentOdometer < lastOilOdometer.Value)
+        {
+            return "قراءة عداد اليوم أقل من آخر غيار زيت";
+        }
+
+        var remainingKm = vehicle.OilChangeIntervalKm - (kmSinceOilChange ?? 0);
+        return BuildOilAlertText(remainingKm);
     }
 
     private ReportDataDto BuildTreasuryReportSnapshot(IEnumerable<TreasuryTransactionDto> treasuryTransactions)
@@ -4070,6 +4101,7 @@ public partial class MainWindow : Window
                 await LoadInsuranceAsync();
                 break;
             case "oilchanges":
+                await LoadVehiclesAsync();
                 await LoadOilChangesAsync();
                 break;
             case "vehicles":
