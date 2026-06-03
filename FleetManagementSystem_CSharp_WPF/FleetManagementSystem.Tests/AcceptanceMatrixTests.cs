@@ -71,7 +71,7 @@ public class AcceptanceMatrixTests
 
         checks.AddRange(BuildDataChecks(harness, seed));
 
-        Assert.Equal(183, checks.Count);
+        Assert.Equal(160, checks.Count);
 
         for (var index = 0; index < checks.Count; index++)
         {
@@ -89,15 +89,14 @@ public class AcceptanceMatrixTests
     private static IReadOnlyList<ReportExpectation> BuildReportExpectations() =>
         new List<ReportExpectation>
         {
-            new("vehicles", "تقرير المركبات", new[] { "رقم السيارة", "نوع العربية", "الموديل", "السنة", "الحالة", "العداد", "كمية البنزين", "إجمالي البنزين" }),
-            new("vehicletrips", "تقرير تشغيلات العربية ACC-001", new[] { "سيريال", "التاريخ", "النهاية", "رقم السيارة", "من", "إلى", "السائق", "الموصي", "المشرف", "الغرض", "الحالة", "المسافة", "بنزين مسجل", "تكلفة البنزين", "ملاحظات" }),
-            new("alltrips", "تقرير جميع التشغيلات", new[] { "سيريال", "التاريخ", "النهاية", "رقم السيارة", "من", "إلى", "السائق", "الموصي", "المشرف", "الغرض", "الحالة", "المسافة", "بنزين مسجل", "تكلفة البنزين", "ملاحظات" }),
-            new("fuel", "تقرير البنزين", new[] { "التاريخ", "رقم السيارة", "رقم التشغيلة", "نوع الوقود", "عدد اللترات", "سعر اللتر", "إجمالي البنزين", "محطة البنزين", "عداد التموين", "من الخزينة" }),
-            new("vehiclelicenses", "تقرير تراخيص العربيات", new[] { "رقم السيارة", "الموديل", "سنة الصنع", "رقم الشاسيه", "رقم الموتور", "نوع الرخصة", "بداية الترخيص", "نهاية الترخيص", "الحالة", "الإنذار" }),
+            new("vehicles", "تقرير المركبات", new[] { "رقم السيارة", "الموديل", "سنة الصنع", "رقم الشاسيه", "رقم الموتور", "نهاية الترخيص", "شركة التأمين", "نهاية التأمين", "تغيير الزيت كل كام كم" }),
+            new("vehicletrips", "تقرير تشغيلات العربية ACC-001", new[] { "سيريال", "التاريخ", "النهاية", "رقم السيارة", "من", "إلى", "السائق", "الموصي", "المشرف", "الغرض", "الحالة", "المسافة", "ملاحظات" }),
+            new("alltrips", "تقرير جميع التشغيلات", new[] { "سيريال", "التاريخ", "النهاية", "رقم السيارة", "من", "إلى", "السائق", "الموصي", "المشرف", "الغرض", "الحالة", "المسافة", "ملاحظات" }),
+            new("vehiclelicenses", "تقرير تراخيص العربيات", new[] { "رقم السيارة", "الموديل", "سنة الصنع", "رقم الشاسيه", "رقم الموتور", "بداية الترخيص", "نهاية الترخيص", "الحالة", "الإنذار" }),
             new("insurance", "تقرير التأمينات", new[] { "رقم السيارة", "الموديل", "سنة الصنع", "رقم الشاسيه", "رقم الموتور", "رقم الوثيقة", "شركة التأمين", "نوع الوثيقة", "بداية التأمين", "نهاية التأمين", "القسط", "الحالة", "الإنذار" }),
             new("contracts", "تقرير العقود", new[] { "رقم العقد", "رقم السيارة", "العميل", "بداية العقد", "نهاية العقد", "قيمة العقد", "المدفوع" }),
             new("maintenance", "تقرير الصيانة", new[] { "رقم السيارة", "نوع الصيانة", "تاريخ الطلب", "الحالة", "التكلفة الفعلية" }),
-            new("oilchanges", "تقرير الزيوت", new[] { "رقم السيارة", "تاريخ التغيير", "عداد التغيير", "تغيير الزيت كل كام كم", "عداد العربية الحالي", "المقطوع منذ آخر تغيير", "تغيير الزيت القادم", "المتبقي كم", "الإنذار", "الحالة", "التكلفة" }),
+            new("oilchanges", "تقرير الزيوت", new[] { "رقم السيارة", "التاريخ", "نوع السجل", "عملية التغيير", "عداد التغيير", "قراءة العداد", "نوع الزيت", "كمية الزيت باللتر", "تكلفة الزيت", "تغيير الزيت كل كام كم", "المقطوع منذ آخر تغيير", "تغيير الزيت القادم", "المتبقي كم", "الإنذار", "الحالة" }),
             new("treasury", "تقرير الخزينة", new[] { "التاريخ", "نوع الحركة", "المبلغ", "الوصف", "مرتبط بـ" })
         };
 
@@ -105,20 +104,13 @@ public class AcceptanceMatrixTests
         new List<AcceptanceCheck>
         {
             new("vehicles report contains seeded vehicle", async () => Assert.Contains(await Rows(harness, "vehicles"), r => Text(r, "رقم السيارة") == seed.Vehicle.PlateNumber)),
-            new("vehicles report fuel quantity", async () => Assert.Equal(50m, Number((await FirstVehicleRow(harness, seed)).Row, "كمية البنزين"))),
-            new("vehicles report fuel total", async () => Assert.Equal(750m, Number((await FirstVehicleRow(harness, seed)).Row, "إجمالي البنزين"))),
             new("all trips has data", async () => Assert.NotEmpty(await Rows(harness, "alltrips"))),
             new("all trips contains start location", async () => Assert.Contains(await Rows(harness, "alltrips"), r => Text(r, "من") == "المقر")),
             new("all trips contains end location", async () => Assert.Contains(await Rows(harness, "alltrips"), r => Text(r, "إلى").Contains("العميل", StringComparison.Ordinal))),
             new("all trips distance", async () => Assert.Contains(await Rows(harness, "alltrips"), r => Number(r, "المسافة") == 300m)),
-            new("all trips registered fuel", async () => Assert.Contains(await Rows(harness, "alltrips"), r => Number(r, "بنزين مسجل") == 50m)),
-            new("all trips registered fuel cost", async () => Assert.Contains(await Rows(harness, "alltrips"), r => Number(r, "تكلفة البنزين") == 750m)),
             new("vehicle trips respects vehicle filter", async () => Assert.All(await Rows(harness, "vehicletrips", seed.Vehicle.Id), r => Assert.Equal(seed.Vehicle.PlateNumber, Text(r, "رقم السيارة")))),
-            new("fuel report quantity", async () => Assert.Contains(await Rows(harness, "fuel"), r => Number(r, "عدد اللترات") == 50m)),
-            new("fuel report unit price", async () => Assert.Contains(await Rows(harness, "fuel"), r => Number(r, "سعر اللتر") == 15m)),
-            new("fuel report total cost", async () => Assert.Contains(await Rows(harness, "fuel"), r => Number(r, "إجمالي البنزين") == 750m)),
-            new("fuel report linked trip id", async () => Assert.Contains(await Rows(harness, "fuel"), r => Text(r, "رقم التشغيلة") == seed.Trip.Id.ToString())),
             new("oil report next odometer", async () => Assert.Contains(await Rows(harness, "oilchanges"), r => Number(r, "تغيير الزيت القادم") == 9800m)),
+            new("oil report current odometer", async () => Assert.Contains(await Rows(harness, "oilchanges"), r => Number(r, "قراءة العداد") == 9600m)),
             new("oil report remaining km", async () => Assert.Contains(await Rows(harness, "oilchanges"), r => Number(r, "المتبقي كم") == 200m)),
             new("oil report due alert", async () => Assert.Contains(await Rows(harness, "oilchanges"), r => Text(r, "الإنذار").Contains("متبقي 200", StringComparison.Ordinal))),
             new("insurance report policy", async () => Assert.Contains(await Rows(harness, "insurance"), r => Text(r, "رقم الوثيقة") == "INS-ACC-001")),
@@ -269,6 +261,8 @@ public class AcceptanceMatrixTests
             VehicleId = vehicle.Id,
             ChangeDate = DateTime.Today.AddDays(-10),
             OdometerAtChange = 4800,
+            CurrentOdometer = 9600,
+            CurrentOdometerDate = DateTime.Today,
             OilType = "10W-40",
             Quantity = 4,
             Cost = 600,

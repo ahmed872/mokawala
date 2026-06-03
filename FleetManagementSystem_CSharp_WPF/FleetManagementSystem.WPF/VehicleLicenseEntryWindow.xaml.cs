@@ -19,7 +19,7 @@ public partial class VehicleLicenseEntryWindow : Window
             ChassisNumber = source.ChassisNumber,
             EngineNumber = source.EngineNumber,
             OilChangeIntervalKm = source.OilChangeIntervalKm > 0 ? source.OilChangeIntervalKm : 10000,
-            RegistrationType = string.IsNullOrWhiteSpace(source.RegistrationType) ? "ترخيص" : source.RegistrationType,
+            RegistrationType = "ترخيص",
             RegistrationStartDate = source.RegistrationStartDate ?? DateTime.Today,
             RegistrationExpiryDate = source.RegistrationExpiryDate ?? DateTime.Today.AddYears(1)
         };
@@ -55,6 +55,7 @@ public partial class VehicleLicenseEntryWindow : Window
             return;
         }
 
+        LicenseRow.RegistrationType = "ترخيص";
         DialogResult = true;
     }
 

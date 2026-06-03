@@ -3,14 +3,14 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:converters="clr-namespace:FleetManagementSystem.WPF.Converters"
         xmlns:primitives="clr-namespace:System.Windows.Controls.Primitives;assembly=PresentationFramework"
-        Title="نظام إدارة الأسطول"
+        Title="شركة جوميكس للحركة والمعدات"
         Width="1500"
         Height="920"
         WindowStartupLocation="CenterScreen"
         WindowState="Maximized"
         ResizeMode="CanMinimize"
         AutomationProperties.AutomationId="MainWindow"
-        AutomationProperties.Name="نافذة نظام إدارة الأسطول"
+        AutomationProperties.Name="نافذة شركة جوميكس للحركة والمعدات"
         FlowDirection="RightToLeft"
         Background="{StaticResource PageBackgroundBrush}">
     <Window.Resources>
@@ -941,7 +941,7 @@
                                                Stretch="Uniform"
                                                Visibility="Collapsed"/>
                                         <TextBlock x:Name="CompanyLogoPlaceholderTextBlock"
-                                                   Text="LOGO"
+                                                   Text="GOMIX"
                                                    FontSize="28"
                                                    FontWeight="Bold"
                                                    Foreground="{StaticResource AccentBrush}"
@@ -951,7 +951,7 @@
                                 </Border>
                                 <TextBlock x:Name="CompanyHeaderTextBlock"
                                            Margin="0,18,0,0"
-                                           Text="نظام إدارة الأسطول"
+                                           Text="شركة جوميكس للحركة والمعدات"
                                            FontSize="30"
                                            FontWeight="Bold"
                                            Foreground="{StaticResource TextBrush}"
@@ -1018,6 +1018,20 @@
                                                 Visibility="Collapsed">
                                             إضافة مستخدم جديد
                                         </Button>
+                                        <Button x:Name="AdminAddDriverButton"
+                                                Style="{StaticResource SecondaryButtonStyle}"
+                                                Margin="0,10,0,0"
+                                                Click="DashboardAddDriverButton_Click"
+                                                Visibility="Collapsed">
+                                            إضافة سائق
+                                        </Button>
+                                        <Button x:Name="AdminAddSupervisorButton"
+                                                Style="{StaticResource SecondaryButtonStyle}"
+                                                Margin="0,10,0,0"
+                                                Click="DashboardAddSupervisorButton_Click"
+                                                Visibility="Collapsed">
+                                            إضافة مشرف
+                                        </Button>
                                     </StackPanel>
                                 </Border>
 
@@ -1035,23 +1049,28 @@
 
                                     <UniformGrid Columns="2"
                                                  Margin="0,26,0,0">
-                                        <Button Style="{StaticResource DashboardNavButtonStyle}"
+                                        <Button x:Name="DashboardTripsShortcutButton"
+                                                Style="{StaticResource DashboardNavButtonStyle}"
                                                 Click="QuickOpenTripsButton_Click">
                                             التشغيلات
                                         </Button>
-                                        <Button Style="{StaticResource DashboardNavButtonStyle}"
+                                        <Button x:Name="DashboardLicensesInsuranceShortcutButton"
+                                                Style="{StaticResource DashboardNavButtonStyle}"
                                                 Click="QuickOpenLicensesAndInsuranceButton_Click">
                                             التراخيص والتأمينات
                                         </Button>
-                                        <Button Style="{StaticResource DashboardNavButtonStyle}"
+                                        <Button x:Name="DashboardCustodyShortcutButton"
+                                                Style="{StaticResource DashboardNavButtonStyle}"
                                                 Click="QuickOpenCustodyButton_Click">
                                             العهد
                                         </Button>
-                                        <Button Style="{StaticResource DashboardNavButtonStyle}"
+                                        <Button x:Name="DashboardTreasuryShortcutButton"
+                                                Style="{StaticResource DashboardNavButtonStyle}"
                                                 Click="QuickOpenTreasuryButton_Click">
                                             الخزينة
                                         </Button>
-                                        <Button Style="{StaticResource DashboardNavButtonStyle}"
+                                        <Button x:Name="DashboardReportsShortcutButton"
+                                                Style="{StaticResource DashboardNavButtonStyle}"
                                                 Click="QuickOpenReportsButton_Click">
                                             التقارير
                                         </Button>
@@ -1098,8 +1117,27 @@
                                                         Orientation="Horizontal"
                                                         Margin="18,0,0,0"
                                                         VerticalAlignment="Center">
-                                                <TextBlock Text="الشهر:"
+                                                <TextBlock Text="النوع:"
                                                            Margin="0,0,8,0"
+                                                           VerticalAlignment="Center"
+                                                           FontSize="13"
+                                                           FontWeight="SemiBold"
+                                                           Foreground="{StaticResource TextBrush}"/>
+                                                <ComboBox x:Name="DashboardAlertTypeComboBox"
+                                                          AutomationProperties.AutomationId="DashboardAlertTypeComboBox"
+                                                          AutomationProperties.Name="فلتر نوع الإنذار"
+                                                          Width="145"
+                                                          Height="38"
+                                                          SelectedIndex="0"
+                                                          Style="{StaticResource AppComboBoxStyle}"
+                                                          SelectionChanged="DashboardAlertFilter_Changed">
+                                                    <ComboBoxItem Content="كل الإنذارات" Tag="All"/>
+                                                    <ComboBoxItem Content="التراخيص" Tag="Vehicle"/>
+                                                    <ComboBoxItem Content="التأمينات" Tag="Insurance"/>
+                                                    <ComboBoxItem Content="الزيت" Tag="OilChange"/>
+                                                </ComboBox>
+                                                <TextBlock Text="الشهر:"
+                                                           Margin="14,0,8,0"
                                                            VerticalAlignment="Center"
                                                            FontSize="13"
                                                            FontWeight="SemiBold"
@@ -1111,7 +1149,7 @@
                                                           Height="38"
                                                           SelectedIndex="0"
                                                           Style="{StaticResource AppComboBoxStyle}"
-                                                          SelectionChanged="DashboardAlertMonthFilter_Changed">
+                                                          SelectionChanged="DashboardAlertFilter_Changed">
                                                     <ComboBoxItem Content="كل الشهور" Tag="0"/>
                                                     <ComboBoxItem Content="يناير" Tag="1"/>
                                                     <ComboBoxItem Content="فبراير" Tag="2"/>
@@ -1443,9 +1481,6 @@
                                             Click="AddTripButton_Click">+</Button>
                                     <Button Style="{StaticResource SecondaryButtonStyle}"
                                             Margin="10,0,0,0"
-                                            Click="AddFuelForSelectedTripButton_Click">تسجيل بنزين</Button>
-                                    <Button Style="{StaticResource SecondaryButtonStyle}"
-                                            Margin="10,0,0,0"
                                             Click="AddOilForSelectedTripVehicleButton_Click">تسجيل زيت</Button>
                                     <Button Style="{StaticResource SecondaryButtonStyle}"
                                             Margin="10,0,0,0"
@@ -1498,8 +1533,8 @@
                                                         <Button Style="{StaticResource GridRowActionButtonStyle}"
                                                                 Content="{Binding}"
                                                                 ContentTemplate="{StaticResource GridDocumentActionIconTemplate}"
-                                                                ToolTip="عرض نموذج التشغيل"
-                                                                AutomationProperties.Name="عرض نموذج التشغيل"
+                                                                ToolTip="تقرير التشغيلة"
+                                                                AutomationProperties.Name="تقرير التشغيلة"
                                                                 Click="ShowTripFormButton_Click"/>
                                                         <Button Style="{StaticResource GridRowActionButtonStyle}"
                                                                 Content="{Binding}"
@@ -1749,40 +1784,6 @@
                                                 </StackPanel>
                                             </DataGridTextColumn.Header>
                                         </DataGridTextColumn>
-                                        <DataGridTextColumn Binding="{Binding RegisteredFuelQuantity, StringFormat=0.##}"
-                                                Width="0.95*">
-                                            <DataGridTextColumn.Header>
-                                                <StackPanel Orientation="Vertical"
-                                                        HorizontalAlignment="Stretch">
-                                                    <TextBlock Text="بنزين مسجل"
-                                                            HorizontalAlignment="Center"
-                                                            FontWeight="Bold"
-                                                            Margin="0,0,0,8"/>
-                                                    <TextBox x:Name="TripFilterRegisteredFuel"
-                                                            AutomationProperties.AutomationId="TripFilterRegisteredFuel"
-                                                            HorizontalAlignment="Stretch"
-                                                            Style="{StaticResource FilterTextBoxStyle}"
-                                                            TextChanged="TripFilter_Changed"/>
-                                                </StackPanel>
-                                            </DataGridTextColumn.Header>
-                                        </DataGridTextColumn>
-                                        <DataGridTextColumn Binding="{Binding RegisteredFuelCost, StringFormat=0.##}"
-                                                Width="1.05*">
-                                            <DataGridTextColumn.Header>
-                                                <StackPanel Orientation="Vertical"
-                                                        HorizontalAlignment="Stretch">
-                                                    <TextBlock Text="تكلفة البنزين"
-                                                            HorizontalAlignment="Center"
-                                                            FontWeight="Bold"
-                                                            Margin="0,0,0,8"/>
-                                                    <TextBox x:Name="TripFilterRegisteredFuelCost"
-                                                            AutomationProperties.AutomationId="TripFilterRegisteredFuelCost"
-                                                            HorizontalAlignment="Stretch"
-                                                            Style="{StaticResource FilterTextBoxStyle}"
-                                                            TextChanged="TripFilter_Changed"/>
-                                                </StackPanel>
-                                            </DataGridTextColumn.Header>
-                                        </DataGridTextColumn>
                                         <DataGridTextColumn Binding="{Binding Notes}"
                                                 ElementStyle="{StaticResource WrappingCellTextStyle}"
                                                 Width="1.4*">
@@ -1809,7 +1810,8 @@
                 </TabItem>
 
                 <TabItem Header="البنزين"
-                         Tag="Fuel">
+                         Tag="Fuel"
+                         Visibility="Collapsed">
                     <DockPanel>
                         <WrapPanel DockPanel.Dock="Top"
                                    Margin="0,0,0,10"
@@ -2075,8 +2077,24 @@
                                 <DataGridTextColumn Binding="{Binding ChangeDate, StringFormat=yyyy-MM-dd}" Width="170">
                                     <DataGridTextColumn.Header>
                                         <StackPanel Orientation="Vertical" HorizontalAlignment="Stretch">
-                                            <TextBlock Text="تاريخ التغيير" HorizontalAlignment="Center" FontWeight="Bold" Margin="0,0,0,8"/>
+                                            <TextBlock Text="التاريخ" HorizontalAlignment="Center" FontWeight="Bold" Margin="0,0,0,8"/>
                                             <DatePicker x:Name="OilFilterDate" AutomationProperties.AutomationId="OilFilterDate" HorizontalAlignment="Stretch" Style="{StaticResource FilterDatePickerStyle}" SelectedDateChanged="OilFilter_Changed"/>
+                                        </StackPanel>
+                                    </DataGridTextColumn.Header>
+                                </DataGridTextColumn>
+                                <DataGridTextColumn Binding="{Binding RecordType}" Width="150">
+                                    <DataGridTextColumn.Header>
+                                        <StackPanel Orientation="Vertical" HorizontalAlignment="Stretch">
+                                            <TextBlock Text="نوع السجل" HorizontalAlignment="Center" FontWeight="Bold" Margin="0,0,0,8"/>
+                                            <TextBox x:Name="OilFilterRecordType" AutomationProperties.AutomationId="OilFilterRecordType" HorizontalAlignment="Stretch" Style="{StaticResource FilterTextBoxStyle}" TextChanged="OilFilter_Changed"/>
+                                        </StackPanel>
+                                    </DataGridTextColumn.Header>
+                                </DataGridTextColumn>
+                                <DataGridTextColumn Binding="{Binding ServiceItems}" Width="150">
+                                    <DataGridTextColumn.Header>
+                                        <StackPanel Orientation="Vertical" HorizontalAlignment="Stretch">
+                                            <TextBlock Text="عملية التغيير" HorizontalAlignment="Center" FontWeight="Bold" Margin="0,0,0,8"/>
+                                            <TextBox x:Name="OilFilterServiceItems" AutomationProperties.AutomationId="OilFilterServiceItems" HorizontalAlignment="Stretch" Style="{StaticResource FilterTextBoxStyle}" TextChanged="OilFilter_Changed"/>
                                         </StackPanel>
                                     </DataGridTextColumn.Header>
                                 </DataGridTextColumn>
@@ -2088,6 +2106,14 @@
                                         </StackPanel>
                                     </DataGridTextColumn.Header>
                                 </DataGridTextColumn>
+                                <DataGridTextColumn Binding="{Binding CurrentOdometer, StringFormat=0.##}" Width="170">
+                                    <DataGridTextColumn.Header>
+                                        <StackPanel Orientation="Vertical" HorizontalAlignment="Stretch">
+                                            <TextBlock Text="قراءة العداد" HorizontalAlignment="Center" FontWeight="Bold" Margin="0,0,0,8"/>
+                                            <TextBox x:Name="OilFilterCurrentOdometer" AutomationProperties.AutomationId="OilFilterCurrentOdometer" HorizontalAlignment="Stretch" Style="{StaticResource FilterTextBoxStyle}" TextChanged="OilFilter_Changed"/>
+                                        </StackPanel>
+                                    </DataGridTextColumn.Header>
+                                </DataGridTextColumn>
                                 <DataGridTextColumn Binding="{Binding OilType}" Width="160">
                                     <DataGridTextColumn.Header>
                                         <StackPanel Orientation="Vertical" HorizontalAlignment="Stretch">
@@ -2096,7 +2122,7 @@
                                         </StackPanel>
                                     </DataGridTextColumn.Header>
                                 </DataGridTextColumn>
-                                <DataGridTextColumn Binding="{Binding Quantity, StringFormat=0.##}" Width="130">
+                                <DataGridTextColumn Binding="{Binding QuantityDisplay}" Width="130">
                                     <DataGridTextColumn.Header>
                                         <StackPanel Orientation="Vertical" HorizontalAlignment="Stretch">
                                             <TextBlock Text="كمية الزيت باللتر" HorizontalAlignment="Center" FontWeight="Bold" Margin="0,0,0,8"/>
@@ -2104,7 +2130,7 @@
                                         </StackPanel>
                                     </DataGridTextColumn.Header>
                                 </DataGridTextColumn>
-                                <DataGridTextColumn Binding="{Binding Cost, StringFormat=0.##}" Width="130">
+                                <DataGridTextColumn Binding="{Binding CostDisplay}" Width="130">
                                     <DataGridTextColumn.Header>
                                         <StackPanel Orientation="Vertical" HorizontalAlignment="Stretch">
                                             <TextBlock Text="تكلفة الزيت" HorizontalAlignment="Center" FontWeight="Bold" Margin="0,0,0,8"/>
@@ -2117,14 +2143,6 @@
                                         <StackPanel Orientation="Vertical" HorizontalAlignment="Stretch">
                                             <TextBlock Text="التغيير القادم" HorizontalAlignment="Center" FontWeight="Bold" Margin="0,0,0,8"/>
                                             <TextBox x:Name="OilFilterNext" AutomationProperties.AutomationId="OilFilterNext" HorizontalAlignment="Stretch" Style="{StaticResource FilterTextBoxStyle}" TextChanged="OilFilter_Changed"/>
-                                        </StackPanel>
-                                    </DataGridTextColumn.Header>
-                                </DataGridTextColumn>
-                                <DataGridTextColumn Binding="{Binding CurrentVehicleMileage, StringFormat=0.##}" Width="175">
-                                    <DataGridTextColumn.Header>
-                                        <StackPanel Orientation="Vertical" HorizontalAlignment="Stretch">
-                                            <TextBlock Text="عداد العربية" HorizontalAlignment="Center" FontWeight="Bold" Margin="0,0,0,8"/>
-                                            <TextBox x:Name="OilFilterCurrent" AutomationProperties.AutomationId="OilFilterCurrent" HorizontalAlignment="Stretch" Style="{StaticResource FilterTextBoxStyle}" TextChanged="OilFilter_Changed"/>
                                         </StackPanel>
                                     </DataGridTextColumn.Header>
                                 </DataGridTextColumn>
@@ -2168,14 +2186,6 @@
                                         </StackPanel>
                                     </DataGridTextColumn.Header>
                                 </DataGridTextColumn>
-                                <DataGridCheckBoxColumn Binding="{Binding IsDue}" Width="145" IsReadOnly="True">
-                                    <DataGridCheckBoxColumn.Header>
-                                        <StackPanel Orientation="Vertical" HorizontalAlignment="Stretch">
-                                            <TextBlock Text="يحتاج متابعة" HorizontalAlignment="Center" FontWeight="Bold" Margin="0,0,0,8"/>
-                                            <TextBox x:Name="OilFilterDue" AutomationProperties.AutomationId="OilFilterDue" HorizontalAlignment="Stretch" Style="{StaticResource FilterTextBoxStyle}" TextChanged="OilFilter_Changed"/>
-                                        </StackPanel>
-                                    </DataGridCheckBoxColumn.Header>
-                                </DataGridCheckBoxColumn>
                                 <DataGridTextColumn Binding="{Binding Notes}" Width="230">
                                     <DataGridTextColumn.Header>
                                         <StackPanel Orientation="Vertical" HorizontalAlignment="Stretch">
@@ -2325,7 +2335,8 @@
                                    VerticalAlignment="Center">
                             <Button Style="{StaticResource PrimaryButtonStyle}"
                                     Click="AddVehicleFromLicenseButton_Click">إضافة عربية بترخيصها</Button>
-                            <Button Style="{StaticResource SecondaryButtonStyle}"
+                            <Button x:Name="OpenInsuranceFromLicensesButton"
+                                    Style="{StaticResource SecondaryButtonStyle}"
                                     Click="OpenInsuranceTabButton_Click">عرض التأمينات</Button>
                             <Button Style="{StaticResource ReportToolbarIconButtonStyle}"
                                     Content="{Binding}"
@@ -2482,23 +2493,6 @@
                                         </StackPanel>
                                     </DataGridTextColumn.Header>
                                 </DataGridTextColumn>
-                                <DataGridTextColumn Binding="{Binding RegistrationType}"
-                                                    Width="160">
-                                    <DataGridTextColumn.Header>
-                                        <StackPanel Orientation="Vertical"
-                                                    HorizontalAlignment="Stretch">
-                                            <TextBlock Text="نوع الرخصة"
-                                                       HorizontalAlignment="Center"
-                                                       FontWeight="Bold"
-                                                       Margin="0,0,0,8"/>
-                                            <TextBox x:Name="LicenseFilterType"
-                                                     AutomationProperties.AutomationId="LicenseFilterType"
-                                                     HorizontalAlignment="Stretch"
-                                                     Style="{StaticResource FilterTextBoxStyle}"
-                                                     TextChanged="LicenseFilter_Changed"/>
-                                        </StackPanel>
-                                    </DataGridTextColumn.Header>
-                                </DataGridTextColumn>
                                 <DataGridTextColumn Binding="{Binding RegistrationStartDate, StringFormat=yyyy-MM-dd}"
                                                     Width="170">
                                     <DataGridTextColumn.Header>
@@ -2580,7 +2574,8 @@
                         <WrapPanel DockPanel.Dock="Top"
                                    Margin="0,0,0,10"
                                    VerticalAlignment="Center">
-                            <Button Style="{StaticResource SecondaryButtonStyle}"
+                            <Button x:Name="BackToLicensesFromInsuranceButton"
+                                    Style="{StaticResource SecondaryButtonStyle}"
                                     Click="BackToLicensesButton_Click">رجوع للتراخيص</Button>
                             <Button Style="{StaticResource TripRoundActionButtonStyle}"
                                     ToolTip="إضافة تأمين"
@@ -2842,6 +2837,23 @@
                                         </StackPanel>
                                     </DataGridTextColumn.Header>
                                 </DataGridTextColumn>
+                                <DataGridTextColumn Binding="{Binding CoverageDetails}"
+                                                    Width="260">
+                                    <DataGridTextColumn.Header>
+                                        <StackPanel Orientation="Vertical"
+                                                    HorizontalAlignment="Stretch">
+                                            <TextBlock Text="تفاصيل التغطية"
+                                                       HorizontalAlignment="Center"
+                                                       FontWeight="Bold"
+                                                       Margin="0,0,0,8"/>
+                                            <TextBox x:Name="InsuranceFilterCoverageDetails"
+                                                     AutomationProperties.AutomationId="InsuranceFilterCoverageDetails"
+                                                     HorizontalAlignment="Stretch"
+                                                     Style="{StaticResource FilterTextBoxStyle}"
+                                                     TextChanged="InsuranceFilter_Changed"/>
+                                        </StackPanel>
+                                    </DataGridTextColumn.Header>
+                                </DataGridTextColumn>
                                 <DataGridTextColumn Binding="{Binding AgentName}"
                                                     Width="175">
                                     <DataGridTextColumn.Header>
@@ -2870,6 +2882,23 @@
                                                        Margin="0,0,0,8"/>
                                             <TextBox x:Name="InsuranceFilterAgentPhone"
                                                      AutomationProperties.AutomationId="InsuranceFilterAgentPhone"
+                                                     HorizontalAlignment="Stretch"
+                                                     Style="{StaticResource FilterTextBoxStyle}"
+                                                     TextChanged="InsuranceFilter_Changed"/>
+                                        </StackPanel>
+                                    </DataGridTextColumn.Header>
+                                </DataGridTextColumn>
+                                <DataGridTextColumn Binding="{Binding Notes}"
+                                                    Width="230">
+                                    <DataGridTextColumn.Header>
+                                        <StackPanel Orientation="Vertical"
+                                                    HorizontalAlignment="Stretch">
+                                            <TextBlock Text="ملاحظات"
+                                                       HorizontalAlignment="Center"
+                                                       FontWeight="Bold"
+                                                       Margin="0,0,0,8"/>
+                                            <TextBox x:Name="InsuranceFilterNotes"
+                                                     AutomationProperties.AutomationId="InsuranceFilterNotes"
                                                      HorizontalAlignment="Stretch"
                                                      Style="{StaticResource FilterTextBoxStyle}"
                                                      TextChanged="InsuranceFilter_Changed"/>
@@ -3153,24 +3182,14 @@
                                                   SelectionChanged="ReportTypeComboBox_SelectionChanged">
                                             <ComboBoxItem Content="المركبات"
                                                           Tag="vehicles"/>
-                                            <ComboBoxItem Content="تشغيلات العربية"
-                                                          Tag="vehicletrips"/>
                                             <ComboBoxItem Content="جميع التشغيلات"
                                                           Tag="alltrips"/>
-                                            <ComboBoxItem Content="البنزين"
-                                                          Tag="fuel"/>
                                             <ComboBoxItem Content="تراخيص العربيات"
                                                           Tag="vehiclelicenses"/>
                                             <ComboBoxItem Content="التأمينات"
                                                           Tag="insurance"/>
-                                            <ComboBoxItem Content="العقود"
-                                                          Tag="contracts"/>
-                                            <ComboBoxItem Content="الصيانة"
-                                                          Tag="maintenance"/>
                                             <ComboBoxItem Content="الزيوت"
                                                           Tag="oilchanges"/>
-                                            <ComboBoxItem Content="الخزينة"
-                                                          Tag="treasury"/>
                                         </ComboBox>
                                     </StackPanel>
 
@@ -3205,9 +3224,11 @@
                                         </Grid>
                                     </StackPanel>
 
-                                    <StackPanel Width="155"
+                                    <StackPanel x:Name="ReportStartDatePanel"
+                                                Width="155"
                                                 Margin="0,0,12,0">
-                                        <TextBlock Text="من"
+                                        <TextBlock x:Name="ReportStartDateLabel"
+                                                   Text="من"
                                                    FontSize="12"
                                                    FontWeight="SemiBold"
                                                    Foreground="{StaticResource MutedBrush}"
@@ -3216,9 +3237,11 @@
                                                     Style="{StaticResource FilterDatePickerStyle}"/>
                                     </StackPanel>
 
-                                    <StackPanel Width="155"
+                                    <StackPanel x:Name="ReportEndDatePanel"
+                                                Width="155"
                                                 Margin="0,0,12,0">
-                                        <TextBlock Text="إلى"
+                                        <TextBlock x:Name="ReportEndDateLabel"
+                                                   Text="إلى"
                                                    FontSize="12"
                                                    FontWeight="SemiBold"
                                                    Foreground="{StaticResource MutedBrush}"

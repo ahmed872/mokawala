@@ -12,6 +12,10 @@ namespace FleetManagementSystem.Data.Entities
         public decimal Quantity { get; set; }
         public decimal Cost { get; set; }
         public decimal NextOilChangeOdometer { get; set; }
+        public decimal? CurrentOdometer { get; set; }
+        public DateTime? CurrentOdometerDate { get; set; }
+        public bool IsOilChanged { get; set; } = true;
+        public string ServiceItems { get; set; } = string.Empty;
         public string Status { get; set; } = "Scheduled";
         public string Notes { get; set; } = string.Empty;
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;

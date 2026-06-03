@@ -3,6 +3,7 @@ global using System.Collections.Generic;
 global using System.Threading.Tasks;
 global using System.Linq;
 global using FleetManagementSystem.Core.DTOs;
+global using FleetManagementSystem.Core.Enums;
 global using FleetManagementSystem.Data;
 global using FleetManagementSystem.Services;
 global using Microsoft.Data.Sqlite;

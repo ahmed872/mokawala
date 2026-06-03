@@ -11,7 +11,7 @@ public partial class TripPermitWindow : Window
         InitializeComponent();
 
         CompanyNameTextBlock.Text = string.IsNullOrWhiteSpace(settings?.CompanyName)
-            ? "نظام إدارة الأسطول"
+            ? "شركة جوميكس للحركة والمعدات"
             : settings.CompanyName;
         CompanyAddressTextBlock.Text = settings?.Address ?? string.Empty;
 

@@ -199,7 +199,7 @@ public partial class MainWindow : Window
     public ObservableCollection<ServiceProviderDto> ServiceProvidersForBinding => _serviceProviders;
     public IReadOnlyList<string> TreasuryTransactionTypes { get; } = new[] { "إيراد", "صرف" };
     public IReadOnlyList<string> PaymentMethods { get; } = new[] { "نقدي", "تحويل بنكي", "بطاقة" };
-    public IReadOnlyList<string> RegistrationTypes { get; } = new[] { "ترخيص", "تصريح" };
+    public IReadOnlyList<string> RegistrationTypes { get; } = new[] { "ترخيص" };
 
     public sealed class VehicleLicenseRow
     {
@@ -240,7 +240,7 @@ public partial class MainWindow : Window
             ChassisNumber = vehicle.ChassisNumber,
             EngineNumber = vehicle.EngineNumber,
             OilChangeIntervalKm = vehicle.OilChangeIntervalKm > 0 ? vehicle.OilChangeIntervalKm : 10000,
-            RegistrationType = string.IsNullOrWhiteSpace(vehicle.RegistrationType) ? "ترخيص" : vehicle.RegistrationType,
+            RegistrationType = "ترخيص",
             RegistrationStartDate = vehicle.RegistrationStartDate,
             RegistrationExpiryDate = vehicle.RegistrationExpiryDate
         };
@@ -268,6 +268,7 @@ public partial class MainWindow : Window
         public string Title { get; private init; } = string.Empty;
         public string Message { get; private init; } = string.Empty;
         public string CategoryText { get; private init; } = string.Empty;
+        public string CategoryKey { get; private init; } = string.Empty;
         public string CategoryInitial { get; private init; } = string.Empty;
         public string StatusText { get; private init; } = string.Empty;
         public string TimingText { get; private init; } = string.Empty;
@@ -304,15 +305,20 @@ public partial class MainWindow : Window
                 _ => (SoonAccentBrush, SoonBackgroundBrush, SoonBorderBrush, SoonChipBrush)
             };
 
+            var isOilAlert = string.Equals(alert.RelatedEntityType, "OilChange", StringComparison.OrdinalIgnoreCase);
+
             return new DashboardAlertItem
             {
                 Title = alert.Title,
                 Message = alert.Message,
                 CategoryText = GetCategoryText(alert.RelatedEntityType),
+                CategoryKey = alert.RelatedEntityType,
                 CategoryInitial = GetCategoryInitial(alert.RelatedEntityType),
-                StatusText = GetStatusText(days),
-                TimingText = GetTimingText(days),
-                DueDateText = dueDate.HasValue ? $"تاريخ الانتهاء {dueDate:yyyy-MM-dd}" : GetNoDateText(alert.RelatedEntityType),
+                StatusText = isOilAlert ? (alert.Type is "Critical" or "Error" ? "متأخر" : "قريب") : GetStatusText(days),
+                TimingText = isOilAlert ? "حسب قراءة العداد" : GetTimingText(days),
+                DueDateText = isOilAlert
+                    ? "إنذار الزيت مرتبط بالعداد"
+                    : dueDate.HasValue ? $"تاريخ الانتهاء {dueDate:yyyy-MM-dd}" : GetNoDateText(alert.RelatedEntityType),
                 DueDate = dueDate,
                 SortPriority = priority,
                 SortDistance = days.HasValue ? Math.Abs(days.Value) : int.MaxValue,
@@ -457,9 +463,12 @@ public partial class MainWindow : Window
         _currentUser = user;
         CurrentUserTextBlock.Text = string.IsNullOrWhiteSpace(user.FullName) ? user.Username : user.FullName;
         UserInitialsTextBlock.Text = BuildInitials(CurrentUserTextBlock.Text);
-        AdminAddUserButton.Visibility = string.Equals(user.Role, "Admin", StringComparison.OrdinalIgnoreCase)
+        var adminShortcutVisibility = string.Equals(user.Role, "Admin", StringComparison.OrdinalIgnoreCase)
             ? Visibility.Visible
             : Visibility.Collapsed;
+        AdminAddUserButton.Visibility = adminShortcutVisibility;
+        AdminAddDriverButton.Visibility = adminShortcutVisibility;
+        AdminAddSupervisorButton.Visibility = adminShortcutVisibility;
         ConnectionInfoTextBlock.Text = GetOperationalStatusText();
         DatabaseSettingsSummaryTextBlock.Text = GetConnectionSummaryText();
         ApplyRoleAccess(user);
@@ -529,7 +538,7 @@ public partial class MainWindow : Window
         ActivityListBox.ItemsSource = metrics.RecentActivities;
     }
 
-    private void DashboardAlertMonthFilter_Changed(object sender, SelectionChangedEventArgs e) => ApplyDashboardAlertMonthFilter();
+    private void DashboardAlertFilter_Changed(object sender, SelectionChangedEventArgs e) => ApplyDashboardAlertMonthFilter();
 
     private void ApplyDashboardAlertMonthFilter()
     {
@@ -542,7 +551,10 @@ public partial class MainWindow : Window
         }
 
         var selectedMonth = GetSelectedDashboardAlertMonth();
+        var selectedType = GetSelectedDashboardAlertType();
         var filteredAlerts = _dashboardAlertItems
+            .Where(alert => string.IsNullOrWhiteSpace(selectedType) ||
+                            string.Equals(alert.CategoryKey, selectedType, StringComparison.OrdinalIgnoreCase))
             .Where(alert => !selectedMonth.HasValue || alert.DueDate?.Month == selectedMonth.Value)
             .ToList();
 
@@ -563,6 +575,19 @@ public partial class MainWindow : Window
         }
 
         return month;
+    }
+
+    private string? GetSelectedDashboardAlertType()
+    {
+        if (DashboardAlertTypeComboBox?.SelectedItem is not ComboBoxItem item)
+        {
+            return null;
+        }
+
+        var type = item.Tag?.ToString();
+        return string.IsNullOrWhiteSpace(type) || string.Equals(type, "All", StringComparison.OrdinalIgnoreCase)
+            ? null
+            : type;
     }
 
     private static bool IsDashboardRenewalAlert(AlertDto alert) =>
@@ -616,15 +641,10 @@ public partial class MainWindow : Window
     {
         var selectedTripId = Selected<TripDto>(TripsGrid)?.Id ?? 0;
         var trips = await _tripService.GetAllAsync();
-        var fuelItems = await _fuelService.GetAllAsync();
-        ReplaceCollection(_fuel, fuelItems);
 
         for (var index = 0; index < trips.Count; index++)
         {
             trips[index].Serial = index + 1;
-            var linkedFuel = GetTripFuelTransactions(trips[index], fuelItems).ToList();
-            trips[index].RegisteredFuelQuantity = linkedFuel.Sum(f => f.Quantity);
-            trips[index].RegisteredFuelCost = linkedFuel.Sum(f => f.TotalCost);
         }
 
         ReplaceCollection(_trips, trips);
@@ -684,7 +704,7 @@ public partial class MainWindow : Window
         CompanyEmailTextBox.Text = _settings.Email;
         CompanyWebsiteTextBox.Text = _settings.Website;
         DatabaseSettingsSummaryTextBlock.Text = GetConnectionSummaryText();
-        CompanyHeaderTextBlock.Text = string.IsNullOrWhiteSpace(_settings.CompanyName) ? "نظام إدارة الأسطول" : _settings.CompanyName;
+        CompanyHeaderTextBlock.Text = string.IsNullOrWhiteSpace(_settings.CompanyName) ? "شركة جوميكس للحركة والمعدات" : _settings.CompanyName;
         UpdateCompanyLogo();
     }
 
@@ -762,6 +782,8 @@ public partial class MainWindow : Window
         "OperationsDataEntry" => "إدخال بيانات التشغيل",
         "MaintenanceOfficer" => "مسؤول الصيانة",
         "TreasuryOfficer" => "مسؤول الخزينة",
+        "TripsLicensesOfficer" => "مسؤول التشغيلات والتراخيص",
+        "InsuranceOfficer" => "مسؤول التأمينات",
         "Viewer" => "عرض فقط",
         "Staff" => "موظف",
         _ => "مستخدم النظام"
@@ -781,6 +803,15 @@ public partial class MainWindow : Window
 
             tab.Visibility = allowed.Contains(module) ? Visibility.Visible : Visibility.Collapsed;
         }
+
+        DashboardTripsShortcutButton.Visibility = allowed.Contains("Trips") ? Visibility.Visible : Visibility.Collapsed;
+        DashboardLicensesInsuranceShortcutButton.Visibility =
+            allowed.Contains("Licenses") || allowed.Contains("Insurance") ? Visibility.Visible : Visibility.Collapsed;
+        DashboardCustodyShortcutButton.Visibility = allowed.Contains("Custody") ? Visibility.Visible : Visibility.Collapsed;
+        DashboardTreasuryShortcutButton.Visibility = allowed.Contains("Treasury") ? Visibility.Visible : Visibility.Collapsed;
+        DashboardReportsShortcutButton.Visibility = allowed.Contains("Reports") ? Visibility.Visible : Visibility.Collapsed;
+        OpenInsuranceFromLicensesButton.Visibility = allowed.Contains("Insurance") ? Visibility.Visible : Visibility.Collapsed;
+        BackToLicensesFromInsuranceButton.Visibility = allowed.Contains("Licenses") ? Visibility.Visible : Visibility.Collapsed;
 
         if (string.Equals(user.Role, "Viewer", StringComparison.OrdinalIgnoreCase))
         {
@@ -1418,6 +1449,9 @@ public partial class MainWindow : Window
             _ => value.ToString()!.Trim()
         };
 
+    private static string FormatDateOnly(DateTime? date) =>
+        date.HasValue ? date.Value.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) : string.Empty;
+
     private static string BuildReportLine(IReadOnlyList<string> columns, Dictionary<string, object> row)
     {
         var selectedColumns = columns.Count > 0 ? columns : row.Keys.ToList();
@@ -1502,7 +1536,6 @@ public partial class MainWindow : Window
                 "رقم الشاسيه",
                 "رقم الموتور",
                 "تغيير الزيت كل كام كم",
-                "نوع الرخصة",
                 "بداية الترخيص",
                 "نهاية الترخيص",
                 "الحالة",
@@ -1516,9 +1549,8 @@ public partial class MainWindow : Window
                 ["رقم الشاسيه"] = license.ChassisNumber,
                 ["رقم الموتور"] = license.EngineNumber,
                 ["تغيير الزيت كل كام كم"] = license.OilChangeIntervalKm,
-                ["نوع الرخصة"] = license.RegistrationType,
-                ["بداية الترخيص"] = license.RegistrationStartDate ?? (object)string.Empty,
-                ["نهاية الترخيص"] = license.RegistrationExpiryDate ?? (object)string.Empty,
+                ["بداية الترخيص"] = FormatDateOnly(license.RegistrationStartDate),
+                ["نهاية الترخيص"] = FormatDateOnly(license.RegistrationExpiryDate),
                 ["الحالة"] = license.Status,
                 ["الإنذار"] = license.ExpiryAlert
             }).ToList()
@@ -1547,6 +1579,7 @@ public partial class MainWindow : Window
                 "نهاية التأمين",
                 "القسط",
                 "مبلغ التغطية",
+                "تفاصيل التغطية",
                 "مندوب التأمين",
                 "هاتف المندوب",
                 "الحالة",
@@ -1563,15 +1596,16 @@ public partial class MainWindow : Window
                 ["رقم الوثيقة"] = insurance.PolicyNumber,
                 ["شركة التأمين"] = insurance.InsuranceCompany,
                 ["نوع الوثيقة"] = insurance.PolicyType,
-                ["بداية التأمين"] = insurance.StartDate,
-                ["نهاية التأمين"] = insurance.ExpiryDate,
+                ["بداية التأمين"] = FormatDateOnly(insurance.StartDate),
+                ["نهاية التأمين"] = FormatDateOnly(insurance.ExpiryDate),
                 ["القسط"] = insurance.PremiumAmount,
                 ["مبلغ التغطية"] = insurance.CoverageAmount,
+                ["تفاصيل التغطية"] = insurance.CoverageDetails,
                 ["مندوب التأمين"] = insurance.AgentName,
                 ["هاتف المندوب"] = insurance.AgentPhoneNumber,
                 ["الحالة"] = insurance.Status,
                 ["الإنذار"] = insurance.ExpiryAlert,
-                ["ملاحظات"] = ValueOrDash(insurance.CoverageDetails, insurance.Notes)
+                ["ملاحظات"] = insurance.Notes
             }).ToList()
         };
     }
@@ -1579,6 +1613,15 @@ public partial class MainWindow : Window
     private ReportDataDto BuildVehiclesReportSnapshot(IEnumerable<VehicleDto> vehicles)
     {
         var rows = vehicles.ToList();
+        var latestInsuranceByVehicle = _insurance
+            .GroupBy(insurance => insurance.VehicleId)
+            .ToDictionary(
+                group => group.Key,
+                group => group
+                    .OrderByDescending(insurance => insurance.ExpiryDate)
+                    .ThenByDescending(insurance => insurance.Id)
+                    .First());
+
         return new ReportDataDto
         {
             ReportTitle = "تقرير المركبات",
@@ -1587,44 +1630,42 @@ public partial class MainWindow : Window
             Columns = new List<string>
             {
                 "رقم السيارة",
-                "نوع العربية",
                 "الموديل",
                 "سنة الصنع",
-                "اللون",
                 "رقم الشاسيه",
                 "رقم الموتور",
                 "العداد الحالي",
                 "الحالة",
-                "مخصص لـ",
-                "تاريخ الشراء",
-                "نوع الرخصة",
                 "بداية الترخيص",
                 "نهاية الترخيص",
-                "تأمين الحوادث",
+                "شركة التأمين",
+                "رقم وثيقة التأمين",
+                "نهاية التأمين",
+                "مبلغ التغطية",
                 "تغيير الزيت كل كام كم",
-                "دورية الصيانة",
                 "ملاحظات"
             },
-            Data = rows.Select(vehicle => new Dictionary<string, object>
+            Data = rows.Select(vehicle =>
             {
-                ["رقم السيارة"] = vehicle.PlateNumber,
-                ["نوع العربية"] = vehicle.VehicleType,
-                ["الموديل"] = vehicle.Model,
-                ["سنة الصنع"] = vehicle.Year,
-                ["اللون"] = vehicle.Color,
-                ["رقم الشاسيه"] = vehicle.ChassisNumber,
-                ["رقم الموتور"] = vehicle.EngineNumber,
-                ["العداد الحالي"] = vehicle.CurrentMileage,
-                ["الحالة"] = vehicle.Status,
-                ["مخصص لـ"] = vehicle.AssignedTo,
-                ["تاريخ الشراء"] = vehicle.PurchaseDate,
-                ["نوع الرخصة"] = vehicle.RegistrationType,
-                ["بداية الترخيص"] = vehicle.RegistrationStartDate ?? (object)string.Empty,
-                ["نهاية الترخيص"] = vehicle.RegistrationExpiryDate ?? (object)string.Empty,
-                ["تأمين الحوادث"] = vehicle.AccidentInsuranceDetails,
-                ["تغيير الزيت كل كام كم"] = vehicle.OilChangeIntervalKm,
-                ["دورية الصيانة"] = vehicle.MaintenanceIntervalKm,
-                ["ملاحظات"] = vehicle.Notes
+                latestInsuranceByVehicle.TryGetValue(vehicle.Id, out var insurance);
+                return new Dictionary<string, object>
+                {
+                    ["رقم السيارة"] = vehicle.PlateNumber,
+                    ["الموديل"] = vehicle.Model,
+                    ["سنة الصنع"] = vehicle.Year,
+                    ["رقم الشاسيه"] = vehicle.ChassisNumber,
+                    ["رقم الموتور"] = vehicle.EngineNumber,
+                    ["العداد الحالي"] = vehicle.CurrentMileage,
+                    ["الحالة"] = vehicle.Status,
+                    ["بداية الترخيص"] = FormatDateOnly(vehicle.RegistrationStartDate),
+                    ["نهاية الترخيص"] = FormatDateOnly(vehicle.RegistrationExpiryDate),
+                    ["شركة التأمين"] = insurance?.InsuranceCompany ?? string.Empty,
+                    ["رقم وثيقة التأمين"] = insurance?.PolicyNumber ?? string.Empty,
+                    ["نهاية التأمين"] = FormatDateOnly(insurance?.ExpiryDate),
+                    ["مبلغ التغطية"] = insurance?.CoverageAmount ?? 0,
+                    ["تغيير الزيت كل كام كم"] = vehicle.OilChangeIntervalKm,
+                    ["ملاحظات"] = vehicle.Notes
+                };
             }).ToList()
         };
     }
@@ -1756,38 +1797,40 @@ public partial class MainWindow : Window
             {
                 "مسلسل",
                 "رقم العربية",
-                "تاريخ التغيير",
+                "التاريخ",
+                "نوع السجل",
+                "عملية التغيير",
                 "عداد التغيير",
+                "قراءة العداد",
                 "نوع الزيت",
                 "كمية الزيت باللتر",
                 "تكلفة الزيت",
                 "التغيير القادم",
-                "عداد العربية",
                 "تغيير الزيت كل كام كم",
                 "المقطوع",
                 "المتبقي",
                 "إنذار الزيت",
                 "الحالة",
-                "يحتاج متابعة",
                 "ملاحظات"
             },
             Data = rows.Select((oil, index) => new Dictionary<string, object>
             {
                 ["مسلسل"] = index + 1,
                 ["رقم العربية"] = oil.VehiclePlateNumber,
-                ["تاريخ التغيير"] = oil.ChangeDate,
+                ["التاريخ"] = oil.ChangeDate,
+                ["نوع السجل"] = oil.RecordType,
+                ["عملية التغيير"] = oil.ServiceItems,
                 ["عداد التغيير"] = oil.OdometerAtChange,
+                ["قراءة العداد"] = oil.CurrentOdometer,
                 ["نوع الزيت"] = oil.OilType,
-                ["كمية الزيت باللتر"] = oil.Quantity,
-                ["تكلفة الزيت"] = oil.Cost,
+                ["كمية الزيت باللتر"] = oil.QuantityDisplay,
+                ["تكلفة الزيت"] = oil.CostDisplay,
                 ["التغيير القادم"] = oil.NextOilChangeOdometer,
-                ["عداد العربية"] = oil.CurrentVehicleMileage,
                 ["تغيير الزيت كل كام كم"] = oil.OilChangeIntervalKm,
                 ["المقطوع"] = oil.KmSinceOilChange,
                 ["المتبقي"] = oil.RemainingKm,
                 ["إنذار الزيت"] = oil.OilAlert,
                 ["الحالة"] = oil.Status,
-                ["يحتاج متابعة"] = oil.IsDue ? "نعم" : "لا",
                 ["ملاحظات"] = oil.Notes
             }).ToList()
         };
@@ -1848,6 +1891,16 @@ public partial class MainWindow : Window
                (!filter.EndDate.HasValue || value <= filter.EndDate.Value.Date);
     }
 
+    private static bool ReportAnyDateMatches(DateTime? firstDate, DateTime? secondDate, ReportFilterDto filter)
+    {
+        if (!filter.StartDate.HasValue && !filter.EndDate.HasValue)
+        {
+            return true;
+        }
+
+        return ReportDateMatches(firstDate, filter) || ReportDateMatches(secondDate, filter);
+    }
+
     private ReportDataDto BuildTripsReportSnapshot(IReadOnlyList<TripDto> trips, string title) =>
         new()
         {
@@ -1868,8 +1921,6 @@ public partial class MainWindow : Window
                 "الغرض",
                 "الحالة",
                 "المسافة",
-                "بنزين مسجل",
-                "تكلفة البنزين",
                 "ملاحظات"
             },
             Data = trips.Select((trip, index) => new Dictionary<string, object>
@@ -1886,41 +1937,9 @@ public partial class MainWindow : Window
                 ["الغرض"] = trip.Purpose,
                 ["الحالة"] = trip.Status,
                 ["المسافة"] = trip.Distance,
-                ["بنزين مسجل"] = trip.RegisteredFuelQuantity,
-                ["تكلفة البنزين"] = trip.RegisteredFuelCost,
                 ["ملاحظات"] = trip.Notes
             }).ToList()
         };
-
-    private decimal GetLoadedTripFuelQuantity(TripDto trip)
-    {
-        var linkedFuel = GetLoadedTripFuelTransactions(trip).ToList();
-        return linkedFuel.Sum(f => f.Quantity);
-    }
-
-    private decimal GetLoadedTripFuelCost(TripDto trip)
-    {
-        var linkedFuel = GetLoadedTripFuelTransactions(trip).ToList();
-        return linkedFuel.Sum(f => f.TotalCost);
-    }
-
-    private IEnumerable<FuelTransactionDto> GetLoadedTripFuelTransactions(TripDto trip)
-    {
-        return GetTripFuelTransactions(trip, _fuel);
-    }
-
-    private static IEnumerable<FuelTransactionDto> GetTripFuelTransactions(TripDto trip, IEnumerable<FuelTransactionDto> fuelTransactions)
-    {
-        var tripStartDate = trip.StartDate.Date;
-        var tripEndDate = (trip.EndDate ?? DateTime.Today).Date;
-
-        return fuelTransactions.Where(f =>
-            f.TripId == trip.Id ||
-            (!f.TripId.HasValue &&
-             f.VehicleId == trip.VehicleId &&
-             f.TransactionDate.Date >= tripStartDate &&
-             f.TransactionDate.Date <= tripEndDate));
-    }
 
     private VehicleFormDto ToVehicleFormFromLicense(VehicleLicenseRow licenseRow, VehicleDto? existingVehicle)
     {
@@ -1945,7 +1964,7 @@ public partial class MainWindow : Window
             AssignedTo = existingVehicle?.AssignedTo ?? string.Empty,
             PurchaseDate = existingVehicle is null || existingVehicle.PurchaseDate == default ? DateTime.Today : existingVehicle.PurchaseDate,
             PurchasePrice = existingVehicle?.PurchasePrice ?? 0,
-            RegistrationType = string.IsNullOrWhiteSpace(licenseRow.RegistrationType) ? "ترخيص" : licenseRow.RegistrationType.Trim(),
+            RegistrationType = "ترخيص",
             RegistrationStartDate = licenseRow.RegistrationStartDate,
             RegistrationExpiryDate = licenseRow.RegistrationExpiryDate,
             AccidentInsuranceDetails = existingVehicle?.AccidentInsuranceDetails ?? string.Empty,
@@ -1974,7 +1993,7 @@ public partial class MainWindow : Window
         AssignedTo = dto.AssignedTo,
         PurchaseDate = dto.PurchaseDate,
         PurchasePrice = dto.PurchasePrice,
-        RegistrationType = string.IsNullOrWhiteSpace(dto.RegistrationType) ? "ترخيص" : dto.RegistrationType,
+        RegistrationType = "ترخيص",
         RegistrationStartDate = dto.RegistrationStartDate,
         RegistrationExpiryDate = dto.RegistrationExpiryDate,
         AccidentInsuranceDetails = dto.AccidentInsuranceDetails,
@@ -2069,8 +2088,8 @@ public partial class MainWindow : Window
         Distance = dto.Distance,
         Purpose = dto.Purpose,
         Status = dto.Status,
-        FuelConsumed = dto.FuelConsumed,
-        TripCost = dto.TripCost,
+        FuelConsumed = 0,
+        TripCost = 0,
         Notes = dto.Notes
     };
 
@@ -2113,6 +2132,10 @@ public partial class MainWindow : Window
         VehicleId = dto.VehicleId,
         ChangeDate = dto.ChangeDate,
         OdometerAtChange = dto.OdometerAtChange,
+        CurrentOdometer = dto.CurrentOdometer,
+        CurrentOdometerDate = dto.CurrentOdometerDate,
+        IsOilChanged = dto.IsOilChanged,
+        ServiceItems = dto.ServiceItems,
         OilType = dto.OilType,
         Quantity = dto.Quantity,
         Cost = dto.Cost,
@@ -2329,9 +2352,24 @@ public partial class MainWindow : Window
         }
     }
 
+    private bool CanAccessModule(string module) =>
+        _currentUser?.AllowedModules.Any(allowed => string.Equals(allowed, module, StringComparison.OrdinalIgnoreCase)) == true;
+
     private void QuickOpenTripsButton_Click(object sender, RoutedEventArgs e) => SelectTabByTag("Trips");
     private void QuickOpenMaintenanceButton_Click(object sender, RoutedEventArgs e) => SelectTabByTag("Maintenance");
-    private void QuickOpenLicensesAndInsuranceButton_Click(object sender, RoutedEventArgs e) => SelectTabByTag("Licenses");
+    private void QuickOpenLicensesAndInsuranceButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (CanAccessModule("Licenses"))
+        {
+            SelectTabByTag("Licenses");
+            return;
+        }
+
+        if (CanAccessModule("Insurance"))
+        {
+            SelectTabByTag("Insurance");
+        }
+    }
     private void QuickOpenCustodyButton_Click(object sender, RoutedEventArgs e) => SelectTabByTag("Custody");
     private void QuickOpenTreasuryButton_Click(object sender, RoutedEventArgs e) => SelectTabByTag("Treasury");
     private void QuickOpenReportsButton_Click(object sender, RoutedEventArgs e) => SelectTabByTag("Reports");
@@ -2347,6 +2385,82 @@ public partial class MainWindow : Window
 
         SelectTabByTag("Users");
         AddUserButton_Click(sender, e);
+    }
+
+    private async void DashboardAddDriverButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (!string.Equals(_currentUser?.Role, "Admin", StringComparison.OrdinalIgnoreCase))
+        {
+            return;
+        }
+
+        var window = new QuickNameEntryWindow(
+            "إضافة سائق",
+            "اكتب اسم السائق فقط. باقي البيانات الفنية يتم تجهيزها تلقائيًا حتى يظهر في التشغيلات.")
+        {
+            Owner = this
+        };
+
+        if (window.ShowDialog() != true)
+        {
+            return;
+        }
+
+        await RunSafeAsync(async () =>
+        {
+            var stamp = DateTime.Now.ToString("yyyyMMddHHmmssfff", CultureInfo.InvariantCulture);
+            await _driverService.SaveAsync(new DriverFormDto
+            {
+                FullName = window.EnteredName,
+                LicenseNumber = $"AUTO-DRV-{stamp}",
+                LicenseExpiryDate = DateTime.Today.AddYears(10),
+                LicenseType = "غير مسجل",
+                DateOfBirth = DateTime.Today.AddYears(-30),
+                IsActive = true,
+                Notes = "أضيف من الرئيسية بالاسم فقط."
+            });
+
+            await LoadDriversAsync();
+            await LoadDashboardAsync();
+            MessageBox.Show("تم حفظ السائق.", "تم", MessageBoxButton.OK, MessageBoxImage.Information);
+        });
+    }
+
+    private async void DashboardAddSupervisorButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (!string.Equals(_currentUser?.Role, "Admin", StringComparison.OrdinalIgnoreCase))
+        {
+            return;
+        }
+
+        var window = new QuickNameEntryWindow(
+            "إضافة مشرف",
+            "اكتب اسم المشرف فقط. سيتم حفظه كمشرف نشط ويظهر مباشرة في التشغيلات.")
+        {
+            Owner = this
+        };
+
+        if (window.ShowDialog() != true)
+        {
+            return;
+        }
+
+        await RunSafeAsync(async () =>
+        {
+            await _employeeService.SaveAsync(new EmployeeFormDto
+            {
+                FullName = window.EnteredName,
+                Department = "التشغيل",
+                Position = "مشرف",
+                HireDate = DateTime.Today,
+                Status = "Active",
+                Notes = "أضيف من الرئيسية بالاسم فقط."
+            });
+
+            await LoadEmployeesAsync();
+            await LoadDashboardAsync();
+            MessageBox.Show("تم حفظ المشرف.", "تم", MessageBoxButton.OK, MessageBoxImage.Information);
+        });
     }
 
     private void MainTabs_SelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -2541,12 +2655,6 @@ public partial class MainWindow : Window
             if (TripFilterDistance != null && !string.IsNullOrWhiteSpace(TripFilterDistance.Text) && !trip.Distance.ToString("0.##", CultureInfo.InvariantCulture).Contains(TripFilterDistance.Text.Trim(), StringComparison.OrdinalIgnoreCase))
                 return false;
 
-            if (TripFilterRegisteredFuel != null && !string.IsNullOrWhiteSpace(TripFilterRegisteredFuel.Text) && !trip.RegisteredFuelQuantity.ToString("0.##", CultureInfo.InvariantCulture).Contains(TripFilterRegisteredFuel.Text.Trim(), StringComparison.OrdinalIgnoreCase))
-                return false;
-
-            if (TripFilterRegisteredFuelCost != null && !string.IsNullOrWhiteSpace(TripFilterRegisteredFuelCost.Text) && !trip.RegisteredFuelCost.ToString("0.##", CultureInfo.InvariantCulture).Contains(TripFilterRegisteredFuelCost.Text.Trim(), StringComparison.OrdinalIgnoreCase))
-                return false;
-
             if (TripFilterNotes != null && !string.IsNullOrWhiteSpace(TripFilterNotes.Text) && (trip.Notes == null || !trip.Notes.Contains(TripFilterNotes.Text.Trim(), StringComparison.OrdinalIgnoreCase)))
                 return false;
 
@@ -2607,18 +2715,19 @@ public partial class MainWindow : Window
 
         return TextFilterMatches(OilFilterPlate, oil.VehiclePlateNumber)
             && DateFilterMatches(OilFilterDate, oil.ChangeDate)
+            && TextFilterMatches(OilFilterRecordType, oil.RecordType)
+            && TextFilterMatches(OilFilterServiceItems, oil.ServiceItems)
             && TextFilterMatches(OilFilterOdometer, oil.OdometerAtChange.ToString("0.##", CultureInfo.InvariantCulture))
+            && TextFilterMatches(OilFilterCurrentOdometer, oil.CurrentOdometer.ToString("0.##", CultureInfo.InvariantCulture))
             && TextFilterMatches(OilFilterType, oil.OilType)
-            && TextFilterMatches(OilFilterQuantity, oil.Quantity.ToString("0.##", CultureInfo.InvariantCulture))
-            && TextFilterMatches(OilFilterCost, oil.Cost.ToString("0.##", CultureInfo.InvariantCulture))
+            && TextFilterMatches(OilFilterQuantity, oil.QuantityDisplay)
+            && TextFilterMatches(OilFilterCost, oil.CostDisplay)
             && TextFilterMatches(OilFilterNext, oil.NextOilChangeOdometer.ToString("0.##", CultureInfo.InvariantCulture))
-            && TextFilterMatches(OilFilterCurrent, oil.CurrentVehicleMileage.ToString("0.##", CultureInfo.InvariantCulture))
             && TextFilterMatches(OilFilterInterval, oil.OilChangeIntervalKm.ToString("0.##", CultureInfo.InvariantCulture))
             && TextFilterMatches(OilFilterSince, oil.KmSinceOilChange.ToString("0.##", CultureInfo.InvariantCulture))
             && TextFilterMatches(OilFilterRemaining, oil.RemainingKm.ToString("0.##", CultureInfo.InvariantCulture))
             && TextFilterMatches(OilFilterAlert, oil.OilAlert)
             && TextFilterMatches(OilFilterStatus, oil.Status)
-            && TextFilterMatches(OilFilterDue, oil.IsDue ? "نعم true yes" : "لا false no")
             && TextFilterMatches(OilFilterNotes, oil.Notes);
     }
 
@@ -2647,7 +2756,6 @@ public partial class MainWindow : Window
             && TextFilterMatches(LicenseFilterChassis, license.ChassisNumber)
             && TextFilterMatches(LicenseFilterEngine, license.EngineNumber)
             && TextFilterMatches(LicenseFilterOilInterval, license.OilChangeIntervalKm.ToString("0.##", CultureInfo.InvariantCulture))
-            && TextFilterMatches(LicenseFilterType, license.RegistrationType)
             && DateFilterMatches(LicenseFilterStartDate, license.RegistrationStartDate)
             && DateFilterMatches(LicenseFilterEndDate, license.RegistrationExpiryDate)
             && TextFilterMatches(LicenseFilterStatus, license.Status)
@@ -2685,8 +2793,10 @@ public partial class MainWindow : Window
             && DateFilterMatches(InsuranceFilterEndDate, insurance.ExpiryDate)
             && TextFilterMatches(InsuranceFilterPremium, insurance.PremiumAmount.ToString("0.##", CultureInfo.InvariantCulture))
             && TextFilterMatches(InsuranceFilterCoverage, insurance.CoverageAmount.ToString("0.##", CultureInfo.InvariantCulture))
+            && TextFilterMatches(InsuranceFilterCoverageDetails, insurance.CoverageDetails)
             && TextFilterMatches(InsuranceFilterAgent, insurance.AgentName)
             && TextFilterMatches(InsuranceFilterAgentPhone, insurance.AgentPhoneNumber)
+            && TextFilterMatches(InsuranceFilterNotes, insurance.Notes)
             && TextFilterMatches(InsuranceFilterStatus, insurance.Status)
             && TextFilterMatches(InsuranceFilterAlert, insurance.ExpiryAlert);
     }
@@ -2893,48 +3003,26 @@ public partial class MainWindow : Window
             return DeleteSelectedAsync(TripsGrid, _trips, x => x.Id, _tripService.DeleteAsync, LoadTripsAsync);
         });
 
-    private async void AddFuelForSelectedTripButton_Click(object sender, RoutedEventArgs e) => await RunSafeAsync(() =>
-    {
-        var trip = Selected<TripDto>(TripsGrid);
-        if (trip is null)
-        {
-            SelectTabByTag("Fuel");
-            Dispatcher.BeginInvoke(new Action(() => AddFuelButton_Click(sender, e)));
-            return Task.CompletedTask;
-        }
-
-        Dispatcher.BeginInvoke(new Action(() => OpenFuelEntry(BuildFuelDraftForTrip(trip))));
-        return Task.CompletedTask;
-    });
-
     private async void AddOilForSelectedTripVehicleButton_Click(object sender, RoutedEventArgs e) => await RunSafeAsync(() =>
     {
-        var trip = Selected<TripDto>(TripsGrid)
-            ?? throw new InvalidOperationException("اختر تشغيلة من الجدول قبل تسجيل الزيت.");
+        var trip = Selected<TripDto>(TripsGrid);
+        var vehicle = trip is null
+            ? _vehicles.FirstOrDefault()
+            : _vehicles.FirstOrDefault(v => v.Id == trip.VehicleId)
+                ?? throw new InvalidOperationException("العربية المرتبطة بالتشغيلة غير موجودة في بيانات المركبات.");
 
-        var vehicle = _vehicles.FirstOrDefault(v => v.Id == trip.VehicleId)
-            ?? throw new InvalidOperationException("العربية المرتبطة بالتشغيلة غير موجودة في بيانات المركبات.");
+        if (vehicle is null)
+        {
+            throw new InvalidOperationException("لا توجد عربيات مسجلة. سجل عربية أولًا من صفحة التراخيص ثم افتح متابعة الزيت.");
+        }
 
-        var currentMileage = trip.EndMileage ?? trip.StartMileage;
+        var currentMileage = trip?.EndMileage ?? trip?.StartMileage ?? vehicle.CurrentMileage;
         if (currentMileage <= 0)
         {
             currentMileage = vehicle.CurrentMileage;
         }
 
-        var interval = vehicle.OilChangeIntervalKm > 0 ? vehicle.OilChangeIntervalKm : 10000;
-        Dispatcher.BeginInvoke(new Action(() => OpenOilChangeEntry(new OilChangeDto
-        {
-            VehicleId = vehicle.Id,
-            VehiclePlateNumber = vehicle.PlateNumber,
-            ChangeDate = DateTime.Today,
-            OdometerAtChange = currentMileage,
-            OilChangeIntervalKm = interval,
-            CurrentVehicleMileage = currentMileage,
-            NextOilChangeOdometer = currentMileage + interval,
-            RemainingKm = interval,
-            OilAlert = "لا يوجد إنذار",
-            Status = "Completed"
-        })));
+        Dispatcher.BeginInvoke(new Action(() => OpenOilChangeEntry(BuildOilEntrySource(vehicle, currentMileage))));
 
         return Task.CompletedTask;
     });
@@ -2945,7 +3033,6 @@ public partial class MainWindow : Window
         try
         {
             Mouse.OverrideCursor = Cursors.Wait;
-            await LoadFuelAsync();
             await LoadTripsAsync();
             var view = CollectionViewSource.GetDefaultView(TripsGrid.ItemsSource);
             var trips = view is null
@@ -3009,12 +3096,7 @@ public partial class MainWindow : Window
             return;
         }
 
-        var vehicle = _vehicles.FirstOrDefault(v => v.Id == trip.VehicleId);
-        var window = new TripPermitWindow(trip, vehicle, _settings)
-        {
-            Owner = this
-        };
-        window.ShowDialog();
+        OpenReportPreview(BuildTripsReportSnapshot(new[] { trip }, $"تقرير التشغيلة رقم {trip.Serial}"));
     }
 
     private TripDto? SelectTripFromSender(object sender)
@@ -3260,27 +3342,63 @@ public partial class MainWindow : Window
     private void AddOilChangeButton_Click(object sender, RoutedEventArgs e)
     {
         var vehicle = _vehicles.FirstOrDefault();
-        var odometerAtChange = vehicle?.CurrentMileage ?? 0;
-        var interval = vehicle?.OilChangeIntervalKm > 0 ? vehicle.OilChangeIntervalKm : 10000;
-        OpenOilChangeEntry(new OilChangeDto
+        OpenOilChangeEntry(BuildOilEntrySource(vehicle, vehicle?.CurrentMileage ?? 0));
+    }
+
+    private OilChangeDto BuildOilEntrySource(VehicleDto? vehicle, decimal currentMileage)
+    {
+        var interval = vehicle?.OilChangeIntervalKm ?? 0;
+        var latestOilChange = vehicle is null
+            ? null
+            : _oilChanges
+                .Where(oil => oil.VehicleId == vehicle.Id && oil.IsOilChanged)
+                .OrderByDescending(oil => oil.OdometerAtChange)
+                .ThenByDescending(oil => oil.ChangeDate)
+                .FirstOrDefault();
+        var isFirstActualChange = latestOilChange is null;
+        var odometerAtChange = latestOilChange?.OdometerAtChange ?? currentMileage;
+        var nextOdometer = interval > 0 ? odometerAtChange + interval : 0;
+        var remainingKm = interval > 0 ? nextOdometer - currentMileage : 0;
+
+        return new OilChangeDto
         {
             VehicleId = vehicle?.Id ?? 0,
             VehiclePlateNumber = vehicle?.PlateNumber ?? string.Empty,
             ChangeDate = DateTime.Today,
             OdometerAtChange = odometerAtChange,
+            CurrentOdometer = currentMileage,
+            CurrentOdometerDate = DateTime.Today,
+            IsOilChanged = isFirstActualChange,
+            RecordType = isFirstActualChange ? "تغيير زيت" : "متابعة يومية",
+            ServiceItems = latestOilChange?.ServiceItems ?? "زيت فقط",
+            OilType = latestOilChange?.OilType ?? string.Empty,
             OilChangeIntervalKm = interval,
-            CurrentVehicleMileage = odometerAtChange,
-            NextOilChangeOdometer = odometerAtChange + interval,
-            RemainingKm = interval,
-            OilAlert = "لا يوجد إنذار",
-            Status = "Completed"
-        });
+            CurrentVehicleMileage = currentMileage,
+            NextOilChangeOdometer = nextOdometer,
+            RemainingKm = remainingKm,
+            OilAlert = interval > 0 ? BuildOilAlertText(remainingKm) : "تغيير الزيت كل كام كم غير مسجلة",
+            Status = isFirstActualChange ? "Completed" : "DailyCheck"
+        };
+    }
+
+    private const decimal OilAlertThresholdKm = 500;
+
+    private static string BuildOilAlertText(decimal remainingKm)
+    {
+        if (remainingKm < 0)
+        {
+            return $"تغيير الزيت متأخر بـ {Math.Abs(remainingKm):0} كم";
+        }
+
+        return remainingKm <= OilAlertThresholdKm
+            ? $"متبقي {remainingKm:0} كم على تغيير الزيت"
+            : "لا يوجد إنذار";
     }
 
     private async void OpenOilChangeEntry(OilChangeDto source)
     {
         SelectTabByTag("OilChanges");
-        var window = new OilChangeEntryWindow(_vehicles, source)
+        var window = new OilChangeEntryWindow(_vehicles, source, _oilChanges)
         {
             Owner = this
         };
@@ -3938,7 +4056,6 @@ public partial class MainWindow : Window
         var normalized = (reportType ?? string.Empty).Trim().ToLowerInvariant();
         switch (normalized)
         {
-            case "vehicletrips":
             case "alltrips":
                 await LoadTripsAsync();
                 break;
@@ -3952,21 +4069,13 @@ public partial class MainWindow : Window
             case "insurance":
                 await LoadInsuranceAsync();
                 break;
-            case "contracts":
-                await LoadContractsAsync();
-                break;
-            case "maintenance":
-                await LoadMaintenanceAsync();
-                break;
             case "oilchanges":
                 await LoadOilChangesAsync();
-                break;
-            case "treasury":
-                await LoadTreasuryAsync();
                 break;
             case "vehicles":
             default:
                 await LoadVehiclesAsync();
+                await LoadInsuranceAsync();
                 break;
         }
     }
@@ -3976,43 +4085,33 @@ public partial class MainWindow : Window
         var reportType = (filter.ReportType ?? string.Empty).Trim().ToLowerInvariant();
         return reportType switch
         {
-            "vehicletrips" => BuildTripsReportSnapshot(
+            "alltrips" => BuildTripsReportSnapshot(
                 _trips.Where(trip =>
                         (!filter.VehicleId.HasValue || trip.VehicleId == filter.VehicleId.Value) &&
                         ReportDateMatches(trip.StartDate, filter))
                     .ToList(),
-                GetSelectedVehicleReportTitle()),
-            "alltrips" => BuildTripsReportSnapshot(
-                _trips.Where(trip => ReportDateMatches(trip.StartDate, filter)).ToList(),
-                "تقرير جميع التشغيلات"),
+                GetSelectedTripsReportTitle(filter.VehicleId)),
             "fuel" => BuildFuelReportSnapshot(_fuel.Where(fuel =>
                     (!filter.VehicleId.HasValue || fuel.VehicleId == filter.VehicleId.Value) &&
                     ReportDateMatches(fuel.TransactionDate, filter))),
             "vehiclelicenses" => BuildVehicleLicensesReportSnapshot(_vehicleLicenses.Where(license =>
-                ReportDateMatches(license.RegistrationExpiryDate, filter)), "تقرير تراخيص العربيات"),
+                ReportAnyDateMatches(license.RegistrationStartDate, license.RegistrationExpiryDate, filter)), "تقرير تراخيص العربيات"),
             "insurance" => BuildInsuranceReportSnapshot(_insurance.Where(insurance =>
-                ReportDateMatches(insurance.ExpiryDate, filter)), "تقرير التأمينات"),
-            "contracts" => BuildContractsReportSnapshot(_contracts.Where(contract =>
-                ReportDateMatches(contract.StartDate, filter) || ReportDateMatches(contract.EndDate, filter))),
-            "maintenance" => BuildMaintenanceReportSnapshot(_maintenance.Where(maintenance =>
-                ReportDateMatches(maintenance.RequestDate, filter))),
-            "oilchanges" => BuildOilChangesReportSnapshot(_oilChanges.Where(oil =>
-                ReportDateMatches(oil.ChangeDate, filter))),
-            "treasury" => BuildTreasuryReportSnapshot(_treasuryTransactions.Where(transaction =>
-                ReportDateMatches(transaction.TransactionDate, filter))),
+                ReportAnyDateMatches(insurance.StartDate, insurance.ExpiryDate, filter)), "تقرير التأمينات"),
+            "oilchanges" => BuildOilChangesReportSnapshot(_oilChanges),
             "vehicles" or _ => BuildVehiclesReportSnapshot(_vehicles.Where(vehicle =>
-                ReportDateMatches(vehicle.PurchaseDate, filter)))
+                ReportAnyDateMatches(vehicle.RegistrationStartDate, vehicle.RegistrationExpiryDate, filter)))
         };
     }
 
-    private string GetSelectedVehicleReportTitle()
+    private string GetSelectedTripsReportTitle(int? vehicleId)
     {
-        var vehicleName = ReportVehicleComboBox.SelectedItem is VehicleDto vehicle
-            ? vehicle.PlateNumber
+        var vehicleName = vehicleId.HasValue
+            ? _vehicles.FirstOrDefault(vehicle => vehicle.Id == vehicleId.Value)?.PlateNumber
             : string.Empty;
 
         return string.IsNullOrWhiteSpace(vehicleName)
-            ? "تقرير تشغيلات العربيات"
+            ? "تقرير جميع التشغيلات"
             : $"تقرير تشغيلات العربية {vehicleName}";
     }
 
@@ -4020,9 +4119,8 @@ public partial class MainWindow : Window
     {
         var selectedItem = ReportTypeComboBox.SelectedItem as ComboBoxItem;
         var reportType = selectedItem?.Tag?.ToString() ?? "vehicles";
-        var usesVehicleFilter =
-            string.Equals(reportType, "vehicletrips", StringComparison.OrdinalIgnoreCase) ||
-            string.Equals(reportType, "fuel", StringComparison.OrdinalIgnoreCase);
+        var usesVehicleFilter = string.Equals(reportType, "fuel", StringComparison.OrdinalIgnoreCase);
+        var usesDateFilter = !string.Equals(reportType, "oilchanges", StringComparison.OrdinalIgnoreCase);
         int? vehicleId = usesVehicleFilter && ReportVehicleComboBox.SelectedValue is int selectedVehicleId
             ? selectedVehicleId
             : null;
@@ -4031,8 +4129,8 @@ public partial class MainWindow : Window
         {
             ReportType = reportType,
             VehicleId = vehicleId,
-            StartDate = ReportStartDatePicker.SelectedDate,
-            EndDate = ReportEndDatePicker.SelectedDate
+            StartDate = usesDateFilter ? ReportStartDatePicker.SelectedDate : null,
+            EndDate = usesDateFilter ? ReportEndDatePicker.SelectedDate : null
         };
     }
 
@@ -4059,10 +4157,34 @@ public partial class MainWindow : Window
         var selectedItem = ReportTypeComboBox.SelectedItem as ComboBoxItem;
         var reportType = selectedItem?.Tag?.ToString();
         ReportVehicleFilterPanel.Visibility =
-            string.Equals(reportType, "vehicletrips", StringComparison.OrdinalIgnoreCase) ||
             string.Equals(reportType, "fuel", StringComparison.OrdinalIgnoreCase)
             ? Visibility.Visible
             : Visibility.Collapsed;
+
+        var dateFilterVisibility = string.Equals(reportType, "oilchanges", StringComparison.OrdinalIgnoreCase)
+            ? Visibility.Collapsed
+            : Visibility.Visible;
+        ReportStartDatePanel.Visibility = dateFilterVisibility;
+        ReportEndDatePanel.Visibility = dateFilterVisibility;
+
+        var dateFilterPrefix = reportType?.ToLowerInvariant() switch
+        {
+            "vehicles" or "vehiclelicenses" => "تاريخ الترخيص",
+            "insurance" => "تاريخ التأمين",
+            "alltrips" => "تاريخ التشغيل",
+            "fuel" => "تاريخ البنزين",
+            _ => "التاريخ"
+        };
+
+        if (ReportStartDateLabel is not null)
+        {
+            ReportStartDateLabel.Text = $"{dateFilterPrefix} من";
+        }
+
+        if (ReportEndDateLabel is not null)
+        {
+            ReportEndDateLabel.Text = $"{dateFilterPrefix} إلى";
+        }
     }
 
     private string? PickDocumentPath()

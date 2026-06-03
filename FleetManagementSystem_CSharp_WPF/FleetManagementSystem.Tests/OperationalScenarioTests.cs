@@ -29,7 +29,12 @@ public class OperationalScenarioTests
         {
             new("Bootstrap seeds admin and lookup data", async (h, n) =>
             {
-                Assert.Contains(await h.Context.Users.ToListAsync(), u => u.Username == "admin");
+                var users = await h.Context.Users.ToListAsync();
+                Assert.Contains(users, u => u.Username == "admin");
+                Assert.Contains(users, u => u.Username == "mahmoud" && u.Role == UserRole.Admin);
+                Assert.Contains(users, u => u.Username == "amr" && u.Role == UserRole.TreasuryOfficer);
+                Assert.Contains(users, u => u.Username == "abdelrahman" && u.Role == UserRole.TripsLicensesOfficer);
+                Assert.Contains(users, u => u.Username == "osama" && u.Role == UserRole.InsuranceOfficer);
                 Assert.NotEmpty(await h.MasterDataService.GetVehicleTypesAsync());
                 Assert.NotEmpty(await h.MasterDataService.GetContractStatusesAsync());
             }),
@@ -707,8 +712,10 @@ public class OperationalScenarioTests
                 var fuelReport = await h.ReportingService.GenerateReportAsync(new ReportFilterDto { ReportType = "fuel", StartDate = DateTime.Today, EndDate = DateTime.Today, VehicleId = bundle.Vehicle.Id });
                 Assert.Contains(fuelReport.Data, row => row["إجمالي البنزين"].ToString() == "600");
                 var tripsReport = await h.ReportingService.GenerateReportAsync(new ReportFilterDto { ReportType = "alltrips", StartDate = DateTime.Today, EndDate = DateTime.Today });
-                Assert.Contains(tripsReport.Data, row => row["تكلفة البنزين"].ToString() == "600");
-                await AssertInvalidOperationAsync(() => h.TripService.DeleteAsync(bundle.Trip.Id), "سجل بنزين");
+                Assert.DoesNotContain("تكلفة البنزين", tripsReport.Columns);
+                await h.TripService.DeleteAsync(bundle.Trip.Id);
+                Assert.Null(await h.TripService.GetByIdAsync(bundle.Trip.Id));
+                Assert.Null((await h.FuelService.GetByIdAsync(fuel.Id))?.TripId);
             }),
             new("Fuel delete removes linked treasury transaction", async (h, n) =>
             {

@@ -123,7 +123,7 @@ public sealed class VehicleService(FleetDbContext context, IAuditService auditSe
         entity.AssignedTo = ServiceHelpers.Clean(dto.AssignedTo);
         entity.PurchaseDate = dto.PurchaseDate == default ? null : dto.PurchaseDate;
         entity.PurchasePrice = dto.PurchasePrice;
-        entity.RegistrationType = string.IsNullOrWhiteSpace(dto.RegistrationType) ? "ترخيص" : ServiceHelpers.Clean(dto.RegistrationType);
+        entity.RegistrationType = "ترخيص";
         entity.RegistrationStartDate = ServiceHelpers.OrNull(dto.RegistrationStartDate);
         entity.RegistrationExpiryDate = ServiceHelpers.OrNull(dto.RegistrationExpiryDate);
         entity.AccidentInsuranceDetails = ServiceHelpers.Clean(dto.AccidentInsuranceDetails);
@@ -835,8 +835,8 @@ public sealed class TripService(FleetDbContext context, IAuditService auditServi
         entity.Distance = ServiceHelpers.Distance(effectiveStartMileage, dto.EndMileage, dto.Distance);
         entity.Purpose = ServiceHelpers.Clean(dto.Purpose);
         entity.Status = isClosing ? "Closed" : string.IsNullOrWhiteSpace(dto.Status) ? "Open" : dto.Status;
-        entity.FuelConsumed = dto.FuelConsumed;
-        entity.TripCost = dto.TripCost;
+        entity.FuelConsumed = 0;
+        entity.TripCost = 0;
         entity.Notes = ServiceHelpers.Clean(dto.Notes);
         entity.UpdatedAt = DateTime.UtcNow;
 
@@ -865,10 +865,13 @@ public sealed class TripService(FleetDbContext context, IAuditService auditServi
         var entity = await _context.Trips.FirstOrDefaultAsync(t => t.Id == id)
             ?? throw new InvalidOperationException("الرحلة غير موجودة.");
 
-        var linkedFuelCount = await _context.FuelTransactions.CountAsync(f => f.TripId == id);
-        if (linkedFuelCount > 0)
+        var linkedFuelRows = await _context.FuelTransactions
+            .Where(f => f.TripId == id)
+            .ToListAsync();
+        foreach (var fuel in linkedFuelRows)
         {
-            throw new InvalidOperationException($"لا يمكن حذف التشغيلة لأنها مرتبطة بعدد {linkedFuelCount} سجل بنزين. احذف سجلات البنزين المرتبطة أولًا أو احتفظ بالتشغيلة للحفاظ على الحسابات.");
+            fuel.TripId = null;
+            fuel.UpdatedAt = DateTime.UtcNow;
         }
 
         var vehicle = await _context.Vehicles.FirstOrDefaultAsync(v => v.Id == entity.VehicleId);

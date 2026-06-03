@@ -44,7 +44,6 @@
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="Auto"/>
                 </Grid.RowDefinitions>
 
                 <StackPanel Margin="0,0,10,12">
@@ -70,30 +69,21 @@
                 <StackPanel Grid.Row="1"
                             Grid.Column="1"
                             Margin="10,0,0,12">
-                    <TextBlock Text="نوع الرخصة"/>
-                    <ComboBox Height="40"
-                              ItemsSource="{Binding RegistrationTypes}"
-                              SelectedItem="{Binding LicenseRow.RegistrationType, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                              Style="{StaticResource AppComboBoxStyle}"/>
-                </StackPanel>
-
-                <StackPanel Grid.Row="2"
-                            Margin="0,0,10,12">
                     <TextBlock Text="رقم الشاسيه"/>
                     <TextBox Style="{StaticResource AppTextBoxStyle}"
                              Text="{Binding LicenseRow.ChassisNumber, UpdateSourceTrigger=PropertyChanged}"/>
                 </StackPanel>
 
                 <StackPanel Grid.Row="2"
-                            Grid.Column="1"
-                            Margin="10,0,0,12">
+                            Margin="0,0,10,12">
                     <TextBlock Text="رقم الموتور"/>
                     <TextBox Style="{StaticResource AppTextBoxStyle}"
                              Text="{Binding LicenseRow.EngineNumber, UpdateSourceTrigger=PropertyChanged}"/>
                 </StackPanel>
 
-                <StackPanel Grid.Row="3"
-                            Margin="0,0,10,12">
+                <StackPanel Grid.Row="2"
+                            Grid.Column="1"
+                            Margin="10,0,0,12">
                     <TextBlock Text="تغيير الزيت كل كام كم"/>
                     <TextBox Style="{StaticResource AppTextBoxStyle}"
                              ToolTip="مثال: 5000 أو 7000 حسب نوع العربية والزيت"
@@ -101,23 +91,23 @@
                 </StackPanel>
 
                 <StackPanel Grid.Row="3"
-                            Grid.Column="1"
-                            Margin="10,0,0,12">
+                            Margin="0,0,10,12">
                     <TextBlock Text="بداية الترخيص"/>
                     <DatePicker Height="40"
                                 SelectedDate="{Binding LicenseRow.RegistrationStartDate, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                                 Language="ar-EG"/>
                 </StackPanel>
 
-                <StackPanel Grid.Row="4"
-                            Margin="0,0,10,12">
+                <StackPanel Grid.Row="3"
+                            Grid.Column="1"
+                            Margin="10,0,0,12">
                     <TextBlock Text="نهاية الترخيص"/>
                     <DatePicker Height="40"
                                 SelectedDate="{Binding LicenseRow.RegistrationExpiryDate, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                                 Language="ar-EG"/>
                 </StackPanel>
 
-                <Border Grid.Row="5"
+                <Border Grid.Row="4"
                         Grid.ColumnSpan="2"
                         Background="{StaticResource SurfaceAltBrush}"
                         BorderBrush="{StaticResource BorderBrush}"

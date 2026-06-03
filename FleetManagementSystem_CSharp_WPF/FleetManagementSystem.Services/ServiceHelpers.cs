@@ -132,6 +132,7 @@ internal static class ServiceHelpers
             "closed" or "completed" => "مغلق",
             "pending" => "معلق",
             "scheduled" or "planned" => "مجدول",
+            "dailycheck" or "daily check" => "متابعة يومية",
             "duesoon" => "قريب",
             "due" => "مستحق",
             "overdue" => "متأخر",
@@ -139,6 +140,22 @@ internal static class ServiceHelpers
             "maintenance" => "صيانة",
             "returned" => "مرتجع",
             _ => Clean(status)
+        };
+    }
+
+    public static string OilStatusDisplay(string? status, bool isOilChanged)
+    {
+        var normalized = Clean(status).ToLowerInvariant();
+        return normalized switch
+        {
+            "oilchanged" => "تغيير زيت",
+            "completed" when isOilChanged => "تغيير زيت",
+            "dailycheck" or "daily check" => "متابعة يومية",
+            "duesoon" => "قريب",
+            "overdue" => "متأخر",
+            "" when isOilChanged => "تغيير زيت",
+            "" => "متابعة يومية",
+            _ => StatusDisplay(status)
         };
     }
 
@@ -167,7 +184,15 @@ internal static class ServiceHelpers
             },
             UserRole.TreasuryOfficer => new List<string>
             {
-                "Dashboard", "Fuel", "Expenses", "Treasury", "Reports", "Notifications"
+                "Dashboard", "Treasury"
+            },
+            UserRole.TripsLicensesOfficer => new List<string>
+            {
+                "Dashboard", "Trips", "Licenses"
+            },
+            UserRole.InsuranceOfficer => new List<string>
+            {
+                "Dashboard", "Insurance"
             },
             UserRole.Viewer => new List<string>
             {
@@ -314,8 +339,8 @@ internal static class ServiceHelpers
             Distance = entity.Distance,
             Purpose = entity.Purpose,
             Status = entity.Status,
-            FuelConsumed = entity.FuelConsumed,
-            TripCost = entity.TripCost,
+            FuelConsumed = 0,
+            TripCost = 0,
             Notes = entity.Notes
         };
 
@@ -361,10 +386,11 @@ internal static class ServiceHelpers
 
     public static OilChangeDto ToDto(this OilChange entity)
     {
-        var currentMileage = entity.Vehicle?.Mileage ?? 0;
-        var kmSinceOilChange = entity.Vehicle is null ? 0 : Math.Max(0, currentMileage - entity.OdometerAtChange);
-        var remainingKm = entity.NextOilChangeOdometer - currentMileage;
-        var isDue = entity.Vehicle is not null && remainingKm <= DefaultOilAlertThresholdKm;
+        var currentVehicleMileage = entity.Vehicle?.Mileage ?? entity.CurrentOdometer ?? 0;
+        var currentOdometer = entity.CurrentOdometer ?? currentVehicleMileage;
+        var kmSinceOilChange = Math.Max(0, currentOdometer - entity.OdometerAtChange);
+        var remainingKm = entity.NextOilChangeOdometer - currentOdometer;
+        var isDue = remainingKm <= DefaultOilAlertThresholdKm;
 
         return new OilChangeDto
         {
@@ -377,12 +403,17 @@ internal static class ServiceHelpers
             Quantity = entity.Quantity,
             Cost = entity.Cost,
             NextOilChangeOdometer = entity.NextOilChangeOdometer,
-            CurrentVehicleMileage = currentMileage,
+            CurrentOdometer = currentOdometer,
+            CurrentOdometerDate = entity.CurrentOdometerDate,
+            IsOilChanged = entity.IsOilChanged,
+            RecordType = entity.IsOilChanged ? "تغيير زيت" : "متابعة يومية",
+            ServiceItems = entity.ServiceItems,
+            CurrentVehicleMileage = currentVehicleMileage,
             OilChangeIntervalKm = entity.Vehicle?.OilChangeIntervalKm ?? 0,
             KmSinceOilChange = kmSinceOilChange,
             RemainingKm = remainingKm,
             OilAlert = BuildOilAlert(remainingKm),
-            Status = entity.Status,
+            Status = OilStatusDisplay(entity.Status, entity.IsOilChanged),
             IsDue = isDue,
             Notes = entity.Notes
         };

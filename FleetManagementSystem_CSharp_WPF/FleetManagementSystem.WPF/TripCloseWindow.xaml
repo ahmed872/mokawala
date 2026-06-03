@@ -63,6 +63,7 @@
                 Padding="18">
             <StackPanel>
                 <TextBlock Text="إغلاق / تعديل التشغيلة"
+                           x:Name="HeaderTitleTextBlock"
                            FontSize="24"
                            FontWeight="Bold"
                            Foreground="{StaticResource TripCloseAccentBrush}" />
@@ -147,53 +148,29 @@
                     </StackPanel>
 
                     <StackPanel Grid.Row="2" Grid.Column="1" Margin="0,0,0,14">
-                        <TextBlock Text="عداد العربية الحالي" Style="{StaticResource TripCloseLabelStyle}" />
+                        <TextBlock Text="آخر عداد محفوظ للعربية قبل الحفظ" Style="{StaticResource TripCloseLabelStyle}" />
                         <TextBox x:Name="VehicleCurrentMileageTextBox"
                                  Style="{StaticResource TripCloseInputStyle}"
                                  IsReadOnly="True"
-                                 ToolTip="آخر عداد محفوظ للعربية من التشغيلات أو البنزين أو الزيت" />
-                    </StackPanel>
-
-                    <StackPanel Grid.Row="3" Margin="0,0,12,14">
-                        <TextBlock Text="حالة التشغيلة" Style="{StaticResource TripCloseLabelStyle}" />
-                        <ComboBox x:Name="StatusComboBox"
-                                  Height="40">
-                            <ComboBoxItem Content="مغلقة" Tag="Closed" />
-                            <ComboBoxItem Content="جارية" Tag="Open" />
-                        </ComboBox>
+                                 ToolTip="آخر عداد محفوظ للعربية من التشغيلات أو الزيت" />
                     </StackPanel>
 
                     <Border Grid.Row="3"
-                            Grid.Column="1"
+                            Grid.ColumnSpan="2"
                             Background="#F7FAFC"
                             BorderBrush="#D7E0E8"
                             BorderThickness="1"
                             CornerRadius="10"
                             Padding="12"
                             Margin="0,0,0,14">
-                        <TextBlock Text="اكتب عداد النهاية من قراءة العربية عند الرجوع. النظام لن يسمح بعداد نهاية أقل من البداية أو تاريخ إغلاق قبل بداية التشغيلة."
+                        <TextBlock Text="اكتب عداد النهاية من قراءة العربية عند الرجوع. النظام سيغلق التشغيلة ويحدث عداد العربية تلقائيًا، ولن يسمح بعداد نهاية أقل من البداية أو تاريخ إغلاق قبل بداية التشغيلة."
                                    Foreground="{StaticResource TripCloseTextBrush}"
                                    FontSize="13"
                                    FontWeight="SemiBold"
                                    TextWrapping="Wrap"/>
                     </Border>
 
-                    <Border Grid.Row="4"
-                            Grid.ColumnSpan="2"
-                            Background="#EAF2F7"
-                            BorderBrush="#C9DAE4"
-                            BorderThickness="1"
-                            CornerRadius="10"
-                            Padding="12"
-                            Margin="0,0,0,14">
-                        <TextBlock Text="البنزين والتكلفة يتم تسجيلهم من زر تسجيل بنزين في صفحة التشغيلات، ويتم حساب بنزين مسجل وتكلفة البنزين تلقائيًا من سجلات البنزين."
-                                   Foreground="{StaticResource TripCloseTextBrush}"
-                                   FontSize="13"
-                                   FontWeight="SemiBold"
-                                   TextWrapping="Wrap"/>
-                    </Border>
-
-                    <StackPanel Grid.Row="5" Grid.ColumnSpan="2" Margin="0,0,0,14">
+                    <StackPanel Grid.Row="4" Grid.ColumnSpan="2" Margin="0,0,0,14">
                         <TextBlock Text="ملاحظات" Style="{StaticResource TripCloseLabelStyle}" />
                         <TextBox x:Name="NotesTextBox"
                                  Height="92"
@@ -205,7 +182,7 @@
                     </StackPanel>
 
                     <TextBlock x:Name="ValidationTextBlock"
-                               Grid.Row="6"
+                               Grid.Row="5"
                                Grid.ColumnSpan="2"
                                Foreground="#B42318"
                                TextWrapping="Wrap" />
@@ -216,6 +193,7 @@
         <WrapPanel Grid.Row="2"
                    HorizontalAlignment="Left">
             <Button Style="{StaticResource TripCloseButtonStyle}"
+                    x:Name="SaveButton"
                     Click="SaveButton_Click">
                 حفظ
             </Button>

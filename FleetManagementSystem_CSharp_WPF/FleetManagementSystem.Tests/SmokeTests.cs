@@ -13,9 +13,51 @@ public class SmokeTests
         var company = await harness.Context.CompanySettings.FirstOrDefaultAsync();
 
         Assert.Contains(users, u => u.Username == "admin");
+        Assert.Contains(users, u => u.Username == "mahmoud" && u.Role == UserRole.Admin);
+        Assert.Contains(users, u => u.Username == "amr" && u.Role == UserRole.TreasuryOfficer);
+        Assert.Contains(users, u => u.Username == "abdelrahman" && u.Role == UserRole.TripsLicensesOfficer);
+        Assert.Contains(users, u => u.Username == "osama" && u.Role == UserRole.InsuranceOfficer);
         Assert.NotEmpty(vehicleTypes);
         Assert.NotEmpty(contractStatuses);
         Assert.NotNull(company);
+    }
+
+    [Fact]
+    public async Task BootstrapService_Seeds_RequestedOperationalUsersWithExactPermissions()
+    {
+        await using var harness = await TestHarness.CreateAsync();
+
+        var mahmoud = await harness.AuthenticationService.AuthenticateAsync(new UserLoginDto { Username = "mahmoud", Password = "mahmoud" });
+        var amr = await harness.AuthenticationService.AuthenticateAsync(new UserLoginDto { Username = "amr", Password = "amr" });
+        var abdelrahman = await harness.AuthenticationService.AuthenticateAsync(new UserLoginDto { Username = "abdelrahman", Password = "abdelrahman" });
+        var osama = await harness.AuthenticationService.AuthenticateAsync(new UserLoginDto { Username = "osama", Password = "osama" });
+
+        Assert.NotNull(mahmoud);
+        Assert.NotNull(amr);
+        Assert.NotNull(abdelrahman);
+        Assert.NotNull(osama);
+
+        Assert.Equal("Admin", mahmoud!.Role);
+        Assert.Contains("Users", mahmoud.AllowedModules);
+        Assert.Contains("Reports", mahmoud.AllowedModules);
+
+        Assert.Equal("TreasuryOfficer", amr!.Role);
+        Assert.Contains("Treasury", amr.AllowedModules);
+        Assert.DoesNotContain("Trips", amr.AllowedModules);
+        Assert.DoesNotContain("Licenses", amr.AllowedModules);
+        Assert.DoesNotContain("Insurance", amr.AllowedModules);
+
+        Assert.Equal("TripsLicensesOfficer", abdelrahman!.Role);
+        Assert.Contains("Trips", abdelrahman.AllowedModules);
+        Assert.Contains("Licenses", abdelrahman.AllowedModules);
+        Assert.DoesNotContain("Insurance", abdelrahman.AllowedModules);
+        Assert.DoesNotContain("Treasury", abdelrahman.AllowedModules);
+
+        Assert.Equal("InsuranceOfficer", osama!.Role);
+        Assert.Contains("Insurance", osama.AllowedModules);
+        Assert.DoesNotContain("Licenses", osama.AllowedModules);
+        Assert.DoesNotContain("Trips", osama.AllowedModules);
+        Assert.DoesNotContain("Treasury", osama.AllowedModules);
     }
 
     [Fact]
@@ -461,6 +503,135 @@ public class SmokeTests
 
         var metrics = await harness.ReportingService.GetDashboardMetricsAsync();
         Assert.True(metrics.OilChangesDue >= 1);
+    }
+
+    [Fact]
+    public async Task OilChangeService_SaveAsync_DailyFollowUp_UsesLastActualOilChangeAndUpdatesMileage()
+    {
+        await using var harness = await TestHarness.CreateAsync();
+        var vehicleTypeId = await harness.Context.VehicleTypes.Select(x => x.Id).FirstAsync();
+
+        var vehicle = await harness.VehicleService.SaveAsync(new VehicleFormDto
+        {
+            PlateNumber = "OIL-DAILY-001",
+            VehicleTypeId = vehicleTypeId,
+            Model = "Toyota Hiace",
+            Year = 2023,
+            Manufacturer = "Toyota",
+            Status = "Available",
+            PurchaseDate = DateTime.Today.AddMonths(-3),
+            CurrentMileage = 10000,
+            OilChangeIntervalKm = 5000,
+            MaintenanceIntervalKm = 15000
+        });
+
+        await harness.OilChangeService.SaveAsync(new OilChangeFormDto
+        {
+            VehicleId = vehicle.Id,
+            ChangeDate = DateTime.Today.AddDays(-1),
+            OdometerAtChange = 10000,
+            CurrentOdometer = 10000,
+            CurrentOdometerDate = DateTime.Today.AddDays(-1),
+            IsOilChanged = true,
+            ServiceItems = "زيت وفلتر",
+            OilType = "5W30",
+            Quantity = 5,
+            Cost = 850
+        });
+
+        var dailyFollowUp = await harness.OilChangeService.SaveAsync(new OilChangeFormDto
+        {
+            VehicleId = vehicle.Id,
+            ChangeDate = DateTime.Today,
+            CurrentOdometer = 10300,
+            CurrentOdometerDate = DateTime.Today,
+            IsOilChanged = false,
+            Notes = "متابعة يومية"
+        });
+
+        var vehicleAfterFollowUp = await harness.VehicleService.GetByIdAsync(vehicle.Id);
+
+        Assert.False(dailyFollowUp.IsOilChanged);
+        Assert.Equal(10000, dailyFollowUp.OdometerAtChange);
+        Assert.Equal(15000, dailyFollowUp.NextOilChangeOdometer);
+        Assert.Equal(10300, dailyFollowUp.CurrentOdometer);
+        Assert.Equal(4700, dailyFollowUp.RemainingKm);
+        Assert.Equal("متابعة يومية", dailyFollowUp.Status);
+        Assert.Equal(string.Empty, dailyFollowUp.ServiceItems);
+        Assert.Equal(string.Empty, dailyFollowUp.OilType);
+        Assert.Equal(10300, vehicleAfterFollowUp?.CurrentMileage);
+    }
+
+    [Fact]
+    public async Task OilChangeService_SaveAsync_OilAndFilterChange_PersistsServiceItems()
+    {
+        await using var harness = await TestHarness.CreateAsync();
+        var vehicleTypeId = await harness.Context.VehicleTypes.Select(x => x.Id).FirstAsync();
+
+        var vehicle = await harness.VehicleService.SaveAsync(new VehicleFormDto
+        {
+            PlateNumber = "OIL-FILTER-001",
+            VehicleTypeId = vehicleTypeId,
+            Model = "Hyundai HD",
+            Year = 2023,
+            Manufacturer = "Hyundai",
+            Status = "Available",
+            PurchaseDate = DateTime.Today.AddMonths(-3),
+            CurrentMileage = 12000,
+            OilChangeIntervalKm = 5000,
+            MaintenanceIntervalKm = 15000
+        });
+
+        var oilChange = await harness.OilChangeService.SaveAsync(new OilChangeFormDto
+        {
+            VehicleId = vehicle.Id,
+            ChangeDate = DateTime.Today,
+            OdometerAtChange = 12000,
+            CurrentOdometer = 12000,
+            CurrentOdometerDate = DateTime.Today,
+            IsOilChanged = true,
+            ServiceItems = "زيت وفلتر",
+            OilType = "15W40",
+            Quantity = 8,
+            Cost = 1300
+        });
+
+        Assert.True(oilChange.IsOilChanged);
+        Assert.Equal("زيت وفلتر", oilChange.ServiceItems);
+        Assert.Equal("تغيير زيت", oilChange.RecordType);
+        Assert.Equal(17000, oilChange.NextOilChangeOdometer);
+    }
+
+    [Fact]
+    public async Task OilChangeService_SaveAsync_DailyFollowUpBeforeFirstOilChange_IsRejected()
+    {
+        await using var harness = await TestHarness.CreateAsync();
+        var vehicleTypeId = await harness.Context.VehicleTypes.Select(x => x.Id).FirstAsync();
+
+        var vehicle = await harness.VehicleService.SaveAsync(new VehicleFormDto
+        {
+            PlateNumber = "OIL-DAILY-002",
+            VehicleTypeId = vehicleTypeId,
+            Model = "Hyundai H1",
+            Year = 2022,
+            Manufacturer = "Hyundai",
+            Status = "Available",
+            PurchaseDate = DateTime.Today.AddMonths(-3),
+            CurrentMileage = 7000,
+            OilChangeIntervalKm = 5000,
+            MaintenanceIntervalKm = 15000
+        });
+
+        var error = await Assert.ThrowsAsync<InvalidOperationException>(() => harness.OilChangeService.SaveAsync(new OilChangeFormDto
+        {
+            VehicleId = vehicle.Id,
+            ChangeDate = DateTime.Today,
+            CurrentOdometer = 7000,
+            CurrentOdometerDate = DateTime.Today,
+            IsOilChanged = false
+        }));
+
+        Assert.Contains("أول تغيير زيت فعلي", error.Message);
     }
 
     [Fact]

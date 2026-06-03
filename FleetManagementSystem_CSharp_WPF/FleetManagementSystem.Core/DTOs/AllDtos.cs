@@ -842,6 +842,11 @@ namespace FleetManagementSystem.Core.DTOs
         public decimal Quantity { get; set; }
         public decimal Cost { get; set; }
         public decimal NextOilChangeOdometer { get; set; }
+        public decimal CurrentOdometer { get; set; }
+        public DateTime? CurrentOdometerDate { get; set; }
+        public bool IsOilChanged { get; set; } = true;
+        public string RecordType { get; set; } = string.Empty;
+        public string ServiceItems { get; set; } = string.Empty;
         public decimal CurrentVehicleMileage { get; set; }
         public decimal OilChangeIntervalKm { get; set; }
         public decimal KmSinceOilChange { get; set; }
@@ -850,6 +855,8 @@ namespace FleetManagementSystem.Core.DTOs
         public string Status { get; set; } = string.Empty;
         public bool IsDue { get; set; }
         public string Notes { get; set; } = string.Empty;
+        public string QuantityDisplay => IsOilChanged ? Quantity.ToString("0.##") : string.Empty;
+        public string CostDisplay => IsOilChanged ? Cost.ToString("0.##") : string.Empty;
     }
 
     public class OilChangeFormDto
@@ -862,6 +869,10 @@ namespace FleetManagementSystem.Core.DTOs
         public decimal Quantity { get; set; }
         public decimal Cost { get; set; }
         public decimal NextOilChangeOdometer { get; set; }
+        public decimal CurrentOdometer { get; set; }
+        public DateTime? CurrentOdometerDate { get; set; }
+        public bool IsOilChanged { get; set; } = true;
+        public string ServiceItems { get; set; } = string.Empty;
         public string Status { get; set; } = "Scheduled";
         public string Notes { get; set; } = string.Empty;
     }

@@ -28,7 +28,7 @@ public partial class LoginWindow : Window
         _connectionSettingsStore = connectionSettingsStore;
         _connectionProfile = connectionProfile;
         _serviceProvider = serviceProvider;
-        CompanyNameTextBlock.Text = "نظام إدارة الأسطول";
+        CompanyNameTextBlock.Text = "شركة جوميكس للحركة والمعدات";
 
         Loaded += LoginWindow_Loaded;
     }
@@ -40,8 +40,9 @@ public partial class LoginWindow : Window
             var settings = await _settingsService.GetSettingsAsync();
             if (!string.IsNullOrWhiteSpace(settings.CompanyName))
             {
-                CompanyNameTextBlock.Text = settings.CompanyName;
-                Title = $"تسجيل الدخول - {settings.CompanyName}";
+                var companyName = NormalizeCompanyName(settings.CompanyName);
+                CompanyNameTextBlock.Text = companyName;
+                Title = $"تسجيل الدخول - {companyName}";
                 SystemNameTextBlock.Text = "تسجيل الدخول إلى النظام";
             }
         }
@@ -52,6 +53,17 @@ public partial class LoginWindow : Window
 
         UsernameTextBox.Focus();
         UsernameTextBox.SelectAll();
+    }
+
+    private static string NormalizeCompanyName(string companyName)
+    {
+        if (companyName.Contains("شركه جوميكس", StringComparison.OrdinalIgnoreCase) ||
+            companyName.Contains("للحركه", StringComparison.OrdinalIgnoreCase))
+        {
+            return "شركة جوميكس للحركة والمعدات";
+        }
+
+        return companyName;
     }
 
     private async void LoginButton_Click(object sender, RoutedEventArgs e)

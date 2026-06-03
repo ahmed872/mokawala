@@ -8,20 +8,23 @@ namespace FleetManagementSystem.WPF;
 public partial class OilChangeEntryWindow : Window
 {
     private readonly IReadOnlyList<VehicleDto> _vehicles;
+    private readonly IReadOnlyList<OilChangeDto> _existingOilChanges;
     private readonly int _sourceId;
-    private readonly decimal _sourceNextOdometer;
 
     public OilChangeFormDto? OilChangeForm { get; private set; }
 
-    public OilChangeEntryWindow(IEnumerable<VehicleDto> vehicles, OilChangeDto source)
+    public OilChangeEntryWindow(
+        IEnumerable<VehicleDto> vehicles,
+        OilChangeDto source,
+        IEnumerable<OilChangeDto>? existingOilChanges = null)
     {
         InitializeComponent();
 
         _sourceId = source.Id;
-        _sourceNextOdometer = source.NextOilChangeOdometer;
         _vehicles = vehicles
             .OrderBy(vehicle => vehicle.PlateNumber)
             .ToList();
+        _existingOilChanges = (existingOilChanges ?? Enumerable.Empty<OilChangeDto>()).ToList();
 
         VehicleComboBox.ItemsSource = _vehicles;
         VehicleComboBox.SelectedValue = source.VehicleId > 0
@@ -30,15 +33,28 @@ public partial class OilChangeEntryWindow : Window
 
         var selectedVehicleId = VehicleComboBox.SelectedValue is int value ? value : 0;
         var selectedVehicle = _vehicles.FirstOrDefault(vehicle => vehicle.Id == selectedVehicleId);
-        ChangeDatePicker.SelectedDate = source.ChangeDate == default ? DateTime.Today : source.ChangeDate.Date;
+        var isOilChanged = source.IsOilChanged || source.Id == 0 && !HasLatestOilChange(selectedVehicle?.Id ?? 0);
+
+        ChangeDatePicker.SelectedDate = source.Id == 0 ? DateTime.Today : source.CurrentOdometerDate?.Date ?? source.ChangeDate.Date;
+        CurrentOdometerTextBox.Text = source.CurrentOdometer > 0
+            ? source.CurrentOdometer.ToString("0.##")
+            : (selectedVehicle?.CurrentMileage ?? source.CurrentVehicleMileage).ToString("0.##");
         OdometerTextBox.Text = source.OdometerAtChange > 0
             ? source.OdometerAtChange.ToString("0.##")
             : (selectedVehicle?.CurrentMileage ?? 0).ToString("0.##");
-        OilTypeTextBox.Text = source.OilType;
-        QuantityTextBox.Text = source.Quantity.ToString("0.##");
-        CostTextBox.Text = source.Cost.ToString("0.##");
+        OilTypeTextBox.Text = source.IsOilChanged ? source.OilType : string.Empty;
+        QuantityTextBox.Text = source.IsOilChanged ? source.Quantity.ToString("0.##") : "0";
+        CostTextBox.Text = source.IsOilChanged ? source.Cost.ToString("0.##") : "0";
         NotesTextBox.Text = source.Notes;
-        SelectStatus(source.Status);
+        SelectServiceItems(source.ServiceItems);
+        SelectEntryMode(isOilChanged);
+
+        if (source.Id == 0 && !isOilChanged)
+        {
+            ApplyLatestOilChangeToChangeFields(selectedVehicle);
+        }
+
+        UpdateChangeFieldsEnabled();
         UpdateVehicleSummary();
     }
 
@@ -46,11 +62,29 @@ public partial class OilChangeEntryWindow : Window
     {
         UpdateVehicleSummary();
 
-        if (VehicleComboBox.SelectedItem is VehicleDto vehicle && (_sourceId == 0 || IsZeroOrEmpty(OdometerTextBox.Text)))
+        if (VehicleComboBox.SelectedItem is not VehicleDto vehicle)
         {
-            OdometerTextBox.Text = vehicle.CurrentMileage.ToString("0.##");
+            return;
         }
 
+        if (_sourceId == 0)
+        {
+            CurrentOdometerTextBox.Text = vehicle.CurrentMileage.ToString("0.##");
+            ChangeDatePicker.SelectedDate = DateTime.Today;
+
+            if (HasLatestOilChange(vehicle.Id))
+            {
+                SelectEntryMode(false);
+                ApplyLatestOilChangeToChangeFields(vehicle);
+            }
+            else
+            {
+                SelectEntryMode(true);
+                OdometerTextBox.Text = vehicle.CurrentMileage.ToString("0.##");
+            }
+        }
+
+        UpdateChangeFieldsEnabled();
         UpdateNextOilChangePreview();
     }
 
@@ -64,43 +98,76 @@ public partial class OilChangeEntryWindow : Window
             return;
         }
 
+        var isOilChanged = IsOilChangeMode();
+        var serviceItems = GetSelectedServiceItems();
+        if (!isOilChanged && GetLatestOilChange(vehicle.Id) is null)
+        {
+            ShowValidation("لا يمكن تسجيل متابعة يومية قبل تسجيل أول تغيير زيت فعلي لهذه العربية.");
+            return;
+        }
+
         if (!TryParseDecimal(OdometerTextBox.Text, out var odometer) || odometer < 0)
         {
-            ShowValidation("عداد العربية وقت تغيير الزيت يجب أن يكون رقمًا لا يقل عن صفر.");
+            ShowValidation(isOilChanged
+                ? "عداد العربية وقت تغيير الزيت يجب أن يكون رقمًا لا يقل عن صفر."
+                : "لا يوجد آخر عداد تغيير زيت فعلي لهذه العربية. اختر نوع التسجيل: تغيير زيت، وسجل أول تغيير.");
             return;
         }
 
-        if (string.IsNullOrWhiteSpace(OilTypeTextBox.Text))
+        decimal currentOdometer;
+        var recordDate = isOilChanged || _sourceId != 0
+            ? ChangeDatePicker.SelectedDate ?? DateTime.Today
+            : DateTime.Today;
+
+        decimal quantity = 0;
+        decimal cost = 0;
+        var oilType = string.Empty;
+
+        if (isOilChanged)
         {
-            ShowValidation("نوع الزيت مطلوب. اكتب نوع الزيت المستخدم قبل الحفظ.");
-            return;
-        }
+            currentOdometer = odometer;
+            oilType = OilTypeTextBox.Text.Trim();
+            if (string.IsNullOrWhiteSpace(oilType))
+            {
+                ShowValidation("نوع الزيت مطلوب عند تسجيل تغيير زيت فعلي.");
+                return;
+            }
 
-        if (!TryParseDecimal(QuantityTextBox.Text, out var quantity) || quantity <= 0)
+            if (!TryParseDecimal(QuantityTextBox.Text, out quantity) || quantity <= 0)
+            {
+                ShowValidation("كمية الزيت لازم تكون أكبر من صفر لتر عند تسجيل تغيير زيت فعلي.");
+                return;
+            }
+
+            if (!TryParseDecimal(CostTextBox.Text, out cost) || cost < 0)
+            {
+                ShowValidation("تكلفة الزيت يجب أن تكون رقمًا لا يقل عن صفر.");
+                return;
+            }
+        }
+        else
         {
-            ShowValidation("كمية الزيت لازم تكون أكبر من صفر لتر.");
-            return;
+            if (!TryParseDecimal(CurrentOdometerTextBox.Text, out currentOdometer) || currentOdometer < 0)
+            {
+                ShowValidation("قراءة العداد اليوم يجب أن تكون رقمًا لا يقل عن صفر.");
+                return;
+            }
         }
-
-        if (!TryParseDecimal(CostTextBox.Text, out var cost) || cost < 0)
-        {
-            ShowValidation("تكلفة الزيت يجب أن تكون رقمًا لا يقل عن صفر.");
-            return;
-        }
-
-        var status = (StatusComboBox.SelectedItem as ComboBoxItem)?.Tag?.ToString() ?? "Completed";
 
         OilChangeForm = new OilChangeFormDto
         {
             Id = _sourceId,
             VehicleId = vehicle.Id,
-            ChangeDate = ChangeDatePicker.SelectedDate ?? DateTime.Today,
+            ChangeDate = recordDate,
             OdometerAtChange = odometer,
-            OilType = OilTypeTextBox.Text.Trim(),
+            CurrentOdometer = currentOdometer,
+            CurrentOdometerDate = recordDate,
+            IsOilChanged = isOilChanged,
+            ServiceItems = serviceItems,
+            OilType = oilType,
             Quantity = quantity,
             Cost = cost,
-            NextOilChangeOdometer = _sourceNextOdometer,
-            Status = status,
+            Status = isOilChanged ? "Completed" : "DailyCheck",
             Notes = NotesTextBox.Text.Trim()
         };
 
@@ -114,6 +181,7 @@ public partial class OilChangeEntryWindow : Window
             VehicleMileageTextBlock.Text = "—";
             VehicleOilIntervalTextBlock.Text = "—";
             NextOilChangePreviewTextBlock.Text = "—";
+            UpdateOilStatusPreview();
             return;
         }
 
@@ -122,9 +190,117 @@ public partial class OilChangeEntryWindow : Window
             ? $"{vehicle.OilChangeIntervalKm:0.##} كم"
             : "غير مسجلة";
         UpdateNextOilChangePreview();
+        UpdateOilStatusPreview();
     }
 
-    private void OilOdometerTextBox_TextChanged(object sender, TextChangedEventArgs e) => UpdateNextOilChangePreview();
+    private void OilOdometerTextBox_TextChanged(object sender, TextChangedEventArgs e)
+    {
+        UpdateNextOilChangePreview();
+        UpdateOilStatusPreview();
+    }
+
+    private void OilEntryModeComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (VehicleComboBox.SelectedItem is VehicleDto vehicle && !IsOilChangeMode())
+        {
+            ApplyLatestOilChangeToChangeFields(vehicle);
+        }
+
+        UpdateChangeFieldsEnabled();
+        UpdateNextOilChangePreview();
+        UpdateOilStatusPreview();
+    }
+
+    private void UpdateChangeFieldsEnabled()
+    {
+        var enabled = IsOilChangeMode();
+        ChangeDetailsPanel.Visibility = enabled ? Visibility.Visible : Visibility.Collapsed;
+        CurrentOdometerPanel.Visibility = enabled ? Visibility.Collapsed : Visibility.Visible;
+        ChangeDatePicker.IsEnabled = enabled || _sourceId != 0;
+
+        if (!enabled && _sourceId == 0)
+        {
+            ChangeDatePicker.SelectedDate = DateTime.Today;
+        }
+
+        if (enabled && TryParseDecimal(OdometerTextBox.Text, out var odometer))
+        {
+            CurrentOdometerTextBox.Text = odometer.ToString("0.##");
+        }
+
+        if (enabled && ServiceItemsComboBox.SelectedItem is null)
+        {
+            SelectServiceItems("زيت فقط");
+        }
+    }
+
+    private void SelectEntryMode(bool isOilChanged)
+    {
+        if (OilEntryModeComboBox is null)
+        {
+            return;
+        }
+
+        var targetTag = isOilChanged ? "OilChange" : "DailyCheck";
+        foreach (ComboBoxItem item in OilEntryModeComboBox.Items)
+        {
+            if (string.Equals(item.Tag?.ToString(), targetTag, StringComparison.OrdinalIgnoreCase))
+            {
+                OilEntryModeComboBox.SelectedItem = item;
+                return;
+            }
+        }
+
+        OilEntryModeComboBox.SelectedIndex = isOilChanged ? 1 : 0;
+    }
+
+    private bool IsOilChangeMode() =>
+        (OilEntryModeComboBox?.SelectedItem as ComboBoxItem)?.Tag?.ToString() == "OilChange";
+
+    private void SelectServiceItems(string? value)
+    {
+        var normalized = NormalizeServiceItems(value);
+        foreach (ComboBoxItem item in ServiceItemsComboBox.Items)
+        {
+            if (string.Equals(item.Tag?.ToString(), normalized, StringComparison.OrdinalIgnoreCase))
+            {
+                ServiceItemsComboBox.SelectedItem = item;
+                return;
+            }
+        }
+
+        ServiceItemsComboBox.SelectedIndex = 0;
+    }
+
+    private string GetSelectedServiceItems() =>
+        (ServiceItemsComboBox.SelectedItem as ComboBoxItem)?.Tag?.ToString() ?? "زيت فقط";
+
+    private static string NormalizeServiceItems(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return "زيت فقط";
+        }
+
+        return value.Contains("فلتر", StringComparison.OrdinalIgnoreCase) ||
+               value.Contains("filter", StringComparison.OrdinalIgnoreCase)
+            ? "زيت وفلتر"
+            : "زيت فقط";
+    }
+
+    private void ApplyLatestOilChangeToChangeFields(VehicleDto? vehicle)
+    {
+        var latest = vehicle is null ? null : GetLatestOilChange(vehicle.Id);
+        if (latest is null)
+        {
+            return;
+        }
+
+        OdometerTextBox.Text = latest.OdometerAtChange.ToString("0.##");
+        OilTypeTextBox.Text = string.Empty;
+        QuantityTextBox.Text = "0";
+        CostTextBox.Text = "0";
+    }
 
     private void UpdateNextOilChangePreview()
     {
@@ -139,29 +315,88 @@ public partial class OilChangeEntryWindow : Window
             return;
         }
 
-        NextOilChangePreviewTextBlock.Text = TryParseDecimal(OdometerTextBox.Text, out var odometer) && odometer >= 0
-            ? $"{odometer + vehicle.OilChangeIntervalKm:0.##} كم"
-            : "—";
-    }
-
-    private void SelectStatus(string? status)
-    {
-        var normalized = string.IsNullOrWhiteSpace(status) ? "Completed" : status.Trim();
-        foreach (ComboBoxItem item in StatusComboBox.Items)
+        if (TryParseDecimal(OdometerTextBox.Text, out var odometer) && odometer >= 0)
         {
-            if (string.Equals(item.Tag?.ToString(), normalized, StringComparison.OrdinalIgnoreCase))
-            {
-                StatusComboBox.SelectedItem = item;
-                return;
-            }
+            NextOilChangePreviewTextBlock.Text = $"{odometer + vehicle.OilChangeIntervalKm:0.##} كم";
+            return;
         }
 
-        StatusComboBox.SelectedIndex = 0;
+        NextOilChangePreviewTextBlock.Text = "—";
     }
 
-    private static bool IsZeroOrEmpty(string? value) =>
-        string.IsNullOrWhiteSpace(value) ||
-        (TryParseDecimal(value, out var parsed) && parsed == 0);
+    private void UpdateOilStatusPreview()
+    {
+        if (OilStatusTextBlock is null)
+        {
+            return;
+        }
+
+        if (VehicleComboBox.SelectedItem is not VehicleDto vehicle)
+        {
+            OilStatusTextBlock.Text = "اختر العربية لعرض حالة الزيت.";
+            return;
+        }
+
+        if (vehicle.OilChangeIntervalKm <= 0)
+        {
+            OilStatusTextBlock.Text = "قيمة تغيير الزيت كل كام كم غير مسجلة لهذه العربية.";
+            return;
+        }
+
+        var isOilChanged = IsOilChangeMode();
+        if (isOilChanged)
+        {
+            if (!TryParseDecimal(OdometerTextBox.Text, out var changeOdometer) || changeOdometer < 0)
+            {
+                OilStatusTextBlock.Text = "اكتب عداد تغيير الزيت لعرض الحالة.";
+                return;
+            }
+
+            var nextOdometer = changeOdometer + vehicle.OilChangeIntervalKm;
+            OilStatusTextBlock.Text = $"بعد الحفظ: التغيير القادم عند {nextOdometer:0.##} كم. المتبقي من نقطة التغيير {vehicle.OilChangeIntervalKm:0.##} كم.";
+            return;
+        }
+
+        var latestOilChange = GetLatestOilChange(vehicle.Id);
+        if (latestOilChange is null)
+        {
+            OilStatusTextBlock.Text = "لا يوجد تغيير زيت فعلي مسجل لهذه العربية. سجل أول تغيير زيت أولًا.";
+            return;
+        }
+
+        if (!TryParseDecimal(CurrentOdometerTextBox.Text, out var currentOdometer) || currentOdometer < 0)
+        {
+            OilStatusTextBlock.Text = "اكتب قراءة العداد اليوم لعرض حالة الزيت.";
+            return;
+        }
+
+        var nextOilOdometer = latestOilChange.OdometerAtChange + vehicle.OilChangeIntervalKm;
+        var remainingKm = nextOilOdometer - currentOdometer;
+        OilStatusTextBlock.Text = $"{BuildOilAlertText(remainingKm)}. التغيير القادم عند {nextOilOdometer:0.##} كم.";
+    }
+
+    private const decimal OilAlertThresholdKm = 500;
+
+    private static string BuildOilAlertText(decimal remainingKm)
+    {
+        if (remainingKm < 0)
+        {
+            return $"تغيير الزيت متأخر بـ {Math.Abs(remainingKm):0} كم";
+        }
+
+        return remainingKm <= OilAlertThresholdKm
+            ? $"متبقي {remainingKm:0} كم على تغيير الزيت"
+            : $"حالة الزيت سليمة، متبقي {remainingKm:0} كم";
+    }
+
+    private OilChangeDto? GetLatestOilChange(int vehicleId) =>
+        _existingOilChanges
+            .Where(oil => oil.VehicleId == vehicleId && oil.Id != _sourceId && oil.IsOilChanged)
+            .OrderByDescending(oil => oil.OdometerAtChange)
+            .ThenByDescending(oil => oil.ChangeDate)
+            .FirstOrDefault();
+
+    private bool HasLatestOilChange(int vehicleId) => GetLatestOilChange(vehicleId) is not null;
 
     private static bool TryParseDecimal(string value, out decimal result) =>
         decimal.TryParse(value.Trim(), NumberStyles.Number, CultureInfo.CurrentCulture, out result) ||

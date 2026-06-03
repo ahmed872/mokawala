@@ -401,8 +401,8 @@
                                 Style="{StaticResource TripSummaryCellStyle}"
                                 BorderThickness="0,0,1,1">
                             <StackPanel>
-                                <TextBlock Text="نوع السيارة" Style="{StaticResource TripPopupLabelStyle}" />
-                                <TextBlock x:Name="VehicleTypeTextBlock" Style="{StaticResource TripPopupValueStyle}" Text="—" />
+                                <TextBlock Text="سنة الصنع" Style="{StaticResource TripPopupLabelStyle}" />
+                                <TextBlock x:Name="VehicleYearTextBlock" Style="{StaticResource TripPopupValueStyle}" Text="—" />
                             </StackPanel>
                         </Border>
                         <Border Grid.Row="2"

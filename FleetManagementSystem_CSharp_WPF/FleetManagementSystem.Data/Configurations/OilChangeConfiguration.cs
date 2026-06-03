@@ -10,6 +10,7 @@ namespace FleetManagementSystem.Data.Configurations
         {
             builder.HasKey(x => x.Id);
             builder.Property(x => x.OilType).HasMaxLength(100);
+            builder.Property(x => x.ServiceItems).HasMaxLength(50);
             builder.Property(x => x.Status).HasMaxLength(50);
             builder.Property(x => x.Notes).HasMaxLength(2000);
 

@@ -7,6 +7,8 @@ public enum UserRole
     OperationsDataEntry,
     MaintenanceOfficer,
     TreasuryOfficer,
+    TripsLicensesOfficer,
+    InsuranceOfficer,
     Viewer,
     Staff
 }

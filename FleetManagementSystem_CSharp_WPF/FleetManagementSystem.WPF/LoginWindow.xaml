@@ -103,10 +103,12 @@
 
                     <TextBlock x:Name="CompanyNameTextBlock"
                                Margin="0,18,0,0"
-                               FontSize="29"
+                               FontSize="26"
                                FontWeight="Bold"
                                Foreground="{StaticResource AccentBrush}"
-                               Text="نظام إدارة الأسطول" />
+                               Text="شركة جوميكس للحركة والمعدات"
+                               TextWrapping="Wrap"
+                               TextAlignment="Right" />
 
                     <TextBlock x:Name="SystemNameTextBlock"
                                Margin="0,8,0,0"
@@ -173,7 +175,7 @@
                            VerticalAlignment="Bottom"
                            HorizontalAlignment="Center"
                            Foreground="{StaticResource MutedBrush}">
-                    Fleet Management System
+                    Gomix Movement and Equipment
                 </TextBlock>
             </Grid>
         </Border>

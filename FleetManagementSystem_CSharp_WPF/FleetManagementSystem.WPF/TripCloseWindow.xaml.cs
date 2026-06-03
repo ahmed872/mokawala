@@ -18,6 +18,11 @@ public partial class TripCloseWindow : Window
         _trip = trip;
         _vehicle = vehicle;
 
+        var isClosed = IsClosed(trip);
+        Title = isClosed ? "تعديل بيانات إغلاق التشغيلة" : "إغلاق التشغيلة";
+        HeaderTitleTextBlock.Text = Title;
+        SaveButton.Content = isClosed ? "حفظ التعديل" : "حفظ الإغلاق";
+
         TripSummaryTextBlock.Text = $"العربية: {ValueOrDash(trip.VehiclePlateNumber)} - السائق: {ValueOrDash(trip.DriverName)} - المسار: {ValueOrDash(trip.StartLocation)} إلى {ValueOrDash(trip.EndLocation)}";
         StartDateTextBox.Text = trip.StartDate.ToString("yyyy-MM-dd HH:mm");
         StartMileageTextBox.Text = trip.StartMileage.ToString("0.##");
@@ -30,7 +35,6 @@ public partial class TripCloseWindow : Window
         UpdateDistanceFromMileage();
         NotesTextBox.Text = trip.Notes;
 
-        StatusComboBox.SelectedIndex = 0;
     }
 
     private void SaveButton_Click(object sender, RoutedEventArgs e)
@@ -72,10 +76,10 @@ public partial class TripCloseWindow : Window
             return;
         }
 
-        var status = (StatusComboBox.SelectedItem as ComboBoxItem)?.Tag?.ToString() ?? "Closed";
-        var endDate = status == "Closed" ? selectedDate.Date.Add(selectedTime) : (DateTime?)null;
-        var distance = status == "Closed" ? endMileage - startMileage : 0;
-        if (endDate.HasValue && endDate.Value < _trip.StartDate)
+        const string status = "Closed";
+        var endDate = selectedDate.Date.Add(selectedTime);
+        var distance = endMileage - startMileage;
+        if (endDate < _trip.StartDate)
         {
             ShowValidation($"تاريخ الإغلاق ({endDate:yyyy-MM-dd HH:mm}) قبل بداية التشغيلة ({_trip.StartDate:yyyy-MM-dd HH:mm}). اختر تاريخ ووقت إغلاق بعد بداية التشغيلة.");
             return;
@@ -94,12 +98,12 @@ public partial class TripCloseWindow : Window
             StartLocation = _trip.StartLocation,
             EndLocation = _trip.EndLocation,
             StartMileage = startMileage,
-            EndMileage = status == "Closed" ? endMileage : null,
+            EndMileage = endMileage,
             Distance = distance,
             Purpose = _trip.Purpose,
             Status = status,
-            FuelConsumed = _trip.FuelConsumed,
-            TripCost = _trip.TripCost,
+            FuelConsumed = 0,
+            TripCost = 0,
             Notes = NotesTextBox.Text.Trim()
         };
 

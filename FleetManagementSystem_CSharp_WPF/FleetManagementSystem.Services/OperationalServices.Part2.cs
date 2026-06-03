@@ -106,12 +106,6 @@ public sealed class FuelService(FleetDbContext context, IAuditService auditServi
         entity.Notes = ServiceHelpers.Clean(dto.Notes);
         entity.UpdatedAt = DateTime.UtcNow;
 
-        if (entity.Odometer.HasValue && entity.Odometer.Value > vehicle.Mileage)
-        {
-            vehicle.Mileage = entity.Odometer.Value;
-            vehicle.UpdatedAt = DateTime.UtcNow;
-        }
-
         await _context.SaveChangesAsync();
 
         if (entity.PaidFromTreasury)
@@ -339,52 +333,88 @@ public sealed class OilChangeService(FleetDbContext context, IAuditService audit
         var vehicle = await _context.Vehicles.FirstOrDefaultAsync(v => v.Id == dto.VehicleId)
             ?? throw new InvalidOperationException("المركبة غير موجودة.");
 
-        if (dto.OdometerAtChange < 0)
-        {
-            throw new InvalidOperationException("قراءة العداد لا يمكن أن تكون سالبة.");
-        }
-
-        if (dto.Id == 0 && dto.OdometerAtChange < vehicle.Mileage)
-        {
-            throw new InvalidOperationException(
-                $"عداد تغيير الزيت ({dto.OdometerAtChange:0.##}) أقل من عداد العربية الحالي ({vehicle.Mileage:0.##}). سجل التغيير على قراءة العداد الحالية أو قراءة أعلى منها فقط.");
-        }
-
-        if (string.IsNullOrWhiteSpace(dto.OilType))
-        {
-            throw new InvalidOperationException("نوع الزيت مطلوب قبل حفظ تغيير الزيت.");
-        }
-
-        if (dto.Quantity <= 0)
-        {
-            throw new InvalidOperationException("كمية الزيت يجب أن تكون أكبر من صفر لتر.");
-        }
-
-        if (dto.Cost < 0)
-        {
-            throw new InvalidOperationException("تكلفة الزيت لا يمكن أن تكون سالبة.");
-        }
-
         if (vehicle.OilChangeIntervalKm <= 0)
         {
             throw new InvalidOperationException("قيمة تغيير الزيت كل كام كم غير مسجلة للعربية. سجل عدد الكيلومترات بين كل تغيير زيت من بيانات العربية أولًا.");
         }
 
+        if (dto.OdometerAtChange < 0)
+        {
+            throw new InvalidOperationException("قراءة العداد لا يمكن أن تكون سالبة.");
+        }
+
+        var currentOdometer = dto.CurrentOdometer > 0
+            ? dto.CurrentOdometer
+            : Math.Max(vehicle.Mileage, dto.OdometerAtChange);
+        var currentOdometerDate = dto.CurrentOdometerDate?.Date ?? DateTime.Today;
+
+        if (currentOdometer < 0)
+        {
+            throw new InvalidOperationException("قراءة العداد اليوم لا يمكن أن تكون سالبة.");
+        }
+
+        if (currentOdometer < vehicle.Mileage)
+        {
+            throw new InvalidOperationException(
+                $"قراءة العداد اليوم ({currentOdometer:0.##}) أقل من آخر عداد محفوظ للعربية ({vehicle.Mileage:0.##}). راجع قراءة العداد قبل الحفظ.");
+        }
+
         var previousOilChanges = await _context.OilChanges
-            .Where(x => x.VehicleId == dto.VehicleId && x.Id != dto.Id)
-            .Select(x => new { x.Id, x.ChangeDate, x.OdometerAtChange })
+            .Where(x => x.VehicleId == dto.VehicleId && x.Id != dto.Id && x.IsOilChanged)
+            .Select(x => new { x.Id, x.ChangeDate, x.OdometerAtChange, x.NextOilChangeOdometer })
             .ToListAsync();
+
+        var latestOilChange = previousOilChanges
+            .OrderByDescending(x => x.OdometerAtChange)
+            .ThenByDescending(x => x.ChangeDate)
+            .FirstOrDefault();
+
+        if (!dto.IsOilChanged && latestOilChange is null)
+        {
+            throw new InvalidOperationException("لا يمكن تسجيل متابعة زيت يومية قبل تسجيل أول تغيير زيت فعلي للعربية.");
+        }
+
+        if (dto.IsOilChanged)
+        {
+            if (currentOdometer < dto.OdometerAtChange)
+            {
+                throw new InvalidOperationException(
+                    $"قراءة العداد اليوم ({currentOdometer:0.##}) لا يمكن أن تكون أقل من عداد تغيير الزيت ({dto.OdometerAtChange:0.##}).");
+            }
+
+            if (string.IsNullOrWhiteSpace(dto.OilType))
+            {
+                throw new InvalidOperationException("نوع الزيت مطلوب عند تسجيل تغيير زيت فعلي.");
+            }
+
+            if (dto.Quantity <= 0)
+            {
+                throw new InvalidOperationException("كمية الزيت يجب أن تكون أكبر من صفر لتر عند تسجيل تغيير زيت فعلي.");
+            }
+
+            if (dto.Cost < 0)
+            {
+                throw new InvalidOperationException("تكلفة الزيت لا يمكن أن تكون سالبة.");
+            }
+        }
+        else if (dto.Cost < 0)
+        {
+            throw new InvalidOperationException("تكلفة الزيت لا يمكن أن تكون سالبة.");
+        }
 
         var latestOilOdometer = previousOilChanges.Count == 0
             ? null
             : previousOilChanges.Max(x => (decimal?)x.OdometerAtChange);
 
-        if (latestOilOdometer.HasValue && dto.OdometerAtChange < latestOilOdometer.Value)
+        if (dto.IsOilChanged && latestOilOdometer.HasValue && dto.OdometerAtChange < latestOilOdometer.Value)
         {
             throw new InvalidOperationException($"قراءة عداد تغيير الزيت لا يمكن أن تكون أقل من آخر تغيير زيت مسجل لنفس العربية عند {latestOilOdometer.Value:0} كم.");
         }
 
-        var nextOilChangeOdometer = dto.OdometerAtChange + vehicle.OilChangeIntervalKm;
+        var odometerAtChange = dto.IsOilChanged
+            ? dto.OdometerAtChange
+            : latestOilChange!.OdometerAtChange;
+        var nextOilChangeOdometer = odometerAtChange + vehicle.OilChangeIntervalKm;
 
         OilChange entity;
         var action = dto.Id == 0 ? "Create" : "Update";
@@ -401,18 +431,22 @@ public sealed class OilChangeService(FleetDbContext context, IAuditService audit
 
         entity.VehicleId = dto.VehicleId;
         entity.ChangeDate = ServiceHelpers.OrToday(dto.ChangeDate);
-        entity.OdometerAtChange = dto.OdometerAtChange;
-        entity.OilType = ServiceHelpers.Clean(dto.OilType);
-        entity.Quantity = dto.Quantity;
-        entity.Cost = dto.Cost;
+        entity.OdometerAtChange = odometerAtChange;
+        entity.IsOilChanged = dto.IsOilChanged;
+        entity.ServiceItems = dto.IsOilChanged ? NormalizeOilServiceItems(dto.ServiceItems) : string.Empty;
+        entity.OilType = dto.IsOilChanged ? ServiceHelpers.Clean(dto.OilType) : string.Empty;
+        entity.Quantity = dto.IsOilChanged ? dto.Quantity : 0;
+        entity.Cost = dto.IsOilChanged ? dto.Cost : 0;
         entity.NextOilChangeOdometer = nextOilChangeOdometer;
-        var effectiveVehicleMileage = Math.Max(vehicle.Mileage, dto.OdometerAtChange);
+        entity.CurrentOdometer = currentOdometer;
+        entity.CurrentOdometerDate = currentOdometerDate;
+        var effectiveVehicleMileage = Math.Max(vehicle.Mileage, currentOdometer);
         var remainingKm = nextOilChangeOdometer - effectiveVehicleMileage;
         entity.Status = remainingKm < 0
             ? "Overdue"
             : remainingKm <= ServiceHelpers.DefaultOilAlertThresholdKm
                 ? "DueSoon"
-                : string.IsNullOrWhiteSpace(dto.Status) ? "Scheduled" : dto.Status;
+                : dto.IsOilChanged ? "Completed" : "DailyCheck";
         entity.Notes = ServiceHelpers.Clean(dto.Notes);
         entity.UpdatedAt = DateTime.UtcNow;
 
@@ -425,6 +459,20 @@ public sealed class OilChangeService(FleetDbContext context, IAuditService audit
         await _context.SaveChangesAsync();
         await _auditService.LogActionAsync(action, "OilChange", entity.Id, null, entity.Status);
         return (await GetByIdAsync(entity.Id))!;
+    }
+
+    private static string NormalizeOilServiceItems(string? serviceItems)
+    {
+        var value = ServiceHelpers.Clean(serviceItems);
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return "زيت فقط";
+        }
+
+        return value.Contains("فلتر", StringComparison.OrdinalIgnoreCase) ||
+               value.Contains("filter", StringComparison.OrdinalIgnoreCase)
+            ? "زيت وفلتر"
+            : "زيت فقط";
     }
 
     public async Task DeleteAsync(int id)

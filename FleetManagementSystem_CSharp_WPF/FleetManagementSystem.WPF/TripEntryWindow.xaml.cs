@@ -207,7 +207,9 @@ public partial class TripEntryWindow : Window
         var vehicle = GetSelectedVehicle();
 
         VehiclePlateTextBlock.Text = vehicle?.PlateNumber ?? "اختر سيارة";
-        VehicleTypeTextBlock.Text = vehicle?.VehicleType ?? "—";
+        VehicleYearTextBlock.Text = vehicle is null || vehicle.Year <= 0
+            ? "—"
+            : vehicle.Year.ToString(CultureInfo.InvariantCulture);
         VehicleModelTextBlock.Text = vehicle?.Model ?? "—";
         VehicleChassisTextBlock.Text = string.IsNullOrWhiteSpace(vehicle?.ChassisNumber) ? "—" : vehicle.ChassisNumber;
         VehicleEngineTextBlock.Text = string.IsNullOrWhiteSpace(vehicle?.EngineNumber) ? "—" : vehicle.EngineNumber;
