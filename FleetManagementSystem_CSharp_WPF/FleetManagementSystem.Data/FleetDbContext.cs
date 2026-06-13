@@ -21,6 +21,7 @@ namespace FleetManagementSystem.Data
         public DbSet<ServiceProvider> ServiceProviders { get; set; }
         public DbSet<MaintenanceRequest> MaintenanceRequests { get; set; }
         public DbSet<Driver> Drivers { get; set; }
+        public DbSet<DriverAttendance> DriverAttendances { get; set; }
         public DbSet<Employee> Employees { get; set; }
         public DbSet<Trip> Trips { get; set; }
         public DbSet<FuelTransaction> FuelTransactions { get; set; }
@@ -50,6 +51,7 @@ namespace FleetManagementSystem.Data
             modelBuilder.ApplyConfiguration(new ServiceProviderConfiguration());
             modelBuilder.ApplyConfiguration(new MaintenanceRequestConfiguration());
             modelBuilder.ApplyConfiguration(new DriverConfiguration());
+            modelBuilder.ApplyConfiguration(new DriverAttendanceConfiguration());
             modelBuilder.ApplyConfiguration(new EmployeeConfiguration());
             modelBuilder.ApplyConfiguration(new TripConfiguration());
             modelBuilder.ApplyConfiguration(new FuelTransactionConfiguration());

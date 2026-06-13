@@ -110,6 +110,7 @@ public partial class App : Application
         services.AddScoped<IContractService, ContractService>();
         services.AddScoped<IMaintenanceService, MaintenanceService>();
         services.AddScoped<IDriverService, DriverService>();
+        services.AddScoped<IDriverAttendanceService, DriverAttendanceService>();
         services.AddScoped<IEmployeeService, EmployeeService>();
         services.AddScoped<ITripService, TripService>();
         services.AddScoped<IFuelService, FuelService>();

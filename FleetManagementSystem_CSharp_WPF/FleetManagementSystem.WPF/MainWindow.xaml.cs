@@ -44,7 +44,8 @@ public partial class MainWindow : Window
         "MaintenanceType",
         "ServiceProvider",
         "Items",
-        "ConfirmPassword"
+        "ConfirmPassword",
+        "DriverId"
     };
 
     private static readonly Dictionary<string, string> ColumnHeaders = new(StringComparer.OrdinalIgnoreCase)
@@ -93,9 +94,41 @@ public partial class MainWindow : Window
         ["Address"] = "العنوان",
         ["DateOfBirth"] = "تاريخ الميلاد",
         ["LicenseNumber"] = "رقم الرخصة",
+        ["LicenseStartDate"] = "بداية الرخصة",
         ["LicenseExpiryDate"] = "انتهاء الرخصة",
         ["LicenseType"] = "نوع الرخصة",
+        ["IsCompanyInsured"] = "متأمن عليه",
+        ["Governorate"] = "المحافظة",
+        ["FullAddress"] = "العنوان بالكامل",
+        ["TrafficUnit"] = "وحدة المرور",
+        ["WorkLocation"] = "موقع العمل",
+        ["LicenseExpiryAlert"] = "إنذار الرخصة",
         ["IsActive"] = "نشط",
+        ["DayName"] = "اليوم",
+        ["WorkDate"] = "التاريخ",
+        ["DriverWorkLocation"] = "موقع عمل السائق",
+        ["AbsenceReason"] = "سبب الغياب",
+        ["SaturdayStatus"] = "السبت",
+        ["SaturdayReason"] = "سبب السبت",
+        ["SundayStatus"] = "الأحد",
+        ["SundayReason"] = "سبب الأحد",
+        ["MondayStatus"] = "الاثنين",
+        ["MondayReason"] = "سبب الاثنين",
+        ["TuesdayStatus"] = "الثلاثاء",
+        ["TuesdayReason"] = "سبب الثلاثاء",
+        ["WednesdayStatus"] = "الأربعاء",
+        ["WednesdayReason"] = "سبب الأربعاء",
+        ["ThursdayStatus"] = "الخميس",
+        ["ThursdayReason"] = "سبب الخميس",
+        ["FridayStatus"] = "الجمعة",
+        ["FridayReason"] = "سبب الجمعة",
+        ["PresentDays"] = "أيام الحضور",
+        ["AbsentDays"] = "أيام الغياب",
+        ["LeaveDays"] = "أيام الإجازة",
+        ["WorkedFridays"] = "جمعات عمل",
+        ["EarnedRestDays"] = "راحات مستحقة",
+        ["RemainingRestDays"] = "رصيد الراحة",
+        ["AbsenceReasons"] = "أسباب الغياب والإجازات",
         ["EmployeeId"] = "كود الموظف",
         ["Department"] = "القسم",
         ["Position"] = "الوظيفة",
@@ -147,6 +180,7 @@ public partial class MainWindow : Window
     private readonly IContractService _contractService;
     private readonly IMaintenanceService _maintenanceService;
     private readonly IDriverService _driverService;
+    private readonly IDriverAttendanceService _driverAttendanceService;
     private readonly IEmployeeService _employeeService;
     private readonly ITripService _tripService;
     private readonly IFuelService _fuelService;
@@ -167,6 +201,9 @@ public partial class MainWindow : Window
     private readonly ObservableCollection<ContractDto> _contracts = new();
     private readonly ObservableCollection<MaintenanceRequestDto> _maintenance = new();
     private readonly ObservableCollection<DriverDto> _drivers = new();
+    private readonly ObservableCollection<DriverDto> _driverReportDriverOptions = new();
+    private readonly ObservableCollection<DriverWeeklyAttendanceRow> _driverAttendanceWeekRows = new();
+    private readonly ObservableCollection<DriverReportDto> _driverReportRows = new();
     private readonly ObservableCollection<EmployeeDto> _employees = new();
     private readonly ObservableCollection<TripDto> _trips = new();
     private readonly ObservableCollection<FuelTransactionDto> _fuel = new();
@@ -189,6 +226,11 @@ public partial class MainWindow : Window
     private ReportDataDto? _currentReport;
     private readonly Dictionary<string, string> _reportColumnFilters = new(StringComparer.OrdinalIgnoreCase);
     private readonly DispatcherTimer _clockTimer;
+    private readonly DispatcherTimer _driverAutoSaveTimer;
+    private readonly DispatcherTimer _driverAttendanceAutoSaveTimer;
+    private bool _isLoadingDriverAttendanceWeek;
+    private bool _isSavingDriverAttendanceWeek;
+    private bool _isSavingDriver;
 
     public ObservableCollection<VehicleDto> VehiclesForBinding => _vehicles;
     public ObservableCollection<TripDto> TripsForBinding => _trips;
@@ -334,6 +376,8 @@ public partial class MainWindow : Window
             relatedEntityType switch
             {
                 "Vehicle" => "ترخيص",
+                "Driver" => "رخصة سائق",
+                "License" => "رخصة سائق",
                 "Insurance" => "تأمين",
                 "OilChange" => "زيت",
                 _ => "متابعة"
@@ -343,6 +387,8 @@ public partial class MainWindow : Window
             relatedEntityType switch
             {
                 "Vehicle" => "ر",
+                "Driver" => "س",
+                "License" => "س",
                 "Insurance" => "ت",
                 "OilChange" => "ز",
                 _ => "!"
@@ -399,6 +445,7 @@ public partial class MainWindow : Window
         _contractService = serviceProvider.GetRequiredService<IContractService>();
         _maintenanceService = serviceProvider.GetRequiredService<IMaintenanceService>();
         _driverService = serviceProvider.GetRequiredService<IDriverService>();
+        _driverAttendanceService = serviceProvider.GetRequiredService<IDriverAttendanceService>();
         _employeeService = serviceProvider.GetRequiredService<IEmployeeService>();
         _tripService = serviceProvider.GetRequiredService<ITripService>();
         _fuelService = serviceProvider.GetRequiredService<IFuelService>();
@@ -419,6 +466,8 @@ public partial class MainWindow : Window
         ContractsGrid.ItemsSource = _contracts;
         MaintenanceGrid.ItemsSource = _maintenance;
         DriversGrid.ItemsSource = _drivers;
+        DriverAttendanceGrid.ItemsSource = _driverAttendanceWeekRows;
+        DriverReportsGrid.ItemsSource = _driverReportRows;
         EmployeesGrid.ItemsSource = _employees;
         TripsGrid.ItemsSource = _trips;
         FuelGrid.ItemsSource = _fuel;
@@ -435,6 +484,10 @@ public partial class MainWindow : Window
         NotificationsListBox.ItemsSource = _notifications;
         UsersGrid.ItemsSource = _users;
         ReportVehicleComboBox.ItemsSource = _vehicles;
+        DriverReportDriverComboBox.ItemsSource = _driverReportDriverOptions;
+        DriverAttendanceWeekPicker.SelectedDate = StartOfDriverWeek(DateTime.Today);
+        DriverReportStartDatePicker.SelectedDate = StartOfDriverWeek(DateTime.Today);
+        DriverReportEndDatePicker.SelectedDate = StartOfDriverWeek(DateTime.Today).AddDays(6);
         UpdateReportVehicleFilterVisibility();
         ApplyReadableGridColumnWidths();
 
@@ -444,6 +497,26 @@ public partial class MainWindow : Window
         };
         _clockTimer.Tick += (_, _) => CurrentDateTimeTextBlock.Text = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
         _clockTimer.Start();
+
+        _driverAutoSaveTimer = new DispatcherTimer
+        {
+            Interval = TimeSpan.FromMilliseconds(900)
+        };
+        _driverAutoSaveTimer.Tick += async (_, _) =>
+        {
+            _driverAutoSaveTimer.Stop();
+            await RunSafeAsync(SaveSelectedDriverSilentlyAsync);
+        };
+
+        _driverAttendanceAutoSaveTimer = new DispatcherTimer
+        {
+            Interval = TimeSpan.FromMilliseconds(900)
+        };
+        _driverAttendanceAutoSaveTimer.Tick += async (_, _) =>
+        {
+            _driverAttendanceAutoSaveTimer.Stop();
+            await RunSafeAsync(SaveDriverAttendanceWeekSilentlyAsync);
+        };
         CurrentDateTimeTextBlock.Text = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
         UpdateTripsSummary();
 
@@ -467,7 +540,6 @@ public partial class MainWindow : Window
             ? Visibility.Visible
             : Visibility.Collapsed;
         AdminAddUserButton.Visibility = adminShortcutVisibility;
-        AdminAddDriverButton.Visibility = adminShortcutVisibility;
         AdminAddSupervisorButton.Visibility = adminShortcutVisibility;
         ConnectionInfoTextBlock.Text = GetOperationalStatusText();
         DatabaseSettingsSummaryTextBlock.Text = GetConnectionSummaryText();
@@ -489,6 +561,7 @@ public partial class MainWindow : Window
         await LoadContractsAsync();
         await LoadMaintenanceAsync();
         await LoadDriversAsync();
+        await LoadDriverAttendanceWeekAsync();
         await LoadEmployeesAsync();
         await LoadTripsAsync();
         await LoadFuelAsync();
@@ -592,6 +665,8 @@ public partial class MainWindow : Window
 
     private static bool IsDashboardRenewalAlert(AlertDto alert) =>
         string.Equals(alert.RelatedEntityType, "Vehicle", StringComparison.OrdinalIgnoreCase) ||
+        string.Equals(alert.RelatedEntityType, "Driver", StringComparison.OrdinalIgnoreCase) ||
+        string.Equals(alert.RelatedEntityType, "License", StringComparison.OrdinalIgnoreCase) ||
         string.Equals(alert.RelatedEntityType, "Insurance", StringComparison.OrdinalIgnoreCase) ||
         string.Equals(alert.RelatedEntityType, "OilChange", StringComparison.OrdinalIgnoreCase);
 
@@ -633,9 +708,205 @@ public partial class MainWindow : Window
     }
     private async Task LoadContractsAsync() => ReplaceCollection(_contracts, await _contractService.GetAllAsync());
     private async Task LoadMaintenanceAsync() => ReplaceCollection(_maintenance, await _maintenanceService.GetAllAsync());
-    private async Task LoadDriversAsync() => ReplaceCollection(_drivers, await _driverService.GetAllAsync());
+    private async Task LoadDriversAsync()
+    {
+        var selectedDriverId = DriverReportDriverComboBox.SelectedValue is int id ? id : 0;
+        ReplaceCollection(_drivers, await _driverService.GetAllAsync());
+        ApplyDriverFilters();
+        _driverReportDriverOptions.Clear();
+        _driverReportDriverOptions.Add(new DriverDto { Id = 0, FullName = "كل السائقين" });
+        foreach (var driver in _drivers)
+        {
+            _driverReportDriverOptions.Add(driver);
+        }
+
+        DriverReportDriverComboBox.SelectedValue = _driverReportDriverOptions.Any(x => x.Id == selectedDriverId)
+            ? selectedDriverId
+            : 0;
+    }
+
+    private async Task LoadDriverAttendanceWeekAsync()
+    {
+        _isLoadingDriverAttendanceWeek = true;
+        try
+        {
+            var weekStart = GetSelectedDriverWeekStart();
+            var records = await _driverAttendanceService.GetWeekAsync(weekStart);
+            var rows = _drivers
+                .Where(driver => driver.IsActive)
+                .OrderBy(driver => driver.FullName, StringComparer.CurrentCultureIgnoreCase)
+                .Select(driver => BuildDriverWeekRow(driver, records, weekStart))
+                .ToList();
+
+            ReplaceCollection(_driverAttendanceWeekRows, rows);
+            ApplyDriverAttendanceFilters();
+        }
+        finally
+        {
+            _isLoadingDriverAttendanceWeek = false;
+        }
+    }
 
     private async Task LoadEmployeesAsync() => ReplaceCollection(_employees, await _employeeService.GetAllAsync());
+
+    private DateTime GetSelectedDriverWeekStart() =>
+        StartOfDriverWeek(DriverAttendanceWeekPicker.SelectedDate ?? DateTime.Today);
+
+    private static DateTime StartOfDriverWeek(DateTime date)
+    {
+        var value = date.Date;
+        while (value.DayOfWeek != DayOfWeek.Saturday)
+        {
+            value = value.AddDays(-1);
+        }
+
+        return value;
+    }
+
+    private static DriverWeeklyAttendanceRow BuildDriverWeekRow(DriverDto driver, IReadOnlyCollection<DriverAttendanceDto> records, DateTime weekStart)
+    {
+        var row = new DriverWeeklyAttendanceRow
+        {
+            DriverId = driver.Id,
+            DriverName = driver.FullName,
+            WorkLocation = driver.WorkLocation,
+            FridayStatus = "غائب",
+            FridayReason = "راحة أسبوعية"
+        };
+
+        for (var dayOffset = 0; dayOffset < 7; dayOffset++)
+        {
+            var date = weekStart.AddDays(dayOffset).Date;
+            var record = records.FirstOrDefault(x => x.DriverId == driver.Id && x.WorkDate.Date == date);
+            if (record is null)
+            {
+                continue;
+            }
+
+            SetDriverDayValues(row, dayOffset, record.Status, record.AbsenceReason);
+            if (!string.IsNullOrWhiteSpace(record.WorkLocation))
+            {
+                row.WorkLocation = record.WorkLocation;
+            }
+        }
+
+        return row;
+    }
+
+    private static void SetDriverDayValues(DriverWeeklyAttendanceRow row, int dayOffset, string status, string reason)
+    {
+        var displayStatus = NormalizeDriverAttendanceStatusForUi(status);
+        var displayReason = NormalizeDriverAttendanceReasonForUi(status, reason, dayOffset);
+
+        switch (dayOffset)
+        {
+            case 0:
+                row.SaturdayStatus = displayStatus;
+                row.SaturdayReason = displayReason;
+                break;
+            case 1:
+                row.SundayStatus = displayStatus;
+                row.SundayReason = displayReason;
+                break;
+            case 2:
+                row.MondayStatus = displayStatus;
+                row.MondayReason = displayReason;
+                break;
+            case 3:
+                row.TuesdayStatus = displayStatus;
+                row.TuesdayReason = displayReason;
+                break;
+            case 4:
+                row.WednesdayStatus = displayStatus;
+                row.WednesdayReason = displayReason;
+                break;
+            case 5:
+                row.ThursdayStatus = displayStatus;
+                row.ThursdayReason = displayReason;
+                break;
+            case 6:
+                row.FridayStatus = string.IsNullOrWhiteSpace(displayStatus) ? "غائب" : displayStatus;
+                row.FridayReason = string.IsNullOrWhiteSpace(displayReason) ? "راحة أسبوعية" : displayReason;
+                break;
+        }
+    }
+
+    private static string NormalizeDriverAttendanceStatusForUi(string status)
+    {
+        var normalized = DriverAttendanceStatusStorage(status);
+        return normalized switch
+        {
+            "Present" => "حاضر",
+            "Absent" => "غائب",
+            "Leave" => "إجازة",
+            "CompensatoryRest" => "إجازة",
+            "Rest" => "غائب",
+            _ => string.IsNullOrWhiteSpace(normalized) ? "حاضر" : status
+        };
+    }
+
+    private static string NormalizeDriverAttendanceReasonForUi(string status, string reason, int dayOffset)
+    {
+        var normalized = DriverAttendanceStatusStorage(status);
+        if (normalized == "Present")
+        {
+            return string.Empty;
+        }
+
+        if (!string.IsNullOrWhiteSpace(reason))
+        {
+            return reason;
+        }
+
+        return string.Empty;
+    }
+
+    private static string DriverAttendanceStatusStorage(string status)
+    {
+        var value = status?.Trim().ToLowerInvariant() ?? string.Empty;
+        return value switch
+        {
+            "present" or "حاضر" or "حضور" => "Present",
+            "absent" or "غائب" or "غياب" => "Absent",
+            "leave" or "اجازة" or "إجازة" or "أجازة" => "Leave",
+            "compensatoryrest" or "compensatory rest" or "راحة مستحقة" or "راحة تعويضية" => "CompensatoryRest",
+            "rest" or "راحة" or "راحة جمعة" or "راحة أسبوعية" or "راحة اسبوعية" => "Rest",
+            _ => string.IsNullOrWhiteSpace(value) ? "Present" : value
+        };
+    }
+
+    private static IEnumerable<DriverAttendanceFormDto> BuildDriverAttendanceForms(DriverWeeklyAttendanceRow row, DateTime weekStart)
+    {
+        var values = new[]
+        {
+            (Offset: 0, Status: row.SaturdayStatus, Reason: row.SaturdayReason),
+            (Offset: 1, Status: row.SundayStatus, Reason: row.SundayReason),
+            (Offset: 2, Status: row.MondayStatus, Reason: row.MondayReason),
+            (Offset: 3, Status: row.TuesdayStatus, Reason: row.TuesdayReason),
+            (Offset: 4, Status: row.WednesdayStatus, Reason: row.WednesdayReason),
+            (Offset: 5, Status: row.ThursdayStatus, Reason: row.ThursdayReason),
+            (Offset: 6, Status: row.FridayStatus, Reason: row.FridayReason)
+        };
+
+        foreach (var value in values)
+        {
+            if (string.IsNullOrWhiteSpace(value.Status) && string.IsNullOrWhiteSpace(value.Reason))
+            {
+                continue;
+            }
+
+            var status = DriverAttendanceStatusStorage(value.Status);
+
+            yield return new DriverAttendanceFormDto
+            {
+                DriverId = row.DriverId,
+                WorkDate = weekStart.AddDays(value.Offset),
+                WorkLocation = row.WorkLocation,
+                Status = value.Status,
+                AbsenceReason = status == "Present" ? string.Empty : value.Reason
+            };
+        }
+    }
 
     private async Task LoadTripsAsync()
     {
@@ -810,6 +1081,7 @@ public partial class MainWindow : Window
         DashboardCustodyShortcutButton.Visibility = allowed.Contains("Custody") ? Visibility.Visible : Visibility.Collapsed;
         DashboardTreasuryShortcutButton.Visibility = allowed.Contains("Treasury") ? Visibility.Visible : Visibility.Collapsed;
         DashboardReportsShortcutButton.Visibility = allowed.Contains("Reports") ? Visibility.Visible : Visibility.Collapsed;
+        DashboardDriversShortcutButton.Visibility = allowed.Contains("Drivers") ? Visibility.Visible : Visibility.Collapsed;
         OpenInsuranceFromLicensesButton.Visibility = allowed.Contains("Insurance") ? Visibility.Visible : Visibility.Collapsed;
         BackToLicensesFromInsuranceButton.Visibility = allowed.Contains("Licenses") ? Visibility.Visible : Visibility.Collapsed;
 
@@ -883,6 +1155,8 @@ public partial class MainWindow : Window
         yield return ContractsGrid;
         yield return MaintenanceGrid;
         yield return DriversGrid;
+        yield return DriverAttendanceGrid;
+        yield return DriverReportsGrid;
         yield return EmployeesGrid;
         yield return TripsGrid;
         yield return FuelGrid;
@@ -960,6 +1234,19 @@ public partial class MainWindow : Window
         }
 
         var normalizedKey = key.Trim();
+
+        if (normalizedKey is "السبت" or "الأحد" or "الاثنين" or "الثلاثاء" or "الأربعاء" or "الخميس" or "الجمعة")
+        {
+            return 230;
+        }
+
+        if (normalizedKey.Contains("رقم قومي", StringComparison.OrdinalIgnoreCase) ||
+            normalizedKey.Contains("رقم الرخصة", StringComparison.OrdinalIgnoreCase) ||
+            normalizedKey.Contains("وحدة المرور", StringComparison.OrdinalIgnoreCase) ||
+            normalizedKey.Contains("موقع العمل", StringComparison.OrdinalIgnoreCase))
+        {
+            return 210;
+        }
 
         if (normalizedKey is "من" or "إلى" ||
             normalizedKey.Contains("الغرض", StringComparison.OrdinalIgnoreCase))
@@ -1163,6 +1450,27 @@ public partial class MainWindow : Window
             Columns = columns,
             Data = rows
         };
+    }
+
+    public sealed class DriverWeeklyAttendanceRow
+    {
+        public int DriverId { get; set; }
+        public string DriverName { get; set; } = string.Empty;
+        public string WorkLocation { get; set; } = string.Empty;
+        public string SaturdayStatus { get; set; } = "حاضر";
+        public string SaturdayReason { get; set; } = string.Empty;
+        public string SundayStatus { get; set; } = "حاضر";
+        public string SundayReason { get; set; } = string.Empty;
+        public string MondayStatus { get; set; } = "حاضر";
+        public string MondayReason { get; set; } = string.Empty;
+        public string TuesdayStatus { get; set; } = "حاضر";
+        public string TuesdayReason { get; set; } = string.Empty;
+        public string WednesdayStatus { get; set; } = "حاضر";
+        public string WednesdayReason { get; set; } = string.Empty;
+        public string ThursdayStatus { get; set; } = "حاضر";
+        public string ThursdayReason { get; set; } = string.Empty;
+        public string FridayStatus { get; set; } = "غائب";
+        public string FridayReason { get; set; } = "راحة أسبوعية";
     }
 
     private static ReportDataDto BuildSelectedReportRowSnapshot(ReportDataDto source, DataRowView selectedRow)
@@ -1902,6 +2210,157 @@ public partial class MainWindow : Window
         };
     }
 
+    private ReportDataDto BuildDriverReportSnapshot(IEnumerable<DriverReportDto> driverReports)
+    {
+        var rows = driverReports.ToList();
+        return new ReportDataDto
+        {
+            ReportTitle = "تقرير السائقين",
+            GeneratedDate = DateTime.UtcNow,
+            GeneratedBy = _currentUser?.Username ?? "System",
+            Columns = new List<string>
+            {
+                "اسم السائق",
+                "رقم قومي",
+                "رقم الرخصة",
+                "نوع الرخصة",
+                "بداية الرخصة",
+                "نهاية الرخصة",
+                "متأمن عليه",
+                "المحافظة",
+                "العنوان بالكامل",
+                "وحدة المرور",
+                "موقع العمل",
+                "أيام الحضور",
+                "أيام الغياب",
+                "أيام الإجازة",
+                "جمعات عمل",
+                "راحات مستحقة",
+                "رصيد الراحة",
+                "أسباب الغياب والإجازات"
+            },
+            Data = rows.Select(row => new Dictionary<string, object>
+            {
+                ["اسم السائق"] = row.FullName,
+                ["رقم قومي"] = row.NationalId,
+                ["رقم الرخصة"] = row.LicenseNumber,
+                ["نوع الرخصة"] = row.LicenseType,
+                ["بداية الرخصة"] = row.LicenseStartDate,
+                ["نهاية الرخصة"] = row.LicenseExpiryDate,
+                ["متأمن عليه"] = row.IsCompanyInsured ? "نعم" : "لا",
+                ["المحافظة"] = row.Governorate,
+                ["العنوان بالكامل"] = row.FullAddress,
+                ["وحدة المرور"] = row.TrafficUnit,
+                ["موقع العمل"] = row.WorkLocation,
+                ["أيام الحضور"] = row.PresentDays,
+                ["أيام الغياب"] = row.AbsentDays,
+                ["أيام الإجازة"] = row.LeaveDays,
+                ["جمعات عمل"] = row.WorkedFridays,
+                ["راحات مستحقة"] = row.EarnedRestDays,
+                ["رصيد الراحة"] = row.RemainingRestDays,
+                ["أسباب الغياب والإجازات"] = row.AbsenceReasons
+            }).ToList()
+        };
+    }
+
+    private ReportDataDto BuildDriversReportSnapshot(IEnumerable<DriverDto> drivers)
+    {
+        var rows = drivers.ToList();
+        return new ReportDataDto
+        {
+            ReportTitle = "تقرير بيانات السائقين",
+            GeneratedDate = DateTime.UtcNow,
+            GeneratedBy = _currentUser?.Username ?? "System",
+            Columns = new List<string>
+            {
+                "مسلسل",
+                "اسم السائق",
+                "رقم قومي",
+                "رقم الرخصة",
+                "نوع الرخصة",
+                "بداية الرخصة",
+                "نهاية الرخصة",
+                "متأمن عليه",
+                "المحافظة",
+                "العنوان بالكامل",
+                "وحدة المرور",
+                "موقع العمل",
+                "مفعل",
+                "إنذار الرخصة",
+                "ملاحظات"
+            },
+            Data = rows.Select((driver, index) => new Dictionary<string, object>
+            {
+                ["مسلسل"] = index + 1,
+                ["اسم السائق"] = driver.FullName,
+                ["رقم قومي"] = driver.NationalId,
+                ["رقم الرخصة"] = driver.LicenseNumber,
+                ["نوع الرخصة"] = driver.LicenseType,
+                ["بداية الرخصة"] = driver.LicenseStartDate,
+                ["نهاية الرخصة"] = driver.LicenseExpiryDate,
+                ["متأمن عليه"] = driver.IsCompanyInsured ? "نعم" : "لا",
+                ["المحافظة"] = driver.Governorate,
+                ["العنوان بالكامل"] = driver.FullAddress,
+                ["وحدة المرور"] = driver.TrafficUnit,
+                ["موقع العمل"] = driver.WorkLocation,
+                ["مفعل"] = driver.IsActive ? "نعم" : "لا",
+                ["إنذار الرخصة"] = driver.LicenseExpiryAlert,
+                ["ملاحظات"] = driver.Notes
+            }).ToList()
+        };
+    }
+
+    private ReportDataDto BuildDriverAttendanceReportSnapshot(IEnumerable<DriverWeeklyAttendanceRow> attendanceRows, DateTime weekStart)
+    {
+        var rows = attendanceRows.ToList();
+        return new ReportDataDto
+        {
+            ReportTitle = $"تقرير حضور وغياب السائقين - أسبوع يبدأ {weekStart:yyyy-MM-dd}",
+            GeneratedDate = DateTime.UtcNow,
+            GeneratedBy = _currentUser?.Username ?? "System",
+            Columns = new List<string>
+            {
+                "مسلسل",
+                "اسم السائق",
+                "موقع العمل",
+                "السبت",
+                "سبب السبت",
+                "الأحد",
+                "سبب الأحد",
+                "الاثنين",
+                "سبب الاثنين",
+                "الثلاثاء",
+                "سبب الثلاثاء",
+                "الأربعاء",
+                "سبب الأربعاء",
+                "الخميس",
+                "سبب الخميس",
+                "الجمعة",
+                "سبب الجمعة"
+            },
+            Data = rows.Select((row, index) => new Dictionary<string, object>
+            {
+                ["مسلسل"] = index + 1,
+                ["اسم السائق"] = row.DriverName,
+                ["موقع العمل"] = row.WorkLocation,
+                ["السبت"] = row.SaturdayStatus,
+                ["سبب السبت"] = row.SaturdayReason,
+                ["الأحد"] = row.SundayStatus,
+                ["سبب الأحد"] = row.SundayReason,
+                ["الاثنين"] = row.MondayStatus,
+                ["سبب الاثنين"] = row.MondayReason,
+                ["الثلاثاء"] = row.TuesdayStatus,
+                ["سبب الثلاثاء"] = row.TuesdayReason,
+                ["الأربعاء"] = row.WednesdayStatus,
+                ["سبب الأربعاء"] = row.WednesdayReason,
+                ["الخميس"] = row.ThursdayStatus,
+                ["سبب الخميس"] = row.ThursdayReason,
+                ["الجمعة"] = row.FridayStatus,
+                ["سبب الجمعة"] = row.FridayReason
+            }).ToList()
+        };
+    }
+
     private static bool ReportDateMatches(DateTime date, ReportFilterDto filter) =>
         ReportDateMatches((DateTime?)date, filter);
 
@@ -2081,8 +2540,14 @@ public partial class MainWindow : Window
         Address = dto.Address,
         DateOfBirth = dto.DateOfBirth,
         LicenseNumber = dto.LicenseNumber,
+        LicenseStartDate = dto.LicenseStartDate,
         LicenseExpiryDate = dto.LicenseExpiryDate,
         LicenseType = dto.LicenseType,
+        IsCompanyInsured = dto.IsCompanyInsured,
+        Governorate = dto.Governorate,
+        FullAddress = dto.FullAddress,
+        TrafficUnit = dto.TrafficUnit,
+        WorkLocation = dto.WorkLocation,
         IsActive = dto.IsActive,
         Notes = dto.Notes
     };
@@ -2387,6 +2852,7 @@ public partial class MainWindow : Window
         _currentUser?.AllowedModules.Any(allowed => string.Equals(allowed, module, StringComparison.OrdinalIgnoreCase)) == true;
 
     private void QuickOpenTripsButton_Click(object sender, RoutedEventArgs e) => SelectTabByTag("Trips");
+    private void QuickOpenDriversButton_Click(object sender, RoutedEventArgs e) => SelectTabByTag("Drivers");
     private void QuickOpenMaintenanceButton_Click(object sender, RoutedEventArgs e) => SelectTabByTag("Maintenance");
     private void QuickOpenLicensesAndInsuranceButton_Click(object sender, RoutedEventArgs e)
     {
@@ -2623,9 +3089,386 @@ public partial class MainWindow : Window
     });
 
     private async void RefreshDriversButton_Click(object sender, RoutedEventArgs e) => await RunSafeAsync(LoadDriversAsync);
-    private void AddDriverButton_Click(object sender, RoutedEventArgs e) => AddNewItem(_drivers, DriversGrid, new DriverDto { DateOfBirth = DateTime.Today.AddYears(-30), LicenseExpiryDate = DateTime.Today.AddYears(1), IsActive = true });
-    private async void SaveDriverButton_Click(object sender, RoutedEventArgs e) => await RunSafeAsync(async () => { var item = Selected<DriverDto>(DriversGrid) ?? throw new InvalidOperationException("اختر سائقًا أولًا."); await _driverService.SaveAsync(ToForm(item)); await LoadDriversAsync(); await LoadDashboardAsync(); });
+    private void AddDriverButton_Click(object sender, RoutedEventArgs e)
+    {
+        var driver = new DriverDto
+        {
+            DateOfBirth = DateTime.Today.AddYears(-30),
+            LicenseStartDate = DateTime.Today,
+            LicenseExpiryDate = DateTime.Today.AddYears(1),
+            IsActive = true,
+            WorkLocation = "الموقع الرئيسي"
+        };
+
+        AddNewItem(_drivers, DriversGrid, driver);
+        ApplyDriverFilters();
+    }
+
+    private async void SaveDriverButton_Click(object sender, RoutedEventArgs e) => await RunSafeAsync(async () =>
+    {
+        await SaveSelectedDriverSilentlyAsync();
+        var item = Selected<DriverDto>(DriversGrid) ?? throw new InvalidOperationException("اختر سائقًا أولًا.");
+        if (item.Id == 0)
+        {
+            throw new InvalidOperationException("أكمل بيانات السائق الأساسية قبل الحفظ.");
+        }
+
+        var saved = item;
+        await LoadDriversAsync();
+        var reselected = _drivers.FirstOrDefault(x => x.Id == saved.Id);
+        if (reselected is not null)
+        {
+            DriversGrid.SelectedItem = reselected;
+            DriversGrid.ScrollIntoView(reselected);
+        }
+
+        await LoadDriverAttendanceWeekAsync();
+        await LoadDashboardAsync();
+    });
     private async void DeleteDriverButton_Click(object sender, RoutedEventArgs e) => await RunSafeAsync(() => DeleteSelectedAsync(DriversGrid, _drivers, x => x.Id, _driverService.DeleteAsync, LoadDriversAsync));
+
+    private void DriversGrid_CellEditEnding(object sender, DataGridCellEditEndingEventArgs e) => ScheduleDriverAutoSave();
+
+    private void DriversGrid_CurrentCellChanged(object sender, EventArgs e) => ScheduleDriverAutoSave();
+
+    private void DriversGrid_SelectedCellsChanged(object sender, SelectedCellsChangedEventArgs e) => ScheduleDriverAutoSave();
+
+    private void ScheduleDriverAutoSave()
+    {
+        if (_isSavingDriver || !DriversGrid.IsKeyboardFocusWithin)
+        {
+            return;
+        }
+
+        _driverAutoSaveTimer.Stop();
+        _driverAutoSaveTimer.Start();
+    }
+
+    private async Task SaveSelectedDriverSilentlyAsync()
+    {
+        if (_isSavingDriver)
+        {
+            return;
+        }
+
+        CommitGridEdit(DriversGrid);
+        var item = Selected<DriverDto>(DriversGrid);
+        if (!CanAutoSaveDriver(item))
+        {
+            return;
+        }
+
+        _isSavingDriver = true;
+        try
+        {
+            var saved = await _driverService.SaveAsync(ToForm(item!));
+            CopySavedDriverValues(item!, saved);
+            ApplyDriverFilters();
+            await LoadDriverAttendanceWeekAsync();
+            await LoadDashboardAsync();
+            await LoadNotificationsAsync();
+        }
+        finally
+        {
+            _isSavingDriver = false;
+        }
+    }
+
+    private static bool CanAutoSaveDriver(DriverDto? driver) =>
+        driver is not null
+        && !string.IsNullOrWhiteSpace(driver.FullName)
+        && !string.IsNullOrWhiteSpace(driver.LicenseNumber)
+        && driver.LicenseStartDate != default
+        && driver.LicenseExpiryDate != default
+        && driver.LicenseExpiryDate.Date >= driver.LicenseStartDate.Date;
+
+    private static void CopySavedDriverValues(DriverDto target, DriverDto saved)
+    {
+        target.Id = saved.Id;
+        target.FullName = saved.FullName;
+        target.NationalId = saved.NationalId;
+        target.PhoneNumber = saved.PhoneNumber;
+        target.Email = saved.Email;
+        target.Address = saved.Address;
+        target.DateOfBirth = saved.DateOfBirth;
+        target.LicenseNumber = saved.LicenseNumber;
+        target.LicenseStartDate = saved.LicenseStartDate;
+        target.LicenseExpiryDate = saved.LicenseExpiryDate;
+        target.LicenseType = saved.LicenseType;
+        target.IsCompanyInsured = saved.IsCompanyInsured;
+        target.Governorate = saved.Governorate;
+        target.FullAddress = saved.FullAddress;
+        target.TrafficUnit = saved.TrafficUnit;
+        target.WorkLocation = saved.WorkLocation;
+        target.LicenseExpiryAlert = saved.LicenseExpiryAlert;
+        target.IsActive = saved.IsActive;
+        target.Notes = saved.Notes;
+    }
+
+    private async void LoadDriverAttendanceWeekButton_Click(object sender, RoutedEventArgs e) => await RunSafeAsync(LoadDriverAttendanceWeekAsync);
+
+    private async void SaveDriverAttendanceWeekButton_Click(object sender, RoutedEventArgs e) => await RunSafeAsync(async () =>
+    {
+        await SaveDriverAttendanceWeekSilentlyAsync();
+        await LoadDriverAttendanceWeekAsync();
+        MessageBox.Show("تم حفظ حضور وغياب السائقين لهذا الأسبوع.", "تم", MessageBoxButton.OK, MessageBoxImage.Information);
+    });
+
+    private void DriverAttendanceInput_Changed(object sender, RoutedEventArgs e)
+    {
+        if (_isLoadingDriverAttendanceWeek || _isSavingDriverAttendanceWeek)
+        {
+            return;
+        }
+
+        if (sender is ComboBox comboBox && DriverAttendanceStatusStorage(comboBox.SelectedItem?.ToString() ?? string.Empty) == "Present")
+        {
+            ClearAttendanceReasonInCurrentCell(comboBox);
+        }
+
+        if (sender is Control control && !control.IsKeyboardFocusWithin && !control.IsMouseOver)
+        {
+            return;
+        }
+
+        _driverAttendanceAutoSaveTimer.Stop();
+        _driverAttendanceAutoSaveTimer.Start();
+    }
+
+    private static void ClearAttendanceReasonInCurrentCell(DependencyObject source)
+    {
+        var parent = System.Windows.Media.VisualTreeHelper.GetParent(source);
+        while (parent is not null && parent is not Grid)
+        {
+            parent = System.Windows.Media.VisualTreeHelper.GetParent(parent);
+        }
+
+        if (parent is null)
+        {
+            return;
+        }
+
+        foreach (var textBox in FindVisualChildren<TextBox>(parent))
+        {
+            if (!string.IsNullOrEmpty(textBox.Text))
+            {
+                textBox.Clear();
+            }
+        }
+    }
+
+    private async Task SaveDriverAttendanceWeekSilentlyAsync()
+    {
+        if (_isLoadingDriverAttendanceWeek || _isSavingDriverAttendanceWeek)
+        {
+            return;
+        }
+
+        _isSavingDriverAttendanceWeek = true;
+        try
+        {
+            CommitGridEdit(DriverAttendanceGrid);
+            var weekStart = GetSelectedDriverWeekStart();
+            var forms = _driverAttendanceWeekRows
+                .SelectMany(row => BuildDriverAttendanceForms(row, weekStart))
+                .ToList();
+
+            await _driverAttendanceService.SaveWeekAsync(weekStart, forms);
+        }
+        finally
+        {
+            _isSavingDriverAttendanceWeek = false;
+        }
+    }
+
+    private async void GenerateDriverReportButton_Click(object sender, RoutedEventArgs e) => await RunSafeAsync(GenerateDriverReportAsync);
+
+    private async Task GenerateDriverReportAsync()
+    {
+        var start = DriverReportStartDatePicker.SelectedDate ?? StartOfDriverWeek(DateTime.Today);
+        var end = DriverReportEndDatePicker.SelectedDate ?? start.AddDays(6);
+        var driverId = DriverReportDriverComboBox.SelectedValue is int selectedDriverId && selectedDriverId > 0
+            ? selectedDriverId
+            : (int?)null;
+        ReplaceCollection(_driverReportRows, await _driverAttendanceService.GenerateReportAsync(start, end, driverId));
+        ApplyDriverReportFilters();
+    }
+
+    private void DriverFilter_Changed(object sender, RoutedEventArgs e) => ApplyDriverFilters();
+
+    private void ApplyDriverFilters()
+    {
+        if (DriversGrid.ItemsSource is null)
+        {
+            return;
+        }
+
+        var view = CollectionViewSource.GetDefaultView(DriversGrid.ItemsSource);
+        if (view is null)
+        {
+            return;
+        }
+
+        view.Filter = DriverRowMatchesFilters;
+        view.Refresh();
+    }
+
+    private bool DriverRowMatchesFilters(object item)
+    {
+        if (item is not DriverDto driver)
+        {
+            return false;
+        }
+
+        if (driver.Id == 0)
+        {
+            return true;
+        }
+
+        return TextFilterMatches(DriverFilterName, driver.FullName)
+            && TextFilterMatches(DriverFilterNationalId, driver.NationalId)
+            && TextFilterMatches(DriverFilterLicense, driver.LicenseNumber)
+            && TextFilterMatches(DriverFilterLicenseType, driver.LicenseType)
+            && DateFilterMatches(DriverFilterLicenseStartDate, driver.LicenseStartDate)
+            && DateFilterMatches(DriverFilterLicenseExpiryDate, driver.LicenseExpiryDate)
+            && TextFilterMatches(DriverFilterInsurance, driver.IsCompanyInsured ? "نعم متأمن مؤمن true yes" : "لا غير متأمن غير مؤمن false no")
+            && TextFilterMatches(DriverFilterGovernorate, driver.Governorate)
+            && TextFilterMatches(DriverFilterFullAddress, driver.FullAddress)
+            && TextFilterMatches(DriverFilterTrafficUnit, driver.TrafficUnit)
+            && TextFilterMatches(DriverFilterWorkLocation, driver.WorkLocation)
+            && TextFilterMatches(DriverFilterActive, driver.IsActive ? "نعم مفعل نشط active true yes" : "لا غير مفعل غير نشط inactive false no");
+    }
+
+    private async void PrintDriversButton_Click(object sender, RoutedEventArgs e) => await RunSafeAsync(() =>
+    {
+        CommitGridEdit(DriversGrid);
+        var rows = GetVisibleRows(DriversGrid, _drivers);
+        OpenReportPreview(BuildDriversReportSnapshot(rows));
+        return Task.CompletedTask;
+    });
+
+    private void DriverAttendanceFilter_Changed(object sender, RoutedEventArgs e) => ApplyDriverAttendanceFilters();
+
+    private void ApplyDriverAttendanceFilters()
+    {
+        if (DriverAttendanceGrid.ItemsSource is null)
+        {
+            return;
+        }
+
+        var view = CollectionViewSource.GetDefaultView(DriverAttendanceGrid.ItemsSource);
+        if (view is null)
+        {
+            return;
+        }
+
+        view.Filter = DriverAttendanceRowMatchesFilters;
+        view.Refresh();
+    }
+
+    private bool DriverAttendanceRowMatchesFilters(object item)
+    {
+        if (item is not DriverWeeklyAttendanceRow row)
+        {
+            return false;
+        }
+
+        return TextFilterMatches(DriverAttendanceFilterName, row.DriverName)
+            && TextFilterMatches(DriverAttendanceFilterWorkLocation, row.WorkLocation)
+            && TextFilterMatches(DriverAttendanceFilterSaturday, DriverAttendanceDayFilterText(row.SaturdayStatus, row.SaturdayReason))
+            && TextFilterMatches(DriverAttendanceFilterSunday, DriverAttendanceDayFilterText(row.SundayStatus, row.SundayReason))
+            && TextFilterMatches(DriverAttendanceFilterMonday, DriverAttendanceDayFilterText(row.MondayStatus, row.MondayReason))
+            && TextFilterMatches(DriverAttendanceFilterTuesday, DriverAttendanceDayFilterText(row.TuesdayStatus, row.TuesdayReason))
+            && TextFilterMatches(DriverAttendanceFilterWednesday, DriverAttendanceDayFilterText(row.WednesdayStatus, row.WednesdayReason))
+            && TextFilterMatches(DriverAttendanceFilterThursday, DriverAttendanceDayFilterText(row.ThursdayStatus, row.ThursdayReason))
+            && TextFilterMatches(DriverAttendanceFilterFriday, DriverAttendanceDayFilterText(row.FridayStatus, row.FridayReason));
+    }
+
+    private static string DriverAttendanceDayFilterText(string status, string reason) =>
+        string.Join(' ', status, reason);
+
+    private async void PrintDriverAttendanceButton_Click(object sender, RoutedEventArgs e) => await RunSafeAsync(async () =>
+    {
+        CommitGridEdit(DriverAttendanceGrid);
+        await SaveDriverAttendanceWeekSilentlyAsync();
+        var rows = GetVisibleRows(DriverAttendanceGrid, _driverAttendanceWeekRows);
+        OpenReportPreview(BuildDriverAttendanceReportSnapshot(rows, GetSelectedDriverWeekStart()));
+    });
+
+    private void DriverReportFilter_Changed(object sender, RoutedEventArgs e) => ApplyDriverReportFilters();
+
+    private void ApplyDriverReportFilters()
+    {
+        if (DriverReportsGrid.ItemsSource is null)
+        {
+            return;
+        }
+
+        var view = CollectionViewSource.GetDefaultView(DriverReportsGrid.ItemsSource);
+        if (view is null)
+        {
+            return;
+        }
+
+        view.Filter = DriverReportRowMatchesFilters;
+        view.Refresh();
+    }
+
+    private bool DriverReportRowMatchesFilters(object item)
+    {
+        if (item is not DriverReportDto row)
+        {
+            return false;
+        }
+
+        return TextFilterMatches(DriverReportFilterName, row.FullName)
+            && TextFilterMatches(DriverReportFilterNationalId, row.NationalId)
+            && TextFilterMatches(DriverReportFilterLicenseNumber, row.LicenseNumber)
+            && TextFilterMatches(DriverReportFilterLicenseType, row.LicenseType)
+            && DateFilterMatches(DriverReportFilterLicenseStartDate, row.LicenseStartDate)
+            && DateFilterMatches(DriverReportFilterLicenseExpiryDate, row.LicenseExpiryDate)
+            && TextFilterMatches(DriverReportFilterInsurance, row.IsCompanyInsured ? "نعم متأمن مؤمن true yes" : "لا غير متأمن غير مؤمن false no")
+            && TextFilterMatches(DriverReportFilterGovernorate, row.Governorate)
+            && TextFilterMatches(DriverReportFilterFullAddress, row.FullAddress)
+            && TextFilterMatches(DriverReportFilterTrafficUnit, row.TrafficUnit)
+            && TextFilterMatches(DriverReportFilterWorkLocation, row.WorkLocation)
+            && TextFilterMatches(DriverReportFilterPresent, row.PresentDays.ToString(CultureInfo.InvariantCulture))
+            && TextFilterMatches(DriverReportFilterAbsent, row.AbsentDays.ToString(CultureInfo.InvariantCulture))
+            && TextFilterMatches(DriverReportFilterLeave, row.LeaveDays.ToString(CultureInfo.InvariantCulture))
+            && TextFilterMatches(DriverReportFilterWorkedFridays, row.WorkedFridays.ToString(CultureInfo.InvariantCulture))
+            && TextFilterMatches(DriverReportFilterEarnedRest, row.EarnedRestDays.ToString(CultureInfo.InvariantCulture))
+            && TextFilterMatches(DriverReportFilterRemainingRest, row.RemainingRestDays.ToString(CultureInfo.InvariantCulture))
+            && TextFilterMatches(DriverReportFilterReasons, row.AbsenceReasons);
+    }
+
+    private async void PrintDriverReportButton_Click(object sender, RoutedEventArgs e) => await RunSafeAsync(async () =>
+    {
+        if (_driverReportRows.Count == 0)
+        {
+            await GenerateDriverReportAsync();
+        }
+
+        var rows = GetVisibleRows(DriverReportsGrid, _driverReportRows);
+        OpenReportPreview(BuildDriverReportSnapshot(rows));
+    });
+
+    private static List<T> GetVisibleRows<T>(DataGrid grid, IEnumerable<T> fallback)
+    {
+        if (grid.ItemsSource is null)
+        {
+            return fallback.ToList();
+        }
+
+        var view = CollectionViewSource.GetDefaultView(grid.ItemsSource);
+        return view is null
+            ? fallback.ToList()
+            : view.Cast<object>().OfType<T>().ToList();
+    }
+
+    private static bool IsDriverSelectableForTrip(DriverDto driver) =>
+        driver.IsActive
+        && !string.IsNullOrWhiteSpace(driver.LicenseNumber)
+        && driver.LicenseExpiryDate.Date >= DateTime.Today;
 
     private async void RefreshEmployeesButton_Click(object sender, RoutedEventArgs e) => await RunSafeAsync(LoadEmployeesAsync);
     private void AddEmployeeButton_Click(object sender, RoutedEventArgs e) => AddNewItem(_employees, EmployeesGrid, new EmployeeDto { HireDate = DateTime.Today, Status = "Active" });
@@ -3006,7 +3849,20 @@ public partial class MainWindow : Window
             return;
         }
 
-        var window = new TripEntryWindow(_vehicles.ToList(), _drivers.ToList(), _employees.ToList())
+        var selectableDrivers = _drivers
+            .Where(IsDriverSelectableForTrip)
+            .ToList();
+        if (selectableDrivers.Count == 0)
+        {
+            MessageBox.Show(
+                "لا يوجد سائق مفعل برخصة سارية يمكن إسناد تشغيلة له. راجع شاشة السائقين وفعل السائق وسجل بيانات الرخصة.",
+                "تنبيه واضح",
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
+            return;
+        }
+
+        var window = new TripEntryWindow(_vehicles.ToList(), selectableDrivers, _employees.ToList())
         {
             Owner = this
         };

@@ -167,18 +167,43 @@ CREATE TABLE IF NOT EXISTS `MaintenanceRequests` (
 CREATE TABLE IF NOT EXISTS `Drivers` (
     `Id` INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
     `FullName` VARCHAR(255) NOT NULL,
+    `NationalId` VARCHAR(20) NOT NULL DEFAULT '',
     `LicenseNumber` VARCHAR(50) NOT NULL UNIQUE,
-    `LicenseExpiry` DATE,
+    `LicenseStartDate` DATE,
+    `LicenseExpiryDate` DATE,
+    `LicenseType` VARCHAR(100) NOT NULL DEFAULT '',
+    `IsCompanyInsured` BOOLEAN NOT NULL DEFAULT FALSE,
     `PhoneNumber` VARCHAR(20),
     `Email` VARCHAR(255),
     `Address` VARCHAR(500),
+    `FullAddress` VARCHAR(500) NOT NULL DEFAULT '',
+    `Governorate` VARCHAR(100) NOT NULL DEFAULT '',
+    `TrafficUnit` VARCHAR(100) NOT NULL DEFAULT '',
+    `WorkLocation` VARCHAR(100) NOT NULL DEFAULT '',
     `DateOfBirth` DATE,
     `Status` VARCHAR(50) NOT NULL DEFAULT 'نشط',
     `CreatedAt` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     `UpdatedAt` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     INDEX `idx_license` (`LicenseNumber`),
     INDEX `idx_status` (`Status`),
-    INDEX `idx_expiry` (`LicenseExpiry`)
+    INDEX `idx_expiry` (`LicenseExpiryDate`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ============================================================================
+-- TABLE: DriverAttendances
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS `DriverAttendances` (
+    `Id` INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    `DriverId` INT NOT NULL,
+    `WorkDate` DATE NOT NULL,
+    `WorkLocation` VARCHAR(255) NOT NULL DEFAULT '',
+    `Status` VARCHAR(40) NOT NULL DEFAULT 'Present',
+    `AbsenceReason` VARCHAR(500) NOT NULL DEFAULT '',
+    `Notes` VARCHAR(500) NOT NULL DEFAULT '',
+    `CreatedAt` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    `UpdatedAt` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY `IX_DriverAttendances_DriverId_WorkDate` (`DriverId`, `WorkDate`),
+    FOREIGN KEY (`DriverId`) REFERENCES `Drivers` (`Id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ============================================================================
@@ -413,13 +438,13 @@ VALUES
 ('ر ع 1238', 4, 'نيسان NV200', 2022, 'نشطة', 'سارة أحمد', 12000, '2022-02-14', NOW(), NOW());
 
 -- Seed: Drivers
-INSERT INTO `Drivers` (`FullName`, `LicenseNumber`, `LicenseExpiry`, `PhoneNumber`, `Email`, `Address`, `DateOfBirth`, `Status`, `CreatedAt`, `UpdatedAt`)
+INSERT INTO `Drivers` (`FullName`, `NationalId`, `LicenseNumber`, `LicenseStartDate`, `LicenseExpiryDate`, `LicenseType`, `IsCompanyInsured`, `PhoneNumber`, `Email`, `Address`, `FullAddress`, `Governorate`, `TrafficUnit`, `WorkLocation`, `DateOfBirth`, `Status`, `CreatedAt`, `UpdatedAt`)
 VALUES 
-('محمد علي الشمري', 'DL-001-2024', '2025-12-31', '+966501234567', 'mohammad@example.sa', 'الرياض', '1985-05-15', 'نشط', NOW(), NOW()),
-('أحمد سالم الدوسري', 'DL-002-2024', '2026-06-30', '+966502345678', 'ahmed@example.sa', 'جدة', '1988-08-22', 'نشط', NOW(), NOW()),
-('علي محمود الغامدي', 'DL-003-2024', '2025-03-15', '+966503456789', 'ali@example.sa', 'الدمام', '1982-11-10', 'نشط', NOW(), NOW()),
-('فارس خالد المطيري', 'DL-004-2024', '2024-09-20', '+966504567890', 'faris@example.sa', 'الرياض', '1990-02-28', 'نشط', NOW(), NOW()),
-('سارة أحمد العتيبي', 'DL-005-2024', '2026-01-10', '+966505678901', 'sarah@example.sa', 'الرياض', '1992-07-05', 'نشط', NOW(), NOW());
+('محمد علي الشمري', '2850515000001', 'DL-001-2024', '2024-01-01', '2025-12-31', 'خاصة', TRUE, '+966501234567', 'mohammad@example.sa', 'الرياض', 'الرياض', 'الرياض', 'مرور الرياض', 'الموقع الرئيسي', '1985-05-15', 'نشط', NOW(), NOW()),
+('أحمد سالم الدوسري', '2880822000002', 'DL-002-2024', '2024-01-01', '2026-06-30', 'خاصة', TRUE, '+966502345678', 'ahmed@example.sa', 'جدة', 'جدة', 'جدة', 'مرور جدة', 'الموقع الرئيسي', '1988-08-22', 'نشط', NOW(), NOW()),
+('علي محمود الغامدي', '2821110000003', 'DL-003-2024', '2024-01-01', '2025-03-15', 'خاصة', FALSE, '+966503456789', 'ali@example.sa', 'الدمام', 'الدمام', 'الدمام', 'مرور الدمام', 'الموقع الرئيسي', '1982-11-10', 'نشط', NOW(), NOW()),
+('فارس خالد المطيري', '2900228000004', 'DL-004-2024', '2024-01-01', '2024-09-20', 'خاصة', TRUE, '+966504567890', 'faris@example.sa', 'الرياض', 'الرياض', 'الرياض', 'مرور الرياض', 'الموقع الرئيسي', '1990-02-28', 'نشط', NOW(), NOW()),
+('سارة أحمد العتيبي', '2920705000005', 'DL-005-2024', '2024-01-01', '2026-01-10', 'خاصة', TRUE, '+966505678901', 'sarah@example.sa', 'الرياض', 'الرياض', 'الرياض', 'مرور الرياض', 'الموقع الرئيسي', '1992-07-05', 'نشط', NOW(), NOW());
 
 -- Seed: Employees
 INSERT INTO `Employees` (`FullName`, `Email`, `PhoneNumber`, `Department`, `Position`, `HireDate`, `Status`, `CreatedAt`, `UpdatedAt`)

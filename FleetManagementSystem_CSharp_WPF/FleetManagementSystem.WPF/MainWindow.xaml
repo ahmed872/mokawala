@@ -3,6 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:converters="clr-namespace:FleetManagementSystem.WPF.Converters"
         xmlns:primitives="clr-namespace:System.Windows.Controls.Primitives;assembly=PresentationFramework"
+        xmlns:sys="clr-namespace:System;assembly=System.Runtime"
         Title="شركة جوميكس للحركة والمعدات"
         Width="1500"
         Height="920"
@@ -15,6 +16,13 @@
         Background="{StaticResource PageBackgroundBrush}">
     <Window.Resources>
         <converters:VisibleRowNumberConverter x:Key="VisibleRowNumberConverter"/>
+        <x:Array x:Key="DriverAttendanceStatuses"
+                 Type="{x:Type sys:String}">
+            <sys:String>حاضر</sys:String>
+            <sys:String>غائب</sys:String>
+            <sys:String>إجازة</sys:String>
+        </x:Array>
+        <converters:AttendanceReasonEnabledConverter x:Key="AttendanceReasonEnabledConverter"/>
 
         <Style x:Key="BaseButtonStyle"
                TargetType="Button">
@@ -249,6 +257,69 @@
                     Value="4,0"/>
             <Setter Property="Padding"
                     Value="8,2"/>
+        </Style>
+
+        <Style x:Key="DriverAttendanceDayCellBorderStyle"
+               TargetType="Border">
+            <Setter Property="Margin"
+                    Value="5,4"/>
+            <Setter Property="Padding"
+                    Value="8"/>
+            <Setter Property="Background"
+                    Value="#F8FBFC"/>
+            <Setter Property="BorderBrush"
+                    Value="#D7E5EC"/>
+            <Setter Property="BorderThickness"
+                    Value="1"/>
+            <Setter Property="CornerRadius"
+                    Value="8"/>
+        </Style>
+
+        <Style x:Key="DriverAttendanceStatusComboBoxStyle"
+               TargetType="ComboBox"
+               BasedOn="{StaticResource AppComboBoxStyle}">
+            <Setter Property="Height"
+                    Value="30"/>
+            <Setter Property="MinHeight"
+                    Value="30"/>
+            <Setter Property="FontSize"
+                    Value="12"/>
+            <Setter Property="FontWeight"
+                    Value="SemiBold"/>
+            <Setter Property="Padding"
+                    Value="8,2"/>
+        </Style>
+
+        <Style x:Key="DriverAttendanceReasonTextBoxStyle"
+               TargetType="TextBox"
+               BasedOn="{StaticResource AppTextBoxStyle}">
+            <Setter Property="Height"
+                    Value="30"/>
+            <Setter Property="FontSize"
+                    Value="12"/>
+            <Setter Property="Padding"
+                    Value="9,2"/>
+            <Setter Property="Margin"
+                    Value="0,6,0,0"/>
+            <Setter Property="Background"
+                    Value="White"/>
+            <Setter Property="BorderBrush"
+                    Value="#D6E4EC"/>
+            <Setter Property="BorderThickness"
+                    Value="1"/>
+            <Setter Property="VerticalContentAlignment"
+                    Value="Center"/>
+            <Style.Triggers>
+                <Trigger Property="IsEnabled"
+                         Value="False">
+                    <Setter Property="Background"
+                            Value="#F1F5F7"/>
+                    <Setter Property="Foreground"
+                            Value="{StaticResource MutedBrush}"/>
+                    <Setter Property="BorderBrush"
+                            Value="#E1E9EE"/>
+                </Trigger>
+            </Style.Triggers>
         </Style>
 
         <Style x:Key="WrappingCellTextStyle"
@@ -795,6 +866,7 @@
                                 BorderThickness="1"
                                 CornerRadius="14">
                             <ContentPresenter Margin="{TemplateBinding Padding}"
+                                              ContentSource="Header"
                                               HorizontalAlignment="Center"
                                               VerticalAlignment="Center"/>
                         </Border>
@@ -823,6 +895,102 @@
                                         Value="0.45"/>
                             </Trigger>
                         </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="DriverModuleTabItemStyle"
+               TargetType="TabItem">
+            <Setter Property="Padding"
+                    Value="30,14"/>
+            <Setter Property="MinWidth"
+                    Value="250"/>
+            <Setter Property="MinHeight"
+                    Value="54"/>
+            <Setter Property="FontSize"
+                    Value="16"/>
+            <Setter Property="FontWeight"
+                    Value="SemiBold"/>
+            <Setter Property="Margin"
+                    Value="8,0,8,0"/>
+            <Setter Property="Foreground"
+                    Value="{StaticResource AccentBrush}"/>
+            <Setter Property="FocusVisualStyle"
+                    Value="{x:Null}"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="TabItem">
+                        <Border x:Name="HeaderBorder"
+                                Background="White"
+                                BorderBrush="#C7D7E0"
+                                BorderThickness="1.4"
+                                CornerRadius="10">
+                            <ContentPresenter Margin="{TemplateBinding Padding}"
+                                              ContentSource="Header"
+                                              HorizontalAlignment="Center"
+                                              VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver"
+                                     Value="True">
+                                <Setter TargetName="HeaderBorder"
+                                        Property="Background"
+                                        Value="#EDF6FA"/>
+                                <Setter TargetName="HeaderBorder"
+                                        Property="BorderBrush"
+                                        Value="{StaticResource AccentBrush}"/>
+                            </Trigger>
+                            <Trigger Property="IsSelected"
+                                     Value="True">
+                                <Setter Property="Foreground"
+                                        Value="White"/>
+                                <Setter TargetName="HeaderBorder"
+                                        Property="Background"
+                                        Value="{StaticResource AccentBrush}"/>
+                                <Setter TargetName="HeaderBorder"
+                                        Property="BorderBrush"
+                                        Value="{StaticResource AccentBrush}"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="DriverModuleTabControlStyle"
+               TargetType="TabControl">
+            <Setter Property="Background"
+                    Value="Transparent"/>
+            <Setter Property="BorderThickness"
+                    Value="0"/>
+            <Setter Property="Padding"
+                    Value="0"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="TabControl">
+                        <Grid KeyboardNavigation.TabNavigation="Local">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="*"/>
+                            </Grid.RowDefinitions>
+                            <Border Grid.Row="0"
+                                    Background="White"
+                                    BorderBrush="#D4E2EA"
+                                    BorderThickness="1"
+                                    CornerRadius="18"
+                                    Padding="20,18"
+                                    Margin="0,0,0,18">
+                                <TabPanel IsItemsHost="True"
+                                          KeyboardNavigation.TabIndex="1"/>
+                            </Border>
+                            <Border Grid.Row="1"
+                                    Background="Transparent">
+                                <ContentPresenter x:Name="PART_SelectedContentHost"
+                                                  ContentSource="SelectedContent"
+                                                  SnapsToDevicePixels="{TemplateBinding SnapsToDevicePixels}"/>
+                            </Border>
+                        </Grid>
                     </ControlTemplate>
                 </Setter.Value>
             </Setter>
@@ -1018,13 +1186,6 @@
                                                 Visibility="Collapsed">
                                             إضافة مستخدم جديد
                                         </Button>
-                                        <Button x:Name="AdminAddDriverButton"
-                                                Style="{StaticResource SecondaryButtonStyle}"
-                                                Margin="0,10,0,0"
-                                                Click="DashboardAddDriverButton_Click"
-                                                Visibility="Collapsed">
-                                            إضافة سائق
-                                        </Button>
                                         <Button x:Name="AdminAddSupervisorButton"
                                                 Style="{StaticResource SecondaryButtonStyle}"
                                                 Margin="0,10,0,0"
@@ -1073,6 +1234,11 @@
                                                 Style="{StaticResource DashboardNavButtonStyle}"
                                                 Click="QuickOpenReportsButton_Click">
                                             التقارير
+                                        </Button>
+                                        <Button x:Name="DashboardDriversShortcutButton"
+                                                Style="{StaticResource DashboardNavButtonStyle}"
+                                                Click="QuickOpenDriversButton_Click">
+                                            السائقين
                                         </Button>
                                     </UniformGrid>
                                 </StackPanel>
@@ -1133,6 +1299,7 @@
                                                           SelectionChanged="DashboardAlertFilter_Changed">
                                                     <ComboBoxItem Content="كل الإنذارات" Tag="All"/>
                                                     <ComboBoxItem Content="التراخيص" Tag="Vehicle"/>
+                                                    <ComboBoxItem Content="رخص السائقين" Tag="Driver"/>
                                                     <ComboBoxItem Content="التأمينات" Tag="Insurance"/>
                                                     <ComboBoxItem Content="الزيت" Tag="OilChange"/>
                                                 </ComboBox>
@@ -1415,21 +1582,890 @@
 
                 <TabItem Header="السائقون"
                          Tag="Drivers">
-                    <DockPanel>
-                        <WrapPanel DockPanel.Dock="Top">
-                            <Button Style="{StaticResource PrimaryButtonStyle}"
-                                    Click="AddDriverButton_Click">إضافة</Button>
-                            <Button Style="{StaticResource PrimaryButtonStyle}"
-                                    Click="SaveDriverButton_Click">حفظ المحدد</Button>
-                            <Button Style="{StaticResource DangerButtonStyle}"
-                                    Click="DeleteDriverButton_Click">حذف المحدد</Button>
-                            <Button Style="{StaticResource PrimaryButtonStyle}"
-                                    Click="RefreshDriversButton_Click">تحديث</Button>
-                        </WrapPanel>
-                        <DataGrid x:Name="DriversGrid"
-                                  AutomationProperties.AutomationId="DriversGrid"
-                                  AutoGeneratingColumn="Grid_AutoGeneratingColumn"/>
-                    </DockPanel>
+                    <TabControl Style="{StaticResource DriverModuleTabControlStyle}"
+                                ItemContainerStyle="{StaticResource DriverModuleTabItemStyle}"
+                                SelectedIndex="0">
+                        <TabItem Header="تسجيل السائقين">
+                            <DockPanel>
+                                <Border DockPanel.Dock="Top"
+                                        Style="{StaticResource TripPageCardStyle}"
+                                        Margin="0,0,0,14">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel>
+                                            <TextBlock Style="{StaticResource PageTitleStyle}"
+                                                       Text="السائقين"/>
+                                        </StackPanel>
+                                        <WrapPanel Grid.Column="1"
+                                                   VerticalAlignment="Center">
+                                            <Button Style="{StaticResource TripRoundActionButtonStyle}"
+                                                    ToolTip="إضافة سائق"
+                                                    Click="AddDriverButton_Click">+</Button>
+                                            <Button Style="{StaticResource DangerButtonStyle}"
+                                                    Margin="10,0,0,0"
+                                                    Click="DeleteDriverButton_Click">حذف</Button>
+                                        </WrapPanel>
+                                    </Grid>
+                                </Border>
+                                <DataGrid x:Name="DriversGrid"
+                                          AutomationProperties.AutomationId="DriversGrid"
+                                          CellEditEnding="DriversGrid_CellEditEnding"
+                                          CurrentCellChanged="DriversGrid_CurrentCellChanged"
+                                          SelectedCellsChanged="DriversGrid_SelectedCellsChanged"
+                                          AutoGenerateColumns="False"
+                                          FrozenColumnCount="1"
+                                          HeadersVisibility="Column"
+                                          MinRowHeight="38"
+                                          ColumnHeaderHeight="75">
+                                    <DataGrid.Columns>
+                                        <DataGridTextColumn Binding="{Binding FullName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                                            Width="220">
+                                            <DataGridTextColumn.Header>
+                                                <StackPanel Orientation="Vertical" HorizontalAlignment="Stretch">
+                                                    <TextBlock Text="اسم السائق" HorizontalAlignment="Center" FontWeight="Bold" Margin="0,0,0,8"/>
+                                                    <TextBox x:Name="DriverFilterName"
+                                                             AutomationProperties.AutomationId="DriverFilterName"
+                                                             HorizontalAlignment="Stretch"
+                                                             Style="{StaticResource FilterTextBoxStyle}"
+                                                             TextChanged="DriverFilter_Changed"/>
+                                                </StackPanel>
+                                            </DataGridTextColumn.Header>
+                                        </DataGridTextColumn>
+                                        <DataGridTextColumn Binding="{Binding NationalId, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                                            Width="170">
+                                            <DataGridTextColumn.Header>
+                                                <StackPanel Orientation="Vertical" HorizontalAlignment="Stretch">
+                                                    <TextBlock Text="رقم قومي" HorizontalAlignment="Center" FontWeight="Bold" Margin="0,0,0,8"/>
+                                                    <TextBox x:Name="DriverFilterNationalId"
+                                                             AutomationProperties.AutomationId="DriverFilterNationalId"
+                                                             HorizontalAlignment="Stretch"
+                                                             Style="{StaticResource FilterTextBoxStyle}"
+                                                             TextChanged="DriverFilter_Changed"/>
+                                                </StackPanel>
+                                            </DataGridTextColumn.Header>
+                                        </DataGridTextColumn>
+                                        <DataGridTextColumn Binding="{Binding LicenseNumber, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                                            Width="150">
+                                            <DataGridTextColumn.Header>
+                                                <StackPanel Orientation="Vertical" HorizontalAlignment="Stretch">
+                                                    <TextBlock Text="رقم الرخصة" HorizontalAlignment="Center" FontWeight="Bold" Margin="0,0,0,8"/>
+                                                    <TextBox x:Name="DriverFilterLicense"
+                                                             AutomationProperties.AutomationId="DriverFilterLicense"
+                                                             HorizontalAlignment="Stretch"
+                                                             Style="{StaticResource FilterTextBoxStyle}"
+                                                             TextChanged="DriverFilter_Changed"/>
+                                                </StackPanel>
+                                            </DataGridTextColumn.Header>
+                                        </DataGridTextColumn>
+                                        <DataGridTextColumn Binding="{Binding LicenseType, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                                            Width="145">
+                                            <DataGridTextColumn.Header>
+                                                <StackPanel Orientation="Vertical" HorizontalAlignment="Stretch">
+                                                    <TextBlock Text="نوع الرخصة" HorizontalAlignment="Center" FontWeight="Bold" Margin="0,0,0,8"/>
+                                                    <TextBox x:Name="DriverFilterLicenseType"
+                                                             AutomationProperties.AutomationId="DriverFilterLicenseType"
+                                                             HorizontalAlignment="Stretch"
+                                                             Style="{StaticResource FilterTextBoxStyle}"
+                                                             TextChanged="DriverFilter_Changed"/>
+                                                </StackPanel>
+                                            </DataGridTextColumn.Header>
+                                        </DataGridTextColumn>
+                                        <DataGridTemplateColumn Width="150">
+                                            <DataGridTemplateColumn.Header>
+                                                <StackPanel Orientation="Vertical" HorizontalAlignment="Stretch">
+                                                    <TextBlock Text="بداية الرخصة" HorizontalAlignment="Center" FontWeight="Bold" Margin="0,0,0,8"/>
+                                                    <DatePicker x:Name="DriverFilterLicenseStartDate"
+                                                                AutomationProperties.AutomationId="DriverFilterLicenseStartDate"
+                                                                HorizontalAlignment="Stretch"
+                                                                Language="ar-EG"
+                                                                Style="{StaticResource FilterDatePickerStyle}"
+                                                                SelectedDateChanged="DriverFilter_Changed"/>
+                                                </StackPanel>
+                                            </DataGridTemplateColumn.Header>
+                                            <DataGridTemplateColumn.CellTemplate>
+                                                <DataTemplate>
+                                                    <TextBlock Text="{Binding LicenseStartDate, StringFormat=yyyy-MM-dd}"
+                                                               VerticalAlignment="Center"/>
+                                                </DataTemplate>
+                                            </DataGridTemplateColumn.CellTemplate>
+                                            <DataGridTemplateColumn.CellEditingTemplate>
+                                                <DataTemplate>
+                                                    <DatePicker SelectedDate="{Binding LicenseStartDate, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                                                Language="ar-EG"
+                                                                Style="{StaticResource FilterDatePickerStyle}"/>
+                                                </DataTemplate>
+                                            </DataGridTemplateColumn.CellEditingTemplate>
+                                        </DataGridTemplateColumn>
+                                        <DataGridTemplateColumn Width="150">
+                                            <DataGridTemplateColumn.Header>
+                                                <StackPanel Orientation="Vertical" HorizontalAlignment="Stretch">
+                                                    <TextBlock Text="نهاية الرخصة" HorizontalAlignment="Center" FontWeight="Bold" Margin="0,0,0,8"/>
+                                                    <DatePicker x:Name="DriverFilterLicenseExpiryDate"
+                                                                AutomationProperties.AutomationId="DriverFilterLicenseExpiryDate"
+                                                                HorizontalAlignment="Stretch"
+                                                                Language="ar-EG"
+                                                                Style="{StaticResource FilterDatePickerStyle}"
+                                                                SelectedDateChanged="DriverFilter_Changed"/>
+                                                </StackPanel>
+                                            </DataGridTemplateColumn.Header>
+                                            <DataGridTemplateColumn.CellTemplate>
+                                                <DataTemplate>
+                                                    <TextBlock Text="{Binding LicenseExpiryDate, StringFormat=yyyy-MM-dd}"
+                                                               VerticalAlignment="Center"/>
+                                                </DataTemplate>
+                                            </DataGridTemplateColumn.CellTemplate>
+                                            <DataGridTemplateColumn.CellEditingTemplate>
+                                                <DataTemplate>
+                                                    <DatePicker SelectedDate="{Binding LicenseExpiryDate, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                                                Language="ar-EG"
+                                                                Style="{StaticResource FilterDatePickerStyle}"/>
+                                                </DataTemplate>
+                                            </DataGridTemplateColumn.CellEditingTemplate>
+                                        </DataGridTemplateColumn>
+                                        <DataGridCheckBoxColumn Binding="{Binding IsCompanyInsured, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                                                Width="120">
+                                            <DataGridCheckBoxColumn.Header>
+                                                <StackPanel Orientation="Vertical" HorizontalAlignment="Stretch">
+                                                    <TextBlock Text="متأمن عليه" HorizontalAlignment="Center" FontWeight="Bold" Margin="0,0,0,8"/>
+                                                    <TextBox x:Name="DriverFilterInsurance"
+                                                             AutomationProperties.AutomationId="DriverFilterInsurance"
+                                                             HorizontalAlignment="Stretch"
+                                                             Style="{StaticResource FilterTextBoxStyle}"
+                                                             TextChanged="DriverFilter_Changed"/>
+                                                </StackPanel>
+                                            </DataGridCheckBoxColumn.Header>
+                                        </DataGridCheckBoxColumn>
+                                        <DataGridTextColumn Binding="{Binding Governorate, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                                            Width="140">
+                                            <DataGridTextColumn.Header>
+                                                <StackPanel Orientation="Vertical" HorizontalAlignment="Stretch">
+                                                    <TextBlock Text="المحافظة" HorizontalAlignment="Center" FontWeight="Bold" Margin="0,0,0,8"/>
+                                                    <TextBox x:Name="DriverFilterGovernorate"
+                                                             AutomationProperties.AutomationId="DriverFilterGovernorate"
+                                                             HorizontalAlignment="Stretch"
+                                                             Style="{StaticResource FilterTextBoxStyle}"
+                                                             TextChanged="DriverFilter_Changed"/>
+                                                </StackPanel>
+                                            </DataGridTextColumn.Header>
+                                        </DataGridTextColumn>
+                                        <DataGridTextColumn Binding="{Binding FullAddress, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                                            Width="240">
+                                            <DataGridTextColumn.Header>
+                                                <StackPanel Orientation="Vertical" HorizontalAlignment="Stretch">
+                                                    <TextBlock Text="العنوان بالكامل" HorizontalAlignment="Center" FontWeight="Bold" Margin="0,0,0,8"/>
+                                                    <TextBox x:Name="DriverFilterFullAddress"
+                                                             AutomationProperties.AutomationId="DriverFilterFullAddress"
+                                                             HorizontalAlignment="Stretch"
+                                                             Style="{StaticResource FilterTextBoxStyle}"
+                                                             TextChanged="DriverFilter_Changed"/>
+                                                </StackPanel>
+                                            </DataGridTextColumn.Header>
+                                        </DataGridTextColumn>
+                                        <DataGridTextColumn Binding="{Binding TrafficUnit, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                                            Width="160">
+                                            <DataGridTextColumn.Header>
+                                                <StackPanel Orientation="Vertical" HorizontalAlignment="Stretch">
+                                                    <TextBlock Text="وحدة المرور" HorizontalAlignment="Center" FontWeight="Bold" Margin="0,0,0,8"/>
+                                                    <TextBox x:Name="DriverFilterTrafficUnit"
+                                                             AutomationProperties.AutomationId="DriverFilterTrafficUnit"
+                                                             HorizontalAlignment="Stretch"
+                                                             Style="{StaticResource FilterTextBoxStyle}"
+                                                             TextChanged="DriverFilter_Changed"/>
+                                                </StackPanel>
+                                            </DataGridTextColumn.Header>
+                                        </DataGridTextColumn>
+                                        <DataGridTextColumn Binding="{Binding WorkLocation, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                                            Width="160">
+                                            <DataGridTextColumn.Header>
+                                                <StackPanel Orientation="Vertical" HorizontalAlignment="Stretch">
+                                                    <TextBlock Text="موقع العمل" HorizontalAlignment="Center" FontWeight="Bold" Margin="0,0,0,8"/>
+                                                    <TextBox x:Name="DriverFilterWorkLocation"
+                                                             AutomationProperties.AutomationId="DriverFilterWorkLocation"
+                                                             HorizontalAlignment="Stretch"
+                                                             Style="{StaticResource FilterTextBoxStyle}"
+                                                             TextChanged="DriverFilter_Changed"/>
+                                                </StackPanel>
+                                            </DataGridTextColumn.Header>
+                                        </DataGridTextColumn>
+                                        <DataGridCheckBoxColumn Binding="{Binding IsActive, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                                                Width="95">
+                                            <DataGridCheckBoxColumn.Header>
+                                                <StackPanel Orientation="Vertical" HorizontalAlignment="Stretch">
+                                                    <TextBlock Text="مفعل" HorizontalAlignment="Center" FontWeight="Bold" Margin="0,0,0,8"/>
+                                                    <TextBox x:Name="DriverFilterActive"
+                                                             AutomationProperties.AutomationId="DriverFilterActive"
+                                                             HorizontalAlignment="Stretch"
+                                                             Style="{StaticResource FilterTextBoxStyle}"
+                                                             TextChanged="DriverFilter_Changed"/>
+                                                </StackPanel>
+                                            </DataGridCheckBoxColumn.Header>
+                                        </DataGridCheckBoxColumn>
+                                    </DataGrid.Columns>
+                                </DataGrid>
+                            </DockPanel>
+                        </TabItem>
+
+                        <TabItem Header="حضور وغياب الأسبوع">
+                            <Grid>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="*"/>
+                                </Grid.RowDefinitions>
+                                <Border Style="{StaticResource TripPageCardStyle}"
+                                        Margin="0,0,0,14">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel>
+                                            <TextBlock Style="{StaticResource PageTitleStyle}"
+                                                       Text="الحضور والغياب"/>
+                                        </StackPanel>
+                                        <WrapPanel Grid.Column="1"
+                                                   VerticalAlignment="Center">
+                                            <StackPanel Width="180"
+                                                        Margin="0,0,10,0">
+                                                <TextBlock Text="أسبوع يبدأ من"
+                                                           FontSize="12"
+                                                           FontWeight="SemiBold"
+                                                           Foreground="{StaticResource MutedBrush}"
+                                                           Margin="0,0,0,6"/>
+                                                <DatePicker x:Name="DriverAttendanceWeekPicker"
+                                                            Height="42"
+                                                            Language="ar-EG"
+                                                            Style="{StaticResource FilterDatePickerStyle}"/>
+                                            </StackPanel>
+                                            <Button Style="{StaticResource SecondaryButtonStyle}"
+                                                    Click="LoadDriverAttendanceWeekButton_Click">تحميل الأسبوع</Button>
+                                        </WrapPanel>
+                                    </Grid>
+                                </Border>
+                                <DataGrid x:Name="DriverAttendanceGrid"
+                                          Grid.Row="1"
+                                          AutomationProperties.AutomationId="DriverAttendanceGrid"
+                                          AutomationProperties.Name="جدول حضور وغياب السائقين"
+                                          RowHeight="92"
+                                          MinRowHeight="92"
+                                          AlternationCount="2"
+                                          GridLinesVisibility="None"
+                                          AutoGenerateColumns="False"
+                                          FrozenColumnCount="1"
+                                          HeadersVisibility="Column"
+                                          ColumnHeaderHeight="75">
+                                    <DataGrid.Columns>
+                                        <DataGridTextColumn Binding="{Binding DriverName}"
+                                                            IsReadOnly="True"
+                                                            Width="220">
+                                            <DataGridTextColumn.Header>
+                                                <StackPanel Orientation="Vertical" HorizontalAlignment="Stretch">
+                                                    <TextBlock Text="اسم السائق" HorizontalAlignment="Center" FontWeight="Bold" Margin="0,0,0,8"/>
+                                                    <TextBox x:Name="DriverAttendanceFilterName"
+                                                             AutomationProperties.AutomationId="DriverAttendanceFilterName"
+                                                             HorizontalAlignment="Stretch"
+                                                             Style="{StaticResource FilterTextBoxStyle}"
+                                                             TextChanged="DriverAttendanceFilter_Changed"/>
+                                                </StackPanel>
+                                            </DataGridTextColumn.Header>
+                                        </DataGridTextColumn>
+                                        <DataGridTextColumn Binding="{Binding WorkLocation, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                                            Width="180">
+                                            <DataGridTextColumn.Header>
+                                                <StackPanel Orientation="Vertical" HorizontalAlignment="Stretch">
+                                                    <TextBlock Text="موقع العمل" HorizontalAlignment="Center" FontWeight="Bold" Margin="0,0,0,8"/>
+                                                    <TextBox x:Name="DriverAttendanceFilterWorkLocation"
+                                                             AutomationProperties.AutomationId="DriverAttendanceFilterWorkLocation"
+                                                             HorizontalAlignment="Stretch"
+                                                             Style="{StaticResource FilterTextBoxStyle}"
+                                                             TextChanged="DriverAttendanceFilter_Changed"/>
+                                                </StackPanel>
+                                            </DataGridTextColumn.Header>
+                                        </DataGridTextColumn>
+                                        <DataGridTemplateColumn Width="190">
+                                            <DataGridTemplateColumn.Header>
+                                                <StackPanel Orientation="Vertical" HorizontalAlignment="Stretch">
+                                                    <TextBlock Text="السبت" HorizontalAlignment="Center" FontWeight="Bold" Margin="0,0,0,8"/>
+                                                    <TextBox x:Name="DriverAttendanceFilterSaturday"
+                                                             AutomationProperties.AutomationId="DriverAttendanceFilterSaturday"
+                                                             HorizontalAlignment="Stretch"
+                                                             Style="{StaticResource FilterTextBoxStyle}"
+                                                             TextChanged="DriverAttendanceFilter_Changed"/>
+                                                </StackPanel>
+                                            </DataGridTemplateColumn.Header>
+                                            <DataGridTemplateColumn.CellTemplate>
+                                                <DataTemplate>
+                                                    <Border Style="{StaticResource DriverAttendanceDayCellBorderStyle}">
+                                                        <Grid>
+                                                            <Grid.RowDefinitions>
+                                                                <RowDefinition Height="Auto"/>
+                                                                <RowDefinition Height="Auto"/>
+                                                            </Grid.RowDefinitions>
+                                                            <ComboBox ItemsSource="{StaticResource DriverAttendanceStatuses}"
+                                                                      SelectedItem="{Binding SaturdayStatus, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                                                      SelectionChanged="DriverAttendanceInput_Changed"
+                                                                      Style="{StaticResource DriverAttendanceStatusComboBoxStyle}"
+                                                                      ToolTip="حالة السبت"
+                                                                      AutomationProperties.Name="حالة السبت"/>
+                                                            <TextBox Grid.Row="1"
+                                                                     Text="{Binding SaturdayReason, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                                                     IsEnabled="{Binding SaturdayStatus, Converter={StaticResource AttendanceReasonEnabledConverter}}"
+                                                                     TextChanged="DriverAttendanceInput_Changed"
+                                                                     Style="{StaticResource DriverAttendanceReasonTextBoxStyle}"
+                                                                     ToolTip="سبب السبت"
+                                                                     AutomationProperties.Name="سبب السبت"/>
+                                                        </Grid>
+                                                    </Border>
+                                                </DataTemplate>
+                                            </DataGridTemplateColumn.CellTemplate>
+                                        </DataGridTemplateColumn>
+                                        <DataGridTemplateColumn Width="190">
+                                            <DataGridTemplateColumn.Header>
+                                                <StackPanel Orientation="Vertical" HorizontalAlignment="Stretch">
+                                                    <TextBlock Text="الأحد" HorizontalAlignment="Center" FontWeight="Bold" Margin="0,0,0,8"/>
+                                                    <TextBox x:Name="DriverAttendanceFilterSunday"
+                                                             AutomationProperties.AutomationId="DriverAttendanceFilterSunday"
+                                                             HorizontalAlignment="Stretch"
+                                                             Style="{StaticResource FilterTextBoxStyle}"
+                                                             TextChanged="DriverAttendanceFilter_Changed"/>
+                                                </StackPanel>
+                                            </DataGridTemplateColumn.Header>
+                                            <DataGridTemplateColumn.CellTemplate>
+                                                <DataTemplate>
+                                                    <Border Style="{StaticResource DriverAttendanceDayCellBorderStyle}">
+                                                        <Grid>
+                                                            <Grid.RowDefinitions>
+                                                                <RowDefinition Height="Auto"/>
+                                                                <RowDefinition Height="Auto"/>
+                                                            </Grid.RowDefinitions>
+                                                            <ComboBox ItemsSource="{StaticResource DriverAttendanceStatuses}"
+                                                                      SelectedItem="{Binding SundayStatus, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                                                      SelectionChanged="DriverAttendanceInput_Changed"
+                                                                      Style="{StaticResource DriverAttendanceStatusComboBoxStyle}"
+                                                                      ToolTip="حالة الأحد"
+                                                                      AutomationProperties.Name="حالة الأحد"/>
+                                                            <TextBox Grid.Row="1"
+                                                                     Text="{Binding SundayReason, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                                                     IsEnabled="{Binding SundayStatus, Converter={StaticResource AttendanceReasonEnabledConverter}}"
+                                                                     TextChanged="DriverAttendanceInput_Changed"
+                                                                     Style="{StaticResource DriverAttendanceReasonTextBoxStyle}"
+                                                                     ToolTip="سبب الأحد"
+                                                                     AutomationProperties.Name="سبب الأحد"/>
+                                                        </Grid>
+                                                    </Border>
+                                                </DataTemplate>
+                                            </DataGridTemplateColumn.CellTemplate>
+                                        </DataGridTemplateColumn>
+                                        <DataGridTemplateColumn Width="190">
+                                            <DataGridTemplateColumn.Header>
+                                                <StackPanel Orientation="Vertical" HorizontalAlignment="Stretch">
+                                                    <TextBlock Text="الاثنين" HorizontalAlignment="Center" FontWeight="Bold" Margin="0,0,0,8"/>
+                                                    <TextBox x:Name="DriverAttendanceFilterMonday"
+                                                             AutomationProperties.AutomationId="DriverAttendanceFilterMonday"
+                                                             HorizontalAlignment="Stretch"
+                                                             Style="{StaticResource FilterTextBoxStyle}"
+                                                             TextChanged="DriverAttendanceFilter_Changed"/>
+                                                </StackPanel>
+                                            </DataGridTemplateColumn.Header>
+                                            <DataGridTemplateColumn.CellTemplate>
+                                                <DataTemplate>
+                                                    <Border Style="{StaticResource DriverAttendanceDayCellBorderStyle}">
+                                                        <Grid>
+                                                            <Grid.RowDefinitions>
+                                                                <RowDefinition Height="Auto"/>
+                                                                <RowDefinition Height="Auto"/>
+                                                            </Grid.RowDefinitions>
+                                                            <ComboBox ItemsSource="{StaticResource DriverAttendanceStatuses}"
+                                                                      SelectedItem="{Binding MondayStatus, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                                                      SelectionChanged="DriverAttendanceInput_Changed"
+                                                                      Style="{StaticResource DriverAttendanceStatusComboBoxStyle}"
+                                                                      ToolTip="حالة الاثنين"
+                                                                      AutomationProperties.Name="حالة الاثنين"/>
+                                                            <TextBox Grid.Row="1"
+                                                                     Text="{Binding MondayReason, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                                                     IsEnabled="{Binding MondayStatus, Converter={StaticResource AttendanceReasonEnabledConverter}}"
+                                                                     TextChanged="DriverAttendanceInput_Changed"
+                                                                     Style="{StaticResource DriverAttendanceReasonTextBoxStyle}"
+                                                                     ToolTip="سبب الاثنين"
+                                                                     AutomationProperties.Name="سبب الاثنين"/>
+                                                        </Grid>
+                                                    </Border>
+                                                </DataTemplate>
+                                            </DataGridTemplateColumn.CellTemplate>
+                                        </DataGridTemplateColumn>
+                                        <DataGridTemplateColumn Width="190">
+                                            <DataGridTemplateColumn.Header>
+                                                <StackPanel Orientation="Vertical" HorizontalAlignment="Stretch">
+                                                    <TextBlock Text="الثلاثاء" HorizontalAlignment="Center" FontWeight="Bold" Margin="0,0,0,8"/>
+                                                    <TextBox x:Name="DriverAttendanceFilterTuesday"
+                                                             AutomationProperties.AutomationId="DriverAttendanceFilterTuesday"
+                                                             HorizontalAlignment="Stretch"
+                                                             Style="{StaticResource FilterTextBoxStyle}"
+                                                             TextChanged="DriverAttendanceFilter_Changed"/>
+                                                </StackPanel>
+                                            </DataGridTemplateColumn.Header>
+                                            <DataGridTemplateColumn.CellTemplate>
+                                                <DataTemplate>
+                                                    <Border Style="{StaticResource DriverAttendanceDayCellBorderStyle}">
+                                                        <Grid>
+                                                            <Grid.RowDefinitions>
+                                                                <RowDefinition Height="Auto"/>
+                                                                <RowDefinition Height="Auto"/>
+                                                            </Grid.RowDefinitions>
+                                                            <ComboBox ItemsSource="{StaticResource DriverAttendanceStatuses}"
+                                                                      SelectedItem="{Binding TuesdayStatus, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                                                      SelectionChanged="DriverAttendanceInput_Changed"
+                                                                      Style="{StaticResource DriverAttendanceStatusComboBoxStyle}"
+                                                                      ToolTip="حالة الثلاثاء"
+                                                                      AutomationProperties.Name="حالة الثلاثاء"/>
+                                                            <TextBox Grid.Row="1"
+                                                                     Text="{Binding TuesdayReason, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                                                     IsEnabled="{Binding TuesdayStatus, Converter={StaticResource AttendanceReasonEnabledConverter}}"
+                                                                     TextChanged="DriverAttendanceInput_Changed"
+                                                                     Style="{StaticResource DriverAttendanceReasonTextBoxStyle}"
+                                                                     ToolTip="سبب الثلاثاء"
+                                                                     AutomationProperties.Name="سبب الثلاثاء"/>
+                                                        </Grid>
+                                                    </Border>
+                                                </DataTemplate>
+                                            </DataGridTemplateColumn.CellTemplate>
+                                        </DataGridTemplateColumn>
+                                        <DataGridTemplateColumn Width="190">
+                                            <DataGridTemplateColumn.Header>
+                                                <StackPanel Orientation="Vertical" HorizontalAlignment="Stretch">
+                                                    <TextBlock Text="الأربعاء" HorizontalAlignment="Center" FontWeight="Bold" Margin="0,0,0,8"/>
+                                                    <TextBox x:Name="DriverAttendanceFilterWednesday"
+                                                             AutomationProperties.AutomationId="DriverAttendanceFilterWednesday"
+                                                             HorizontalAlignment="Stretch"
+                                                             Style="{StaticResource FilterTextBoxStyle}"
+                                                             TextChanged="DriverAttendanceFilter_Changed"/>
+                                                </StackPanel>
+                                            </DataGridTemplateColumn.Header>
+                                            <DataGridTemplateColumn.CellTemplate>
+                                                <DataTemplate>
+                                                    <Border Style="{StaticResource DriverAttendanceDayCellBorderStyle}">
+                                                        <Grid>
+                                                            <Grid.RowDefinitions>
+                                                                <RowDefinition Height="Auto"/>
+                                                                <RowDefinition Height="Auto"/>
+                                                            </Grid.RowDefinitions>
+                                                            <ComboBox ItemsSource="{StaticResource DriverAttendanceStatuses}"
+                                                                      SelectedItem="{Binding WednesdayStatus, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                                                      SelectionChanged="DriverAttendanceInput_Changed"
+                                                                      Style="{StaticResource DriverAttendanceStatusComboBoxStyle}"
+                                                                      ToolTip="حالة الأربعاء"
+                                                                      AutomationProperties.Name="حالة الأربعاء"/>
+                                                            <TextBox Grid.Row="1"
+                                                                     Text="{Binding WednesdayReason, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                                                     IsEnabled="{Binding WednesdayStatus, Converter={StaticResource AttendanceReasonEnabledConverter}}"
+                                                                     TextChanged="DriverAttendanceInput_Changed"
+                                                                     Style="{StaticResource DriverAttendanceReasonTextBoxStyle}"
+                                                                     ToolTip="سبب الأربعاء"
+                                                                     AutomationProperties.Name="سبب الأربعاء"/>
+                                                        </Grid>
+                                                    </Border>
+                                                </DataTemplate>
+                                            </DataGridTemplateColumn.CellTemplate>
+                                        </DataGridTemplateColumn>
+                                        <DataGridTemplateColumn Width="190">
+                                            <DataGridTemplateColumn.Header>
+                                                <StackPanel Orientation="Vertical" HorizontalAlignment="Stretch">
+                                                    <TextBlock Text="الخميس" HorizontalAlignment="Center" FontWeight="Bold" Margin="0,0,0,8"/>
+                                                    <TextBox x:Name="DriverAttendanceFilterThursday"
+                                                             AutomationProperties.AutomationId="DriverAttendanceFilterThursday"
+                                                             HorizontalAlignment="Stretch"
+                                                             Style="{StaticResource FilterTextBoxStyle}"
+                                                             TextChanged="DriverAttendanceFilter_Changed"/>
+                                                </StackPanel>
+                                            </DataGridTemplateColumn.Header>
+                                            <DataGridTemplateColumn.CellTemplate>
+                                                <DataTemplate>
+                                                    <Border Style="{StaticResource DriverAttendanceDayCellBorderStyle}">
+                                                        <Grid>
+                                                            <Grid.RowDefinitions>
+                                                                <RowDefinition Height="Auto"/>
+                                                                <RowDefinition Height="Auto"/>
+                                                            </Grid.RowDefinitions>
+                                                            <ComboBox ItemsSource="{StaticResource DriverAttendanceStatuses}"
+                                                                      SelectedItem="{Binding ThursdayStatus, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                                                      SelectionChanged="DriverAttendanceInput_Changed"
+                                                                      Style="{StaticResource DriverAttendanceStatusComboBoxStyle}"
+                                                                      ToolTip="حالة الخميس"
+                                                                      AutomationProperties.Name="حالة الخميس"/>
+                                                            <TextBox Grid.Row="1"
+                                                                     Text="{Binding ThursdayReason, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                                                     IsEnabled="{Binding ThursdayStatus, Converter={StaticResource AttendanceReasonEnabledConverter}}"
+                                                                     TextChanged="DriverAttendanceInput_Changed"
+                                                                     Style="{StaticResource DriverAttendanceReasonTextBoxStyle}"
+                                                                     ToolTip="سبب الخميس"
+                                                                     AutomationProperties.Name="سبب الخميس"/>
+                                                        </Grid>
+                                                    </Border>
+                                                </DataTemplate>
+                                            </DataGridTemplateColumn.CellTemplate>
+                                        </DataGridTemplateColumn>
+                                        <DataGridTemplateColumn Width="190">
+                                            <DataGridTemplateColumn.Header>
+                                                <StackPanel Orientation="Vertical" HorizontalAlignment="Stretch">
+                                                    <TextBlock Text="الجمعة" HorizontalAlignment="Center" FontWeight="Bold" Margin="0,0,0,8"/>
+                                                    <TextBox x:Name="DriverAttendanceFilterFriday"
+                                                             AutomationProperties.AutomationId="DriverAttendanceFilterFriday"
+                                                             HorizontalAlignment="Stretch"
+                                                             Style="{StaticResource FilterTextBoxStyle}"
+                                                             TextChanged="DriverAttendanceFilter_Changed"/>
+                                                </StackPanel>
+                                            </DataGridTemplateColumn.Header>
+                                            <DataGridTemplateColumn.CellTemplate>
+                                                <DataTemplate>
+                                                    <Border Style="{StaticResource DriverAttendanceDayCellBorderStyle}">
+                                                        <Grid>
+                                                            <Grid.RowDefinitions>
+                                                                <RowDefinition Height="Auto"/>
+                                                                <RowDefinition Height="Auto"/>
+                                                            </Grid.RowDefinitions>
+                                                            <ComboBox ItemsSource="{StaticResource DriverAttendanceStatuses}"
+                                                                      SelectedItem="{Binding FridayStatus, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                                                      SelectionChanged="DriverAttendanceInput_Changed"
+                                                                      Style="{StaticResource DriverAttendanceStatusComboBoxStyle}"
+                                                                      ToolTip="حالة الجمعة"
+                                                                      AutomationProperties.Name="حالة الجمعة"/>
+                                                            <TextBox Grid.Row="1"
+                                                                     Text="{Binding FridayReason, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                                                     IsEnabled="{Binding FridayStatus, Converter={StaticResource AttendanceReasonEnabledConverter}}"
+                                                                     TextChanged="DriverAttendanceInput_Changed"
+                                                                     Style="{StaticResource DriverAttendanceReasonTextBoxStyle}"
+                                                                     ToolTip="سبب الجمعة"
+                                                                     AutomationProperties.Name="سبب الجمعة"/>
+                                                        </Grid>
+                                                    </Border>
+                                                </DataTemplate>
+                                            </DataGridTemplateColumn.CellTemplate>
+                                        </DataGridTemplateColumn>
+                                    </DataGrid.Columns>
+                                </DataGrid>
+                            </Grid>
+                        </TabItem>
+
+                        <TabItem Header="تقرير السائقين">
+                            <Grid>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="*"/>
+                                </Grid.RowDefinitions>
+                                <Border Style="{StaticResource TripPageCardStyle}"
+                                        Margin="0,0,0,14">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel>
+                                            <TextBlock Style="{StaticResource PageTitleStyle}"
+                                                       Text="تقارير السائقين"/>
+                                        </StackPanel>
+                                        <WrapPanel Grid.Column="1"
+                                                   VerticalAlignment="Center">
+                                            <StackPanel Width="150"
+                                                        Margin="0,0,10,0">
+                                                <TextBlock Text="من"
+                                                           FontSize="12"
+                                                           FontWeight="SemiBold"
+                                                           Foreground="{StaticResource MutedBrush}"
+                                                           Margin="0,0,0,6"/>
+                                                <DatePicker x:Name="DriverReportStartDatePicker"
+                                                            Height="42"
+                                                            Language="ar-EG"
+                                                            Style="{StaticResource FilterDatePickerStyle}"/>
+                                            </StackPanel>
+                                            <StackPanel Width="150"
+                                                        Margin="0,0,10,0">
+                                                <TextBlock Text="إلى"
+                                                           FontSize="12"
+                                                           FontWeight="SemiBold"
+                                                           Foreground="{StaticResource MutedBrush}"
+                                                           Margin="0,0,0,6"/>
+                                                <DatePicker x:Name="DriverReportEndDatePicker"
+                                                            Height="42"
+                                                            Language="ar-EG"
+                                                            Style="{StaticResource FilterDatePickerStyle}"/>
+                                            </StackPanel>
+                                            <StackPanel Width="240"
+                                                        Margin="0,0,10,0">
+                                                <TextBlock Text="السائق"
+                                                           FontSize="12"
+                                                           FontWeight="SemiBold"
+                                                           Foreground="{StaticResource MutedBrush}"
+                                                           Margin="0,0,0,6"/>
+                                                <ComboBox x:Name="DriverReportDriverComboBox"
+                                                          Height="42"
+                                                          DisplayMemberPath="FullName"
+                                                          SelectedValuePath="Id"
+                                                          Style="{StaticResource AppComboBoxStyle}"/>
+                                            </StackPanel>
+                                            <Button Style="{StaticResource SecondaryButtonStyle}"
+                                                    Click="GenerateDriverReportButton_Click">توليد التقرير</Button>
+                                            <Button Style="{StaticResource ReportToolbarIconButtonStyle}"
+                                                    Content="{Binding}"
+                                                    ContentTemplate="{StaticResource GridPrintActionIconTemplate}"
+                                                    ToolTip="طباعة تقرير السائقين"
+                                                    AutomationProperties.AutomationId="PrintDriverReportButton"
+                                                    AutomationProperties.Name="طباعة تقرير السائقين"
+                                                    Click="PrintDriverReportButton_Click"/>
+                                        </WrapPanel>
+                                    </Grid>
+                                </Border>
+                                <DataGrid x:Name="DriverReportsGrid"
+                                          Grid.Row="1"
+                                          AutomationProperties.AutomationId="DriverReportsGrid"
+                                          IsReadOnly="True"
+                                          AutoGenerateColumns="False"
+                                          FrozenColumnCount="1"
+                                          HeadersVisibility="Column"
+                                          ColumnHeaderHeight="75">
+                                    <DataGrid.Columns>
+                                        <DataGridTextColumn Binding="{Binding FullName}"
+                                                            Width="220">
+                                            <DataGridTextColumn.Header>
+                                                <StackPanel Orientation="Vertical" HorizontalAlignment="Stretch">
+                                                    <TextBlock Text="اسم السائق" HorizontalAlignment="Center" FontWeight="Bold" Margin="0,0,0,8"/>
+                                                    <TextBox x:Name="DriverReportFilterName"
+                                                             AutomationProperties.AutomationId="DriverReportFilterName"
+                                                             HorizontalAlignment="Stretch"
+                                                             Style="{StaticResource FilterTextBoxStyle}"
+                                                             TextChanged="DriverReportFilter_Changed"/>
+                                                </StackPanel>
+                                            </DataGridTextColumn.Header>
+                                        </DataGridTextColumn>
+                                        <DataGridTextColumn Binding="{Binding NationalId}"
+                                                            Width="170">
+                                            <DataGridTextColumn.Header>
+                                                <StackPanel Orientation="Vertical" HorizontalAlignment="Stretch">
+                                                    <TextBlock Text="رقم قومي" HorizontalAlignment="Center" FontWeight="Bold" Margin="0,0,0,8"/>
+                                                    <TextBox x:Name="DriverReportFilterNationalId"
+                                                             AutomationProperties.AutomationId="DriverReportFilterNationalId"
+                                                             HorizontalAlignment="Stretch"
+                                                             Style="{StaticResource FilterTextBoxStyle}"
+                                                             TextChanged="DriverReportFilter_Changed"/>
+                                                </StackPanel>
+                                            </DataGridTextColumn.Header>
+                                        </DataGridTextColumn>
+                                        <DataGridTextColumn Binding="{Binding LicenseNumber}"
+                                                            Width="150">
+                                            <DataGridTextColumn.Header>
+                                                <StackPanel Orientation="Vertical" HorizontalAlignment="Stretch">
+                                                    <TextBlock Text="رقم الرخصة" HorizontalAlignment="Center" FontWeight="Bold" Margin="0,0,0,8"/>
+                                                    <TextBox x:Name="DriverReportFilterLicenseNumber"
+                                                             AutomationProperties.AutomationId="DriverReportFilterLicenseNumber"
+                                                             HorizontalAlignment="Stretch"
+                                                             Style="{StaticResource FilterTextBoxStyle}"
+                                                             TextChanged="DriverReportFilter_Changed"/>
+                                                </StackPanel>
+                                            </DataGridTextColumn.Header>
+                                        </DataGridTextColumn>
+                                        <DataGridTextColumn Binding="{Binding LicenseType}"
+                                                            Width="150">
+                                            <DataGridTextColumn.Header>
+                                                <StackPanel Orientation="Vertical" HorizontalAlignment="Stretch">
+                                                    <TextBlock Text="نوع الرخصة" HorizontalAlignment="Center" FontWeight="Bold" Margin="0,0,0,8"/>
+                                                    <TextBox x:Name="DriverReportFilterLicenseType"
+                                                             AutomationProperties.AutomationId="DriverReportFilterLicenseType"
+                                                             HorizontalAlignment="Stretch"
+                                                             Style="{StaticResource FilterTextBoxStyle}"
+                                                             TextChanged="DriverReportFilter_Changed"/>
+                                                </StackPanel>
+                                            </DataGridTextColumn.Header>
+                                        </DataGridTextColumn>
+                                        <DataGridTextColumn Binding="{Binding LicenseStartDate, StringFormat=yyyy-MM-dd}"
+                                                            Width="160">
+                                            <DataGridTextColumn.Header>
+                                                <StackPanel Orientation="Vertical" HorizontalAlignment="Stretch">
+                                                    <TextBlock Text="بداية الرخصة" HorizontalAlignment="Center" FontWeight="Bold" Margin="0,0,0,8"/>
+                                                    <DatePicker x:Name="DriverReportFilterLicenseStartDate"
+                                                                AutomationProperties.AutomationId="DriverReportFilterLicenseStartDate"
+                                                                HorizontalAlignment="Stretch"
+                                                                Language="ar-EG"
+                                                                Style="{StaticResource FilterDatePickerStyle}"
+                                                                SelectedDateChanged="DriverReportFilter_Changed"/>
+                                                </StackPanel>
+                                            </DataGridTextColumn.Header>
+                                        </DataGridTextColumn>
+                                        <DataGridTextColumn Binding="{Binding LicenseExpiryDate, StringFormat=yyyy-MM-dd}"
+                                                            Width="160">
+                                            <DataGridTextColumn.Header>
+                                                <StackPanel Orientation="Vertical" HorizontalAlignment="Stretch">
+                                                    <TextBlock Text="نهاية الرخصة" HorizontalAlignment="Center" FontWeight="Bold" Margin="0,0,0,8"/>
+                                                    <DatePicker x:Name="DriverReportFilterLicenseExpiryDate"
+                                                                AutomationProperties.AutomationId="DriverReportFilterLicenseExpiryDate"
+                                                                HorizontalAlignment="Stretch"
+                                                                Language="ar-EG"
+                                                                Style="{StaticResource FilterDatePickerStyle}"
+                                                                SelectedDateChanged="DriverReportFilter_Changed"/>
+                                                </StackPanel>
+                                            </DataGridTextColumn.Header>
+                                        </DataGridTextColumn>
+                                        <DataGridCheckBoxColumn Binding="{Binding IsCompanyInsured}"
+                                                                Width="120">
+                                            <DataGridCheckBoxColumn.Header>
+                                                <StackPanel Orientation="Vertical" HorizontalAlignment="Stretch">
+                                                    <TextBlock Text="متأمن عليه" HorizontalAlignment="Center" FontWeight="Bold" Margin="0,0,0,8"/>
+                                                    <TextBox x:Name="DriverReportFilterInsurance"
+                                                             AutomationProperties.AutomationId="DriverReportFilterInsurance"
+                                                             HorizontalAlignment="Stretch"
+                                                             Style="{StaticResource FilterTextBoxStyle}"
+                                                             TextChanged="DriverReportFilter_Changed"/>
+                                                </StackPanel>
+                                            </DataGridCheckBoxColumn.Header>
+                                        </DataGridCheckBoxColumn>
+                                        <DataGridTextColumn Binding="{Binding Governorate}"
+                                                            Width="150">
+                                            <DataGridTextColumn.Header>
+                                                <StackPanel Orientation="Vertical" HorizontalAlignment="Stretch">
+                                                    <TextBlock Text="المحافظة" HorizontalAlignment="Center" FontWeight="Bold" Margin="0,0,0,8"/>
+                                                    <TextBox x:Name="DriverReportFilterGovernorate"
+                                                             AutomationProperties.AutomationId="DriverReportFilterGovernorate"
+                                                             HorizontalAlignment="Stretch"
+                                                             Style="{StaticResource FilterTextBoxStyle}"
+                                                             TextChanged="DriverReportFilter_Changed"/>
+                                                </StackPanel>
+                                            </DataGridTextColumn.Header>
+                                        </DataGridTextColumn>
+                                        <DataGridTextColumn Binding="{Binding FullAddress}"
+                                                            Width="320">
+                                            <DataGridTextColumn.Header>
+                                                <StackPanel Orientation="Vertical" HorizontalAlignment="Stretch">
+                                                    <TextBlock Text="العنوان بالكامل" HorizontalAlignment="Center" FontWeight="Bold" Margin="0,0,0,8"/>
+                                                    <TextBox x:Name="DriverReportFilterFullAddress"
+                                                             AutomationProperties.AutomationId="DriverReportFilterFullAddress"
+                                                             HorizontalAlignment="Stretch"
+                                                             Style="{StaticResource FilterTextBoxStyle}"
+                                                             TextChanged="DriverReportFilter_Changed"/>
+                                                </StackPanel>
+                                            </DataGridTextColumn.Header>
+                                        </DataGridTextColumn>
+                                        <DataGridTextColumn Binding="{Binding TrafficUnit}"
+                                                            Width="180">
+                                            <DataGridTextColumn.Header>
+                                                <StackPanel Orientation="Vertical" HorizontalAlignment="Stretch">
+                                                    <TextBlock Text="وحدة المرور" HorizontalAlignment="Center" FontWeight="Bold" Margin="0,0,0,8"/>
+                                                    <TextBox x:Name="DriverReportFilterTrafficUnit"
+                                                             AutomationProperties.AutomationId="DriverReportFilterTrafficUnit"
+                                                             HorizontalAlignment="Stretch"
+                                                             Style="{StaticResource FilterTextBoxStyle}"
+                                                             TextChanged="DriverReportFilter_Changed"/>
+                                                </StackPanel>
+                                            </DataGridTextColumn.Header>
+                                        </DataGridTextColumn>
+                                        <DataGridTextColumn Binding="{Binding WorkLocation}"
+                                                            Width="180">
+                                            <DataGridTextColumn.Header>
+                                                <StackPanel Orientation="Vertical" HorizontalAlignment="Stretch">
+                                                    <TextBlock Text="موقع العمل" HorizontalAlignment="Center" FontWeight="Bold" Margin="0,0,0,8"/>
+                                                    <TextBox x:Name="DriverReportFilterWorkLocation"
+                                                             AutomationProperties.AutomationId="DriverReportFilterWorkLocation"
+                                                             HorizontalAlignment="Stretch"
+                                                             Style="{StaticResource FilterTextBoxStyle}"
+                                                             TextChanged="DriverReportFilter_Changed"/>
+                                                </StackPanel>
+                                            </DataGridTextColumn.Header>
+                                        </DataGridTextColumn>
+                                        <DataGridTextColumn Binding="{Binding PresentDays}"
+                                                            Width="100">
+                                            <DataGridTextColumn.Header>
+                                                <StackPanel Orientation="Vertical" HorizontalAlignment="Stretch">
+                                                    <TextBlock Text="حضور" HorizontalAlignment="Center" FontWeight="Bold" Margin="0,0,0,8"/>
+                                                    <TextBox x:Name="DriverReportFilterPresent"
+                                                             AutomationProperties.AutomationId="DriverReportFilterPresent"
+                                                             HorizontalAlignment="Stretch"
+                                                             Style="{StaticResource FilterTextBoxStyle}"
+                                                             TextChanged="DriverReportFilter_Changed"/>
+                                                </StackPanel>
+                                            </DataGridTextColumn.Header>
+                                        </DataGridTextColumn>
+                                        <DataGridTextColumn Binding="{Binding AbsentDays}"
+                                                            Width="100">
+                                            <DataGridTextColumn.Header>
+                                                <StackPanel Orientation="Vertical" HorizontalAlignment="Stretch">
+                                                    <TextBlock Text="غياب" HorizontalAlignment="Center" FontWeight="Bold" Margin="0,0,0,8"/>
+                                                    <TextBox x:Name="DriverReportFilterAbsent"
+                                                             AutomationProperties.AutomationId="DriverReportFilterAbsent"
+                                                             HorizontalAlignment="Stretch"
+                                                             Style="{StaticResource FilterTextBoxStyle}"
+                                                             TextChanged="DriverReportFilter_Changed"/>
+                                                </StackPanel>
+                                            </DataGridTextColumn.Header>
+                                        </DataGridTextColumn>
+                                        <DataGridTextColumn Binding="{Binding LeaveDays}"
+                                                            Width="100">
+                                            <DataGridTextColumn.Header>
+                                                <StackPanel Orientation="Vertical" HorizontalAlignment="Stretch">
+                                                    <TextBlock Text="إجازات" HorizontalAlignment="Center" FontWeight="Bold" Margin="0,0,0,8"/>
+                                                    <TextBox x:Name="DriverReportFilterLeave"
+                                                             AutomationProperties.AutomationId="DriverReportFilterLeave"
+                                                             HorizontalAlignment="Stretch"
+                                                             Style="{StaticResource FilterTextBoxStyle}"
+                                                             TextChanged="DriverReportFilter_Changed"/>
+                                                </StackPanel>
+                                            </DataGridTextColumn.Header>
+                                        </DataGridTextColumn>
+                                        <DataGridTextColumn Binding="{Binding WorkedFridays}"
+                                                            Width="115">
+                                            <DataGridTextColumn.Header>
+                                                <StackPanel Orientation="Vertical" HorizontalAlignment="Stretch">
+                                                    <TextBlock Text="جمعات عمل" HorizontalAlignment="Center" FontWeight="Bold" Margin="0,0,0,8"/>
+                                                    <TextBox x:Name="DriverReportFilterWorkedFridays"
+                                                             AutomationProperties.AutomationId="DriverReportFilterWorkedFridays"
+                                                             HorizontalAlignment="Stretch"
+                                                             Style="{StaticResource FilterTextBoxStyle}"
+                                                             TextChanged="DriverReportFilter_Changed"/>
+                                                </StackPanel>
+                                            </DataGridTextColumn.Header>
+                                        </DataGridTextColumn>
+                                        <DataGridTextColumn Binding="{Binding EarnedRestDays}"
+                                                            Width="135">
+                                            <DataGridTextColumn.Header>
+                                                <StackPanel Orientation="Vertical" HorizontalAlignment="Stretch">
+                                                    <TextBlock Text="راحات مستحقة" HorizontalAlignment="Center" FontWeight="Bold" Margin="0,0,0,8"/>
+                                                    <TextBox x:Name="DriverReportFilterEarnedRest"
+                                                             AutomationProperties.AutomationId="DriverReportFilterEarnedRest"
+                                                             HorizontalAlignment="Stretch"
+                                                             Style="{StaticResource FilterTextBoxStyle}"
+                                                             TextChanged="DriverReportFilter_Changed"/>
+                                                </StackPanel>
+                                            </DataGridTextColumn.Header>
+                                        </DataGridTextColumn>
+                                        <DataGridTextColumn Binding="{Binding RemainingRestDays}"
+                                                            Width="135">
+                                            <DataGridTextColumn.Header>
+                                                <StackPanel Orientation="Vertical" HorizontalAlignment="Stretch">
+                                                    <TextBlock Text="رصيد الراحة" HorizontalAlignment="Center" FontWeight="Bold" Margin="0,0,0,8"/>
+                                                    <TextBox x:Name="DriverReportFilterRemainingRest"
+                                                             AutomationProperties.AutomationId="DriverReportFilterRemainingRest"
+                                                             HorizontalAlignment="Stretch"
+                                                             Style="{StaticResource FilterTextBoxStyle}"
+                                                             TextChanged="DriverReportFilter_Changed"/>
+                                                </StackPanel>
+                                            </DataGridTextColumn.Header>
+                                        </DataGridTextColumn>
+                                        <DataGridTextColumn Binding="{Binding AbsenceReasons}"
+                                                            Width="260">
+                                            <DataGridTextColumn.Header>
+                                                <StackPanel Orientation="Vertical" HorizontalAlignment="Stretch">
+                                                    <TextBlock Text="الأسباب" HorizontalAlignment="Center" FontWeight="Bold" Margin="0,0,0,8"/>
+                                                    <TextBox x:Name="DriverReportFilterReasons"
+                                                             AutomationProperties.AutomationId="DriverReportFilterReasons"
+                                                             HorizontalAlignment="Stretch"
+                                                             Style="{StaticResource FilterTextBoxStyle}"
+                                                             TextChanged="DriverReportFilter_Changed"/>
+                                                </StackPanel>
+                                            </DataGridTextColumn.Header>
+                                        </DataGridTextColumn>
+                                    </DataGrid.Columns>
+                                </DataGrid>
+                            </Grid>
+                        </TabItem>
+                    </TabControl>
                 </TabItem>
 
                 <TabItem Header="الموظفون"

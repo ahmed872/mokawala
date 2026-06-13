@@ -49,6 +49,13 @@ public interface IDriverService
     Task<List<DriverLookupDto>> GetLookupAsync();
 }
 
+public interface IDriverAttendanceService
+{
+    Task<List<DriverAttendanceDto>> GetWeekAsync(DateTime weekStart);
+    Task<List<DriverAttendanceDto>> SaveWeekAsync(DateTime weekStart, IEnumerable<DriverAttendanceFormDto> records);
+    Task<List<DriverReportDto>> GenerateReportAsync(DateTime startDate, DateTime endDate, int? driverId = null);
+}
+
 public interface IEmployeeService
 {
     Task<List<EmployeeDto>> GetAllAsync(string? search = null);

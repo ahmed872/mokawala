@@ -293,10 +293,87 @@ internal static class ServiceHelpers
             Address = entity.Address,
             DateOfBirth = entity.DateOfBirth ?? DateTime.Today,
             LicenseNumber = entity.LicenseNumber,
+            LicenseStartDate = entity.LicenseStartDate ?? DateTime.Today,
             LicenseExpiryDate = entity.LicenseExpiryDate ?? DateTime.Today,
             LicenseType = entity.LicenseType,
+            IsCompanyInsured = entity.IsCompanyInsured,
+            Governorate = entity.Governorate,
+            FullAddress = string.IsNullOrWhiteSpace(entity.FullAddress) ? entity.Address : entity.FullAddress,
+            TrafficUnit = entity.TrafficUnit,
+            WorkLocation = entity.WorkLocation,
+            LicenseExpiryAlert = DriverLicenseAlert(entity.LicenseExpiryDate),
             IsActive = entity.IsActive,
             Notes = entity.Notes
+        };
+
+    public static DriverAttendanceDto ToDto(this DriverAttendance entity) =>
+        new()
+        {
+            Id = entity.Id,
+            DriverId = entity.DriverId,
+            DriverName = entity.Driver?.FullName ?? string.Empty,
+            DriverWorkLocation = entity.Driver?.WorkLocation ?? string.Empty,
+            WorkDate = entity.WorkDate,
+            DayName = ArabicDayName(entity.WorkDate.DayOfWeek),
+            WorkLocation = string.IsNullOrWhiteSpace(entity.WorkLocation) ? entity.Driver?.WorkLocation ?? string.Empty : entity.WorkLocation,
+            Status = AttendanceStatusDisplay(entity.Status),
+            AbsenceReason = entity.AbsenceReason,
+            Notes = entity.Notes
+        };
+
+    public static string DriverLicenseAlert(DateTime? expiryDate)
+    {
+        if (!expiryDate.HasValue)
+        {
+            return "تاريخ انتهاء الرخصة غير مسجل";
+        }
+
+        var days = (expiryDate.Value.Date - DateTime.Today).Days;
+        return days switch
+        {
+            < 0 => "رخصة منتهية",
+            <= 30 => $"الرخصة تنتهي خلال {days} يوم",
+            _ => "لا يوجد إنذار"
+        };
+    }
+
+    public static string AttendanceStatusStorage(string status)
+    {
+        var value = Clean(status);
+        return value.Trim().ToLowerInvariant() switch
+        {
+            "present" or "حاضر" or "حضور" => "Present",
+            "absent" or "غائب" or "غياب" => "Absent",
+            "leave" or "اجازة" or "إجازة" or "أجازة" => "Leave",
+            "compensatoryrest" or "compensatory rest" or "راحة مستحقة" or "راحة تعويضية" => "CompensatoryRest",
+            "rest" or "راحة" or "راحة جمعة" or "راحة أسبوعية" or "راحة اسبوعية" => "Rest",
+            _ => string.IsNullOrWhiteSpace(value) ? "Present" : value
+        };
+    }
+
+    public static string AttendanceStatusDisplay(string status) =>
+        Clean(status).Trim().ToLowerInvariant() switch
+        {
+            "present" => "حاضر",
+            "absent" => "غائب",
+            "leave" => "إجازة",
+            "compensatoryrest" => "إجازة",
+            "rest" => "غائب",
+            "" => "حاضر",
+            var value => value
+        };
+
+    public static string ArabicDayName(DayOfWeek day) =>
+        day switch
+        {
+            DayOfWeek.Saturday => "السبت",
+            DayOfWeek.Sunday => "الأحد",
+            DayOfWeek.Monday => "الاثنين",
+            DayOfWeek.Tuesday => "الثلاثاء",
+            DayOfWeek.Wednesday => "الأربعاء",
+            DayOfWeek.Thursday => "الخميس",
+            DayOfWeek.Friday => "الجمعة",
+            _ => string.Empty
         };
 
     public static EmployeeDto ToDto(this Employee entity) =>

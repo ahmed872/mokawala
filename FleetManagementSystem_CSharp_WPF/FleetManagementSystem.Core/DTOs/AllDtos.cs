@@ -523,7 +523,14 @@ namespace FleetManagementSystem.Core.DTOs
         public string NationalId { get; set; } = string.Empty;
         public string PhoneNumber { get; set; } = string.Empty;
         public string LicenseNumber { get; set; } = string.Empty;
+        public DateTime LicenseStartDate { get; set; }
         public DateTime LicenseExpiryDate { get; set; }
+        public string LicenseType { get; set; } = string.Empty;
+        public bool IsCompanyInsured { get; set; }
+        public string Governorate { get; set; } = string.Empty;
+        public string FullAddress { get; set; } = string.Empty;
+        public string TrafficUnit { get; set; } = string.Empty;
+        public string WorkLocation { get; set; } = string.Empty;
         public bool IsLicenseExpiring { get; set; }
         public bool IsActive { get; set; }
     }
@@ -541,8 +548,15 @@ namespace FleetManagementSystem.Core.DTOs
         public string Address { get; set; } = string.Empty;
         public DateTime DateOfBirth { get; set; }
         public string LicenseNumber { get; set; } = string.Empty;
+        public DateTime LicenseStartDate { get; set; }
         public DateTime LicenseExpiryDate { get; set; }
         public string LicenseType { get; set; } = string.Empty;
+        public bool IsCompanyInsured { get; set; }
+        public string Governorate { get; set; } = string.Empty;
+        public string FullAddress { get; set; } = string.Empty;
+        public string TrafficUnit { get; set; } = string.Empty;
+        public string WorkLocation { get; set; } = string.Empty;
+        public string LicenseExpiryAlert { get; set; } = string.Empty;
         public bool IsActive { get; set; }
         public string Notes { get; set; } = string.Empty;
     }
@@ -560,10 +574,65 @@ namespace FleetManagementSystem.Core.DTOs
         public string Address { get; set; } = string.Empty;
         public DateTime DateOfBirth { get; set; }
         public string LicenseNumber { get; set; } = string.Empty;
+        public DateTime LicenseStartDate { get; set; }
         public DateTime LicenseExpiryDate { get; set; }
         public string LicenseType { get; set; } = string.Empty;
+        public bool IsCompanyInsured { get; set; }
+        public string Governorate { get; set; } = string.Empty;
+        public string FullAddress { get; set; } = string.Empty;
+        public string TrafficUnit { get; set; } = string.Empty;
+        public string WorkLocation { get; set; } = string.Empty;
         public bool IsActive { get; set; } = true;
         public string Notes { get; set; } = string.Empty;
+    }
+
+    public class DriverAttendanceDto
+    {
+        public int Id { get; set; }
+        public int DriverId { get; set; }
+        public string DriverName { get; set; } = string.Empty;
+        public string DriverWorkLocation { get; set; } = string.Empty;
+        public DateTime WorkDate { get; set; }
+        public string DayName { get; set; } = string.Empty;
+        public string WorkLocation { get; set; } = string.Empty;
+        public string Status { get; set; } = "حاضر";
+        public string AbsenceReason { get; set; } = string.Empty;
+        public string Notes { get; set; } = string.Empty;
+        public bool IsFriday => WorkDate.DayOfWeek == DayOfWeek.Friday;
+    }
+
+    public class DriverAttendanceFormDto
+    {
+        public int Id { get; set; }
+        public int DriverId { get; set; }
+        public DateTime WorkDate { get; set; }
+        public string WorkLocation { get; set; } = string.Empty;
+        public string Status { get; set; } = "حاضر";
+        public string AbsenceReason { get; set; } = string.Empty;
+        public string Notes { get; set; } = string.Empty;
+    }
+
+    public class DriverReportDto
+    {
+        public int DriverId { get; set; }
+        public string FullName { get; set; } = string.Empty;
+        public string NationalId { get; set; } = string.Empty;
+        public string LicenseNumber { get; set; } = string.Empty;
+        public string LicenseType { get; set; } = string.Empty;
+        public DateTime LicenseStartDate { get; set; }
+        public DateTime LicenseExpiryDate { get; set; }
+        public bool IsCompanyInsured { get; set; }
+        public string Governorate { get; set; } = string.Empty;
+        public string FullAddress { get; set; } = string.Empty;
+        public string TrafficUnit { get; set; } = string.Empty;
+        public string WorkLocation { get; set; } = string.Empty;
+        public int PresentDays { get; set; }
+        public int AbsentDays { get; set; }
+        public int LeaveDays { get; set; }
+        public int WorkedFridays { get; set; }
+        public int EarnedRestDays { get; set; }
+        public int RemainingRestDays { get; set; }
+        public string AbsenceReasons { get; set; } = string.Empty;
     }
 
     // ========================================================================

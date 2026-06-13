@@ -180,6 +180,13 @@ public sealed class DataBootstrapService(FleetDbContext context) : IDataBootstra
         await EnsureColumnAsync("OilChanges", "CurrentOdometerDate", GetNullableDateColumnDefinition());
         await EnsureColumnAsync("OilChanges", "IsOilChanged", GetBooleanColumnDefinition(defaultValue: true));
         await EnsureColumnAsync("OilChanges", "ServiceItems", GetShortTextColumnDefinition(defaultValue: string.Empty));
+        await EnsureColumnAsync("Drivers", "LicenseStartDate", GetNullableDateColumnDefinition());
+        await EnsureColumnAsync("Drivers", "IsCompanyInsured", GetBooleanColumnDefinition(defaultValue: false));
+        await EnsureColumnAsync("Drivers", "Governorate", GetShortTextColumnDefinition(defaultValue: string.Empty));
+        await EnsureColumnAsync("Drivers", "FullAddress", GetInsuranceDetailsColumnDefinition());
+        await EnsureColumnAsync("Drivers", "TrafficUnit", GetShortTextColumnDefinition(defaultValue: string.Empty));
+        await EnsureColumnAsync("Drivers", "WorkLocation", GetShortTextColumnDefinition(defaultValue: string.Empty));
+        await EnsureDriverAttendanceTableAsync();
 
         if (await HasColumnAsync("Vehicles", "RegistrationType"))
         {
@@ -209,6 +216,55 @@ public sealed class DataBootstrapService(FleetDbContext context) : IDataBootstra
         }
     }
 
+    private async Task EnsureDriverAttendanceTableAsync()
+    {
+        if (await HasTableAsync("DriverAttendances"))
+        {
+            return;
+        }
+
+#pragma warning disable EF1002
+        if (_context.Database.IsSqlite())
+        {
+            await _context.Database.ExecuteSqlRawAsync("""
+                CREATE TABLE IF NOT EXISTS DriverAttendances (
+                    Id INTEGER NOT NULL CONSTRAINT PK_DriverAttendances PRIMARY KEY AUTOINCREMENT,
+                    DriverId INTEGER NOT NULL,
+                    WorkDate TEXT NOT NULL,
+                    WorkLocation TEXT NOT NULL DEFAULT '',
+                    Status TEXT NOT NULL DEFAULT 'Present',
+                    AbsenceReason TEXT NOT NULL DEFAULT '',
+                    Notes TEXT NOT NULL DEFAULT '',
+                    CreatedAt TEXT NOT NULL,
+                    UpdatedAt TEXT NOT NULL,
+                    CONSTRAINT FK_DriverAttendances_Drivers_DriverId FOREIGN KEY (DriverId) REFERENCES Drivers (Id) ON DELETE CASCADE
+                );
+                """);
+            await _context.Database.ExecuteSqlRawAsync("CREATE UNIQUE INDEX IF NOT EXISTS IX_DriverAttendances_DriverId_WorkDate ON DriverAttendances (DriverId, WorkDate)");
+            return;
+        }
+
+        if (_context.Database.IsMySql())
+        {
+            await _context.Database.ExecuteSqlRawAsync("""
+                CREATE TABLE IF NOT EXISTS DriverAttendances (
+                    Id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+                    DriverId INT NOT NULL,
+                    WorkDate DATETIME NOT NULL,
+                    WorkLocation VARCHAR(255) NOT NULL DEFAULT '',
+                    Status VARCHAR(40) NOT NULL DEFAULT 'Present',
+                    AbsenceReason VARCHAR(500) NOT NULL DEFAULT '',
+                    Notes VARCHAR(500) NOT NULL DEFAULT '',
+                    CreatedAt DATETIME NOT NULL,
+                    UpdatedAt DATETIME NOT NULL,
+                    UNIQUE KEY IX_DriverAttendances_DriverId_WorkDate (DriverId, WorkDate),
+                    CONSTRAINT FK_DriverAttendances_Drivers_DriverId FOREIGN KEY (DriverId) REFERENCES Drivers (Id) ON DELETE CASCADE
+                );
+                """);
+        }
+#pragma warning restore EF1002
+    }
+
     private async Task EnsureColumnAsync(string tableName, string columnName, string columnDefinition)
     {
         if (await HasColumnAsync(tableName, columnName))
@@ -220,6 +276,48 @@ public sealed class DataBootstrapService(FleetDbContext context) : IDataBootstra
         await _context.Database.ExecuteSqlRawAsync(
             $"ALTER TABLE {tableName} ADD COLUMN {columnName} {columnDefinition}");
 #pragma warning restore EF1002
+    }
+
+    private async Task<bool> HasTableAsync(string tableName)
+    {
+        var connection = _context.Database.GetDbConnection();
+        var closeWhenDone = connection.State != ConnectionState.Open;
+        if (closeWhenDone)
+        {
+            await connection.OpenAsync();
+        }
+
+        try
+        {
+            await using var command = connection.CreateCommand();
+            if (_context.Database.IsSqlite())
+            {
+                command.CommandText = "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = @tableName";
+            }
+            else if (_context.Database.IsMySql())
+            {
+                command.CommandText = "SELECT COUNT(*) FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = @tableName";
+            }
+            else
+            {
+                command.CommandText = "SELECT COUNT(*) FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = @tableName";
+            }
+
+            var parameter = command.CreateParameter();
+            parameter.ParameterName = "@tableName";
+            parameter.Value = tableName;
+            command.Parameters.Add(parameter);
+
+            var result = await command.ExecuteScalarAsync();
+            return Convert.ToInt32(result) > 0;
+        }
+        finally
+        {
+            if (closeWhenDone)
+            {
+                await connection.CloseAsync();
+            }
+        }
     }
 
     private async Task<bool> HasColumnAsync(string tableName, string columnName)
@@ -405,8 +503,14 @@ public sealed class DataBootstrapService(FleetDbContext context) : IDataBootstra
                     FullName = "أحمد محمود علي",
                     NationalId = "29801011234567",
                     LicenseNumber = "DRV-DEMO-001",
+                    LicenseStartDate = DateTime.Today.AddYears(-1),
                     LicenseExpiryDate = DateTime.Today.AddYears(1),
                     LicenseType = "مهنية",
+                    IsCompanyInsured = true,
+                    Governorate = "القاهرة",
+                    FullAddress = "مدينة نصر",
+                    TrafficUnit = "مرور مدينة نصر",
+                    WorkLocation = "الموقع الرئيسي",
                     PhoneNumber = "01000000011",
                     IsActive = true,
                     Address = "مدينة نصر"
@@ -416,8 +520,14 @@ public sealed class DataBootstrapService(FleetDbContext context) : IDataBootstra
                     FullName = "محمد السيد حسن",
                     NationalId = "29605021234567",
                     LicenseNumber = "DRV-DEMO-002",
+                    LicenseStartDate = DateTime.Today.AddYears(-1),
                     LicenseExpiryDate = DateTime.Today.AddYears(2),
                     LicenseType = "مهنية",
+                    IsCompanyInsured = true,
+                    Governorate = "القاهرة",
+                    FullAddress = "المعادى",
+                    TrafficUnit = "مرور المعادى",
+                    WorkLocation = "الموقع الرئيسي",
                     PhoneNumber = "01000000012",
                     IsActive = true,
                     Address = "المعادى"
@@ -427,8 +537,14 @@ public sealed class DataBootstrapService(FleetDbContext context) : IDataBootstra
                     FullName = "خالد إبراهيم سعد",
                     NationalId = "29507151234567",
                     LicenseNumber = "DRV-DEMO-003",
+                    LicenseStartDate = DateTime.Today.AddYears(-1),
                     LicenseExpiryDate = DateTime.Today.AddMonths(18),
                     LicenseType = "خاصة",
+                    IsCompanyInsured = false,
+                    Governorate = "الجيزة",
+                    FullAddress = "الهرم",
+                    TrafficUnit = "مرور الهرم",
+                    WorkLocation = "الموقع الرئيسي",
                     PhoneNumber = "01000000013",
                     IsActive = true,
                     Address = "الهرم"
@@ -978,7 +1094,7 @@ public sealed class ReportingService(FleetDbContext context) : IReportingService
             OpenMaintenanceRequests = await _context.MaintenanceRequests.CountAsync(m => m.Status != "Completed" && m.Status != "مكتمل"),
             CompletedMaintenanceRequests = await _context.MaintenanceRequests.CountAsync(m => m.Status == "Completed" || m.Status == "مكتمل"),
             VehicleLicensesExpiring = await _context.Vehicles.CountAsync(v => v.RegistrationExpiryDate.HasValue && v.RegistrationExpiryDate.Value <= today.AddDays(VehicleRegistrationAlertDays)),
-            DriversWithExpiringLicenses = await _context.Licenses.CountAsync(l => l.ExpiryDate >= DateTime.Today && l.ExpiryDate <= DateTime.Today.AddDays(30)),
+            DriversWithExpiringLicenses = await _context.Drivers.CountAsync(d => d.LicenseExpiryDate.HasValue && d.LicenseExpiryDate.Value >= DateTime.Today && d.LicenseExpiryDate.Value <= DateTime.Today.AddDays(30)),
             InsurancePoliciesExpiring = await _context.Insurances.CountAsync(i => i.ExpiryDate <= DateTime.Today.AddDays(60)),
             OilChangesDue = oilChangesDue,
             TotalExpenses = totalExpenses,
@@ -1032,6 +1148,26 @@ public sealed class ReportingService(FleetDbContext context) : IReportingService
             RelatedEntityId = l.Id,
             DueDate = l.ExpiryDate,
             CreatedAt = l.UpdatedAt
+        }));
+
+        var expiringDrivers = await _context.Drivers
+            .Where(d => d.LicenseExpiryDate.HasValue && d.LicenseExpiryDate.Value <= now.AddDays(30))
+            .OrderBy(d => d.LicenseExpiryDate)
+            .Take(10)
+            .ToListAsync();
+
+        alerts.AddRange(expiringDrivers.Select(d => new AlertDto
+        {
+            Id = d.Id,
+            Type = "Warning",
+            Title = d.LicenseExpiryDate!.Value.Date < now ? "رخصة سائق منتهية" : "رخصة سائق تقترب من الانتهاء",
+            Message = d.LicenseExpiryDate!.Value.Date < now
+                ? $"رخصة السائق {d.FullName} منتهية منذ {d.LicenseExpiryDate:yyyy-MM-dd}."
+                : $"رخصة السائق {d.FullName} تنتهي بتاريخ {d.LicenseExpiryDate:yyyy-MM-dd}.",
+            RelatedEntityType = "Driver",
+            RelatedEntityId = d.Id,
+            DueDate = d.LicenseExpiryDate,
+            CreatedAt = d.UpdatedAt
         }));
 
         var expiringVehicleRegistrations = await _context.Vehicles

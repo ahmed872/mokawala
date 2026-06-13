@@ -108,6 +108,21 @@ namespace FleetManagementSystem.WPF.Converters
         }
     }
 
+    public class AttendanceReasonEnabledConverter : IValueConverter
+    {
+        public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+        {
+            var status = value?.ToString()?.Trim();
+            return !string.Equals(status, "حاضر", StringComparison.OrdinalIgnoreCase)
+                && !string.Equals(status, "Present", StringComparison.OrdinalIgnoreCase);
+        }
+
+        public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
+        {
+            throw new NotImplementedException();
+        }
+    }
+
     // ========================================================================
     // ENUM TO STRING CONVERTER
     // ========================================================================

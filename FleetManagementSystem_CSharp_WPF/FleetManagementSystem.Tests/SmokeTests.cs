@@ -61,6 +61,60 @@ public class SmokeTests
     }
 
     [Fact]
+    public async Task DriverAttendanceService_SavesWeeklyAttendance_ReportsRestBalance_AndAlertsExpiringLicense()
+    {
+        await using var harness = await TestHarness.CreateAsync();
+
+        var driver = await harness.DriverService.SaveAsync(new DriverFormDto
+        {
+            FullName = "سائق حضور",
+            NationalId = "2990101000100",
+            LicenseNumber = "DRV-ATT-001",
+            LicenseStartDate = DateTime.Today.AddYears(-1),
+            LicenseExpiryDate = DateTime.Today.AddDays(20),
+            LicenseType = "خاصة",
+            IsCompanyInsured = true,
+            Governorate = "القاهرة",
+            FullAddress = "مدينة نصر - شارع الاختبار",
+            TrafficUnit = "مرور مدينة نصر",
+            WorkLocation = "محطة التجمع",
+            IsActive = true
+        });
+
+        var weekStart = DateTime.Today;
+        while (weekStart.DayOfWeek != DayOfWeek.Saturday)
+        {
+            weekStart = weekStart.AddDays(-1);
+        }
+
+        await harness.DriverAttendanceService.SaveWeekAsync(weekStart, new[]
+        {
+            new DriverAttendanceFormDto { DriverId = driver.Id, WorkDate = weekStart, WorkLocation = "محطة التجمع", Status = "غائب", AbsenceReason = "ظرف مرضي" },
+            new DriverAttendanceFormDto { DriverId = driver.Id, WorkDate = weekStart.AddDays(1), WorkLocation = "محطة التجمع", Status = "إجازة", AbsenceReason = "إجازة سنوية" },
+            new DriverAttendanceFormDto { DriverId = driver.Id, WorkDate = weekStart.AddDays(2), WorkLocation = "محطة التجمع", Status = "حاضر" },
+            new DriverAttendanceFormDto { DriverId = driver.Id, WorkDate = weekStart.AddDays(6), WorkLocation = "محطة التجمع", Status = "حاضر" }
+        });
+
+        var weeklyRows = await harness.DriverAttendanceService.GetWeekAsync(weekStart);
+        var report = Assert.Single(await harness.DriverAttendanceService.GenerateReportAsync(weekStart, weekStart.AddDays(6), driver.Id));
+        var alerts = await harness.ReportingService.GetAlertsAsync();
+
+        Assert.Contains(weeklyRows, x => x.DriverId == driver.Id && x.DayName == "الجمعة" && x.Status == "حاضر");
+        Assert.Equal(driver.FullName, report.FullName);
+        Assert.Equal(driver.LicenseNumber, report.LicenseNumber);
+        Assert.Equal("محطة التجمع", report.WorkLocation);
+        Assert.Equal(2, report.PresentDays);
+        Assert.Equal(1, report.AbsentDays);
+        Assert.Equal(1, report.LeaveDays);
+        Assert.Equal(1, report.WorkedFridays);
+        Assert.Equal(1, report.EarnedRestDays);
+        Assert.Equal(0, report.RemainingRestDays);
+        Assert.Contains("ظرف مرضي", report.AbsenceReasons);
+        Assert.Contains("إجازة سنوية", report.AbsenceReasons);
+        Assert.Contains(alerts, a => a.RelatedEntityType == "Driver" && a.Title.Contains("رخصة سائق"));
+    }
+
+    [Fact]
     public async Task VehicleService_SaveAsync_PersistsVehicleAndAudit()
     {
         await using var harness = await TestHarness.CreateAsync();
@@ -164,7 +218,9 @@ public class SmokeTests
         {
             FullName = "Test Driver",
             LicenseNumber = "DRV-100",
+            LicenseStartDate = DateTime.Today.AddYears(-1),
             LicenseExpiryDate = DateTime.Today.AddYears(1),
+            WorkLocation = "الموقع الرئيسي",
             IsActive = true
         });
 
@@ -255,7 +311,9 @@ public class SmokeTests
         {
             FullName = "سائق التشغيل",
             LicenseNumber = "DRV-200",
+            LicenseStartDate = DateTime.Today.AddYears(-1),
             LicenseExpiryDate = DateTime.Today.AddYears(1),
+            WorkLocation = "الموقع الرئيسي",
             IsActive = true
         });
 
@@ -332,7 +390,9 @@ public class SmokeTests
         {
             FullName = "سائق حالة معلقة",
             LicenseNumber = "DRV-STALE",
+            LicenseStartDate = DateTime.Today.AddYears(-1),
             LicenseExpiryDate = DateTime.Today.AddYears(1),
+            WorkLocation = "الموقع الرئيسي",
             IsActive = true
         });
 
@@ -387,7 +447,9 @@ public class SmokeTests
         {
             FullName = "سائق المسافة",
             LicenseNumber = "DRV-DIST",
+            LicenseStartDate = DateTime.Today.AddYears(-1),
             LicenseExpiryDate = DateTime.Today.AddYears(1),
+            WorkLocation = "الموقع الرئيسي",
             IsActive = true
         });
 
@@ -746,6 +808,7 @@ public class SmokeTests
         public IContractService ContractService { get; }
         public IMaintenanceService MaintenanceService { get; }
         public IDriverService DriverService { get; }
+        public IDriverAttendanceService DriverAttendanceService { get; }
         public IEmployeeService EmployeeService { get; }
         public ITripService TripService { get; }
         public IInsuranceService InsuranceService { get; }
@@ -764,6 +827,7 @@ public class SmokeTests
             IContractService contractService,
             IMaintenanceService maintenanceService,
             IDriverService driverService,
+            IDriverAttendanceService driverAttendanceService,
             IEmployeeService employeeService,
             ITripService tripService,
             IInsuranceService insuranceService,
@@ -781,6 +845,7 @@ public class SmokeTests
             ContractService = contractService;
             MaintenanceService = maintenanceService;
             DriverService = driverService;
+            DriverAttendanceService = driverAttendanceService;
             EmployeeService = employeeService;
             TripService = tripService;
             InsuranceService = insuranceService;
@@ -810,6 +875,7 @@ public class SmokeTests
             var contractService = new ContractService(context, auditService, notificationService);
             var maintenanceService = new MaintenanceService(context, auditService, notificationService);
             var driverService = new DriverService(context, auditService);
+            var driverAttendanceService = new DriverAttendanceService(context, auditService);
             var employeeService = new EmployeeService(context, auditService);
             var tripService = new TripService(context, auditService);
             var insuranceService = new InsuranceService(context, auditService);
@@ -828,6 +894,7 @@ public class SmokeTests
                 contractService,
                 maintenanceService,
                 driverService,
+                driverAttendanceService,
                 employeeService,
                 tripService,
                 insuranceService,

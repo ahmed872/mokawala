@@ -427,9 +427,19 @@ public sealed class DriverService(FleetDbContext context, IAuditService auditSer
             throw new InvalidOperationException("رقم رخصة السائق مطلوب.");
         }
 
+        if (dto.LicenseStartDate == default)
+        {
+            throw new InvalidOperationException("تاريخ بداية رخصة السائق مطلوب.");
+        }
+
         if (dto.LicenseExpiryDate == default)
         {
             throw new InvalidOperationException("تاريخ انتهاء رخصة السائق مطلوب.");
+        }
+
+        if (dto.LicenseExpiryDate.Date < dto.LicenseStartDate.Date)
+        {
+            throw new InvalidOperationException("تاريخ انتهاء رخصة السائق يجب أن يكون بعد تاريخ البداية.");
         }
 
         var duplicate = await _context.Drivers.FirstOrDefaultAsync(d => d.Id != dto.Id && d.LicenseNumber == dto.LicenseNumber.Trim());
@@ -458,8 +468,14 @@ public sealed class DriverService(FleetDbContext context, IAuditService auditSer
         entity.Address = ServiceHelpers.Clean(dto.Address);
         entity.DateOfBirth = dto.DateOfBirth == default ? null : dto.DateOfBirth;
         entity.LicenseNumber = ServiceHelpers.Clean(dto.LicenseNumber);
+        entity.LicenseStartDate = dto.LicenseStartDate == default ? null : dto.LicenseStartDate;
         entity.LicenseExpiryDate = dto.LicenseExpiryDate == default ? null : dto.LicenseExpiryDate;
         entity.LicenseType = ServiceHelpers.Clean(dto.LicenseType);
+        entity.IsCompanyInsured = dto.IsCompanyInsured;
+        entity.Governorate = ServiceHelpers.Clean(dto.Governorate);
+        entity.FullAddress = ServiceHelpers.Clean(string.IsNullOrWhiteSpace(dto.FullAddress) ? dto.Address : dto.FullAddress);
+        entity.TrafficUnit = ServiceHelpers.Clean(dto.TrafficUnit);
+        entity.WorkLocation = ServiceHelpers.Clean(dto.WorkLocation);
         entity.IsActive = dto.IsActive;
         entity.Notes = ServiceHelpers.Clean(dto.Notes);
         entity.UpdatedAt = DateTime.UtcNow;
@@ -476,11 +492,12 @@ public sealed class DriverService(FleetDbContext context, IAuditService auditSer
 
         var hasDependents =
             await _context.Trips.AnyAsync(t => t.DriverId == id) ||
-            await _context.Licenses.AnyAsync(l => l.DriverId == id);
+            await _context.Licenses.AnyAsync(l => l.DriverId == id) ||
+            await _context.DriverAttendances.AnyAsync(a => a.DriverId == id);
 
         if (hasDependents)
         {
-            throw new InvalidOperationException("لا يمكن حذف السائق لارتباطه برحلات أو رخص.");
+            throw new InvalidOperationException("لا يمكن حذف السائق لارتباطه برحلات أو رخص أو حضور.");
         }
 
         _context.Drivers.Remove(entity);
@@ -498,6 +515,195 @@ public sealed class DriverService(FleetDbContext context, IAuditService auditSer
                 LicenseNumber = d.LicenseNumber
             })
             .ToListAsync();
+}
+
+public sealed class DriverAttendanceService(FleetDbContext context, IAuditService auditService) : IDriverAttendanceService
+{
+    private readonly FleetDbContext _context = context;
+    private readonly IAuditService _auditService = auditService;
+
+    public async Task<List<DriverAttendanceDto>> GetWeekAsync(DateTime weekStart)
+    {
+        var start = StartOfDriverWeek(weekStart);
+        var endExclusive = start.AddDays(7);
+        var records = await _context.DriverAttendances
+            .Include(x => x.Driver)
+            .Where(x => x.WorkDate >= start && x.WorkDate < endExclusive)
+            .OrderBy(x => x.Driver!.FullName)
+            .ThenBy(x => x.WorkDate)
+            .ToListAsync();
+
+        return records.Select(x => x.ToDto()).ToList();
+    }
+
+    public async Task<List<DriverAttendanceDto>> SaveWeekAsync(DateTime weekStart, IEnumerable<DriverAttendanceFormDto> records)
+    {
+        var start = StartOfDriverWeek(weekStart);
+        var endExclusive = start.AddDays(7);
+        var forms = records.ToList();
+        var driverIds = forms.Select(x => x.DriverId).Distinct().ToList();
+        var validDrivers = await _context.Drivers
+            .Where(x => driverIds.Contains(x.Id))
+            .ToDictionaryAsync(x => x.Id);
+
+        var existing = await _context.DriverAttendances
+            .Where(x => x.WorkDate >= start && x.WorkDate < endExclusive && driverIds.Contains(x.DriverId))
+            .ToListAsync();
+
+        foreach (var dto in forms)
+        {
+            if (!validDrivers.TryGetValue(dto.DriverId, out var driver))
+            {
+                throw new InvalidOperationException("السائق غير موجود.");
+            }
+
+            var date = dto.WorkDate.Date;
+            if (date < start || date >= endExclusive)
+            {
+                throw new InvalidOperationException("تاريخ الحضور خارج الأسبوع المحدد.");
+            }
+
+            var status = ServiceHelpers.AttendanceStatusStorage(dto.Status);
+            var record = existing.FirstOrDefault(x => x.DriverId == dto.DriverId && x.WorkDate.Date == date);
+            if (record is null)
+            {
+                record = new DriverAttendance
+                {
+                    DriverId = dto.DriverId,
+                    WorkDate = date,
+                    CreatedAt = DateTime.UtcNow
+                };
+                _context.DriverAttendances.Add(record);
+                existing.Add(record);
+            }
+
+            record.WorkLocation = ServiceHelpers.Clean(string.IsNullOrWhiteSpace(dto.WorkLocation) ? driver.WorkLocation : dto.WorkLocation);
+            record.Status = status;
+            var reason = ServiceHelpers.Clean(dto.AbsenceReason);
+            record.AbsenceReason = status switch
+            {
+                "Present" => string.Empty,
+                "Rest" => string.IsNullOrWhiteSpace(reason) ? "راحة أسبوعية" : reason,
+                _ => reason
+            };
+            record.Notes = ServiceHelpers.Clean(dto.Notes);
+            record.UpdatedAt = DateTime.UtcNow;
+        }
+
+        await _context.SaveChangesAsync();
+        await _auditService.LogActionAsync("SaveWeek", "DriverAttendance", 0, null, start.ToString("yyyy-MM-dd"));
+        return await GetWeekAsync(start);
+    }
+
+    public async Task<List<DriverReportDto>> GenerateReportAsync(DateTime startDate, DateTime endDate, int? driverId = null)
+    {
+        var start = startDate.Date;
+        var end = endDate.Date;
+        if (end < start)
+        {
+            throw new InvalidOperationException("تاريخ نهاية تقرير السائقين يجب أن يكون بعد تاريخ البداية.");
+        }
+
+        var endExclusive = end.AddDays(1);
+        var driversQuery = _context.Drivers.AsQueryable();
+        if (driverId.HasValue)
+        {
+            driversQuery = driversQuery.Where(x => x.Id == driverId.Value);
+        }
+
+        var drivers = await driversQuery
+            .OrderBy(x => x.FullName)
+            .ToListAsync();
+        var ids = drivers.Select(x => x.Id).ToList();
+        var attendance = await _context.DriverAttendances
+            .Where(x => ids.Contains(x.DriverId) && x.WorkDate >= start && x.WorkDate < endExclusive)
+            .ToListAsync();
+        var balanceAttendance = await _context.DriverAttendances
+            .Where(x => ids.Contains(x.DriverId) && x.WorkDate < endExclusive)
+            .ToListAsync();
+
+        return drivers.Select(driver =>
+        {
+            var rows = attendance.Where(x => x.DriverId == driver.Id).ToList();
+            var balanceRows = balanceAttendance.Where(x => x.DriverId == driver.Id).ToList();
+            var presentDays = rows.Count(IsDriverPresent);
+            var absentRows = rows
+                .Where(IsDriverAbsent)
+                .ToList();
+            var leaveRows = rows
+                .Where(IsDriverLeave)
+                .ToList();
+            var workedFridays = rows.Count(IsWorkedWeeklyRest);
+            var earnedRestDays = workedFridays;
+            var balanceEarnedRestDays = balanceRows.Count(IsWorkedWeeklyRest);
+            var balanceUsedRestDays = balanceRows.Count(IsDriverLeave);
+            var reasons = absentRows.Concat(leaveRows)
+                .Select(x => x.AbsenceReason)
+                .Where(x => !string.IsNullOrWhiteSpace(x))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+
+            return new DriverReportDto
+            {
+                DriverId = driver.Id,
+                FullName = driver.FullName,
+                NationalId = driver.NationalId,
+                LicenseNumber = driver.LicenseNumber,
+                LicenseType = driver.LicenseType,
+                LicenseStartDate = driver.LicenseStartDate ?? DateTime.Today,
+                LicenseExpiryDate = driver.LicenseExpiryDate ?? DateTime.Today,
+                IsCompanyInsured = driver.IsCompanyInsured,
+                Governorate = driver.Governorate,
+                FullAddress = string.IsNullOrWhiteSpace(driver.FullAddress) ? driver.Address : driver.FullAddress,
+                TrafficUnit = driver.TrafficUnit,
+                WorkLocation = driver.WorkLocation,
+                PresentDays = presentDays,
+                AbsentDays = absentRows.Count,
+                LeaveDays = leaveRows.Count,
+                WorkedFridays = workedFridays,
+                EarnedRestDays = earnedRestDays,
+                RemainingRestDays = Math.Max(0, balanceEarnedRestDays - balanceUsedRestDays),
+                AbsenceReasons = reasons.Count == 0 ? string.Empty : string.Join("، ", reasons)
+            };
+        }).ToList();
+    }
+
+    private static bool IsDriverPresent(DriverAttendance attendance) =>
+        ServiceHelpers.AttendanceStatusStorage(attendance.Status) == "Present";
+
+    private static bool IsDriverAbsent(DriverAttendance attendance) =>
+        ServiceHelpers.AttendanceStatusStorage(attendance.Status) == "Absent" &&
+        !IsDriverWeeklyRest(attendance) &&
+        !IsDriverLeave(attendance);
+
+    private static bool IsWorkedWeeklyRest(DriverAttendance attendance) =>
+        attendance.WorkDate.DayOfWeek == DayOfWeek.Friday && IsDriverPresent(attendance);
+
+    private static bool IsDriverWeeklyRest(DriverAttendance attendance) =>
+        ServiceHelpers.AttendanceStatusStorage(attendance.Status) == "Rest" ||
+        (attendance.WorkDate.DayOfWeek == DayOfWeek.Friday &&
+            !IsDriverPresent(attendance) &&
+            ContainsAny(attendance.AbsenceReason, "راحة", "اسبوعية", "أسبوعية"));
+
+    private static bool IsDriverLeave(DriverAttendance attendance) =>
+        !IsDriverWeeklyRest(attendance) &&
+        (ServiceHelpers.AttendanceStatusStorage(attendance.Status) is "Leave" or "CompensatoryRest" ||
+            ContainsAny(attendance.AbsenceReason, "إجازة", "اجازة", "أجازة", "راحة مستحقة", "راحة تعويضية"));
+
+    private static bool ContainsAny(string? value, params string[] terms) =>
+        !string.IsNullOrWhiteSpace(value) &&
+        terms.Any(term => value.Contains(term, StringComparison.OrdinalIgnoreCase));
+
+    public static DateTime StartOfDriverWeek(DateTime date)
+    {
+        var value = date.Date;
+        while (value.DayOfWeek != DayOfWeek.Saturday)
+        {
+            value = value.AddDays(-1);
+        }
+
+        return value;
+    }
 }
 
 public sealed class EmployeeService(FleetDbContext context, IAuditService auditService) : IEmployeeService

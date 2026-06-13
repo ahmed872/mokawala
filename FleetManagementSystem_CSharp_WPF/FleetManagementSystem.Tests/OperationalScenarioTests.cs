@@ -204,7 +204,9 @@ public class OperationalScenarioTests
                     Id = driver.Id,
                     FullName = driver.FullName,
                     LicenseNumber = driver.LicenseNumber,
+                    LicenseStartDate = driver.LicenseStartDate,
                     LicenseExpiryDate = driver.LicenseExpiryDate,
+                    WorkLocation = driver.WorkLocation,
                     IsActive = false
                 });
 
@@ -217,7 +219,9 @@ public class OperationalScenarioTests
                 {
                     FullName = "سائق مكرر",
                     LicenseNumber = driver.LicenseNumber,
+                    LicenseStartDate = DateTime.Today.AddYears(-1),
                     LicenseExpiryDate = DateTime.Today.AddYears(1),
+                    WorkLocation = "الموقع الرئيسي",
                     IsActive = true
                 }), "الرخصة");
             }),
@@ -806,8 +810,10 @@ public class OperationalScenarioTests
             NationalId = $"2990101{scenario:000}{suffix.Length}",
             PhoneNumber = "01000000000",
             LicenseNumber = $"DRV-{scenario:000}-{suffix}",
+            LicenseStartDate = DateTime.Today.AddYears(-1),
             LicenseExpiryDate = licenseExpiry ?? DateTime.Today.AddYears(1),
             LicenseType = "خاصة",
+            WorkLocation = "الموقع الرئيسي",
             IsActive = active,
             Address = "القاهرة"
         });

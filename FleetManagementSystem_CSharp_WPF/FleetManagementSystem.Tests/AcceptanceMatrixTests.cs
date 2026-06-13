@@ -183,8 +183,10 @@ public class AcceptanceMatrixTests
             NationalId = "2990101000001",
             PhoneNumber = "01000000000",
             LicenseNumber = "DRV-ACC-001",
+            LicenseStartDate = DateTime.Today.AddYears(-1),
             LicenseExpiryDate = DateTime.Today.AddYears(1),
             LicenseType = "خاصة",
+            WorkLocation = "الموقع الرئيسي",
             IsActive = true,
             Address = "القاهرة"
         });
