@@ -60,6 +60,9 @@ public partial class InsuranceEntryWindow : Window
 
     private void SaveButton_Click(object sender, RoutedEventArgs e)
     {
+        StartDatePicker.GetBindingExpression(DatePicker.SelectedDateProperty)?.UpdateSource();
+        ExpiryDatePicker.GetBindingExpression(DatePicker.SelectedDateProperty)?.UpdateSource();
+
         if (Insurance.VehicleId <= 0)
         {
             MessageBox.Show("اختر العربية المرتبطة بوثيقة التأمين.", "تنبيه", MessageBoxButton.OK, MessageBoxImage.Warning);

@@ -16,9 +16,10 @@ public partial class ReportPreviewWindow : Window
         _jobName = string.IsNullOrWhiteSpace(title) ? "تقرير" : title;
         TitleTextBlock.Text = _jobName;
         PreviewDocumentViewer.MinZoom = 50;
-        PreviewDocumentViewer.MaxZoom = 220;
+        PreviewDocumentViewer.MaxZoom = 300;
         PreviewDocumentViewer.Zoom = 100;
         PreviewDocumentViewer.Document = _document;
+        UpdateZoomText();
     }
 
     private void PrintButton_Click(object sender, RoutedEventArgs e)
@@ -38,18 +39,23 @@ public partial class ReportPreviewWindow : Window
 
     private void ZoomOutButton_Click(object sender, RoutedEventArgs e)
     {
-        PreviewDocumentViewer.Zoom = Math.Max(PreviewDocumentViewer.MinZoom, PreviewDocumentViewer.Zoom - 10);
+        PreviewDocumentViewer.Zoom = Math.Max(PreviewDocumentViewer.MinZoom, PreviewDocumentViewer.Zoom - 25);
+        UpdateZoomText();
     }
 
     private void ResetZoomButton_Click(object sender, RoutedEventArgs e)
     {
         PreviewDocumentViewer.Zoom = 100;
+        UpdateZoomText();
     }
 
     private void ZoomInButton_Click(object sender, RoutedEventArgs e)
     {
-        PreviewDocumentViewer.Zoom = Math.Min(PreviewDocumentViewer.MaxZoom, PreviewDocumentViewer.Zoom + 10);
+        PreviewDocumentViewer.Zoom = Math.Min(PreviewDocumentViewer.MaxZoom, PreviewDocumentViewer.Zoom + 25);
+        UpdateZoomText();
     }
+
+    private void UpdateZoomText() => ZoomTextBlock.Text = $"{PreviewDocumentViewer.Zoom:0}%";
 
     private void CloseButton_Click(object sender, RoutedEventArgs e) => Close();
 }

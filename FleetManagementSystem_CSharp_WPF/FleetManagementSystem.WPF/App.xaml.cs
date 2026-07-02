@@ -76,6 +76,12 @@ public partial class App : Application
             }
         }
 
+        var fallbackResult = await connectionStore.TestAsync(fallbackProfile);
+        if (fallbackResult.IsSuccess)
+        {
+            return fallbackProfile;
+        }
+
         var setupWindow = new ConnectionSettingsWindow(connectionStore, savedProfile ?? fallbackProfile);
         return setupWindow.ShowDialog() == true ? setupWindow.ConnectionProfile : null;
     }

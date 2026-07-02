@@ -47,11 +47,6 @@ internal static class ServiceHelpers
             return "Expired";
         }
 
-        if (expiryDate.Date <= DateTime.Today.AddDays(60))
-        {
-            return "Expiring";
-        }
-
         return "Active";
     }
 
@@ -358,7 +353,7 @@ internal static class ServiceHelpers
             "absent" => "غائب",
             "leave" => "إجازة",
             "compensatoryrest" => "إجازة",
-            "rest" => "غائب",
+            "rest" => string.Empty,
             "" => "حاضر",
             var value => value
         };
@@ -560,7 +555,7 @@ internal static class ServiceHelpers
             CoverageDetails = entity.CoverageDetails,
             AgentName = entity.AgentName,
             AgentPhoneNumber = entity.AgentPhoneNumber,
-            Status = string.IsNullOrWhiteSpace(entity.Status) ? InsuranceStatus(entity.ExpiryDate) : entity.Status,
+            Status = InsuranceStatus(entity.ExpiryDate),
             DocumentUrl = entity.DocumentUrl,
             Notes = entity.Notes
         };

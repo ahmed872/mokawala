@@ -1,0 +1,237 @@
+<Window x:Class="FleetManagementSystem.WPF.DriverEntryWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="إضافة سائق"
+        Width="720"
+        SizeToContent="Height"
+        MaxHeight="760"
+        WindowStartupLocation="CenterOwner"
+        ResizeMode="NoResize"
+        FlowDirection="RightToLeft"
+        Background="{StaticResource SurfaceBrush}"
+        FontFamily="Cairo, Segoe UI, Tahoma">
+    <Window.Resources>
+        <Style x:Key="DriverEntryLabelStyle"
+               TargetType="TextBlock">
+            <Setter Property="Foreground"
+                    Value="{StaticResource TextBrush}"/>
+            <Setter Property="FontWeight"
+                    Value="SemiBold"/>
+            <Setter Property="Margin"
+                    Value="0,0,0,6"/>
+        </Style>
+    </Window.Resources>
+
+    <Border Margin="22"
+            Padding="20"
+            Background="White"
+            BorderBrush="{StaticResource BorderBrush}"
+            BorderThickness="1"
+            CornerRadius="12">
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+
+            <StackPanel>
+                <TextBlock x:Name="DriverEntryTitleTextBlock"
+                           Text="إضافة سائق جديد"
+                           FontSize="22"
+                           FontWeight="Bold"
+                           Foreground="{StaticResource TextBrush}"/>
+                <TextBlock x:Name="DriverEntrySubtitleTextBlock"
+                           Margin="0,6,0,18"
+                           Text="سجل بيانات السائق والرخصة من نموذج واحد."
+                           Foreground="{StaticResource MutedBrush}"
+                           TextWrapping="Wrap"/>
+            </StackPanel>
+
+            <ScrollViewer Grid.Row="1"
+                          MaxHeight="500"
+                          VerticalScrollBarVisibility="Auto"
+                          HorizontalScrollBarVisibility="Disabled">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+
+                    <StackPanel Margin="0,0,10,12">
+                        <TextBlock Text="اسم السائق *"
+                                   Style="{StaticResource DriverEntryLabelStyle}"/>
+                        <TextBox Style="{StaticResource AppTextBoxStyle}"
+                                 AutomationProperties.AutomationId="DriverEntryFullNameTextBox"
+                                 Text="{Binding Draft.FullName, UpdateSourceTrigger=PropertyChanged}"/>
+                    </StackPanel>
+
+                    <StackPanel Grid.Column="1"
+                                Margin="10,0,0,12">
+                        <TextBlock Text="الرقم القومي"
+                                   Style="{StaticResource DriverEntryLabelStyle}"/>
+                        <TextBox Style="{StaticResource AppTextBoxStyle}"
+                                 AutomationProperties.AutomationId="DriverEntryNationalIdTextBox"
+                                 Text="{Binding Draft.NationalId, UpdateSourceTrigger=PropertyChanged}"/>
+                    </StackPanel>
+
+                    <StackPanel Grid.Row="1"
+                                Margin="0,0,10,12">
+                        <TextBlock Text="رقم الهاتف"
+                                   Style="{StaticResource DriverEntryLabelStyle}"/>
+                        <TextBox Style="{StaticResource AppTextBoxStyle}"
+                                 AutomationProperties.AutomationId="DriverEntryPhoneTextBox"
+                                 Text="{Binding Draft.PhoneNumber, UpdateSourceTrigger=PropertyChanged}"/>
+                    </StackPanel>
+
+                    <StackPanel Grid.Row="1"
+                                Grid.Column="1"
+                                Margin="10,0,0,12">
+                        <TextBlock Text="البريد الإلكتروني"
+                                   Style="{StaticResource DriverEntryLabelStyle}"/>
+                        <TextBox Style="{StaticResource AppTextBoxStyle}"
+                                 AutomationProperties.AutomationId="DriverEntryEmailTextBox"
+                                 Text="{Binding Draft.Email, UpdateSourceTrigger=PropertyChanged}"/>
+                    </StackPanel>
+
+                    <StackPanel Grid.Row="2"
+                                Margin="0,0,10,12">
+                        <TextBlock Text="تاريخ الميلاد"
+                                   Style="{StaticResource DriverEntryLabelStyle}"/>
+                        <DatePicker x:Name="DriverEntryDateOfBirthPicker"
+                                    Height="40"
+                                    AutomationProperties.AutomationId="DriverEntryDateOfBirthPicker"
+                                    SelectedDate="{Binding Draft.DateOfBirth, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                    Language="ar-EG"/>
+                    </StackPanel>
+
+                    <StackPanel Grid.Row="2"
+                                Grid.Column="1"
+                                Margin="10,0,0,12">
+                        <TextBlock Text="رقم الرخصة *"
+                                   Style="{StaticResource DriverEntryLabelStyle}"/>
+                        <TextBox Style="{StaticResource AppTextBoxStyle}"
+                                 AutomationProperties.AutomationId="DriverEntryLicenseNumberTextBox"
+                                 Text="{Binding Draft.LicenseNumber, UpdateSourceTrigger=PropertyChanged}"/>
+                    </StackPanel>
+
+                    <StackPanel Grid.Row="3"
+                                Margin="0,0,10,12">
+                        <TextBlock Text="بداية الرخصة *"
+                                   Style="{StaticResource DriverEntryLabelStyle}"/>
+                        <DatePicker x:Name="DriverEntryLicenseStartDatePicker"
+                                    Height="40"
+                                    AutomationProperties.AutomationId="DriverEntryLicenseStartDatePicker"
+                                    SelectedDate="{Binding Draft.LicenseStartDate, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                    Language="ar-EG"/>
+                    </StackPanel>
+
+                    <StackPanel Grid.Row="3"
+                                Grid.Column="1"
+                                Margin="10,0,0,12">
+                        <TextBlock Text="نهاية الرخصة *"
+                                   Style="{StaticResource DriverEntryLabelStyle}"/>
+                        <DatePicker x:Name="DriverEntryLicenseExpiryDatePicker"
+                                    Height="40"
+                                    AutomationProperties.AutomationId="DriverEntryLicenseExpiryDatePicker"
+                                    SelectedDate="{Binding Draft.LicenseExpiryDate, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                    Language="ar-EG"/>
+                    </StackPanel>
+
+                    <StackPanel Grid.Row="4"
+                                Margin="0,0,10,12">
+                        <TextBlock Text="نوع الرخصة"
+                                   Style="{StaticResource DriverEntryLabelStyle}"/>
+                        <TextBox Style="{StaticResource AppTextBoxStyle}"
+                                 AutomationProperties.AutomationId="DriverEntryLicenseTypeTextBox"
+                                 Text="{Binding Draft.LicenseType, UpdateSourceTrigger=PropertyChanged}"/>
+                    </StackPanel>
+
+                    <StackPanel Grid.Row="4"
+                                Grid.Column="1"
+                                Margin="10,0,0,12">
+                        <TextBlock Text="موقع العمل"
+                                   Style="{StaticResource DriverEntryLabelStyle}"/>
+                        <TextBox Style="{StaticResource AppTextBoxStyle}"
+                                 AutomationProperties.AutomationId="DriverEntryWorkLocationTextBox"
+                                 Text="{Binding Draft.WorkLocation, UpdateSourceTrigger=PropertyChanged}"/>
+                    </StackPanel>
+
+                    <StackPanel Grid.Row="5"
+                                Margin="0,0,10,12">
+                        <TextBlock Text="المحافظة"
+                                   Style="{StaticResource DriverEntryLabelStyle}"/>
+                        <TextBox Style="{StaticResource AppTextBoxStyle}"
+                                 AutomationProperties.AutomationId="DriverEntryGovernorateTextBox"
+                                 Text="{Binding Draft.Governorate, UpdateSourceTrigger=PropertyChanged}"/>
+                    </StackPanel>
+
+                    <StackPanel Grid.Row="5"
+                                Grid.Column="1"
+                                Margin="10,0,0,12">
+                        <TextBlock Text="وحدة المرور"
+                                   Style="{StaticResource DriverEntryLabelStyle}"/>
+                        <TextBox Style="{StaticResource AppTextBoxStyle}"
+                                 AutomationProperties.AutomationId="DriverEntryTrafficUnitTextBox"
+                                 Text="{Binding Draft.TrafficUnit, UpdateSourceTrigger=PropertyChanged}"/>
+                    </StackPanel>
+
+                    <StackPanel Grid.Row="6"
+                                Margin="0,0,10,12">
+                        <TextBlock Text="العنوان بالتفصيل"
+                                   Style="{StaticResource DriverEntryLabelStyle}"/>
+                        <TextBox Style="{StaticResource AppTextBoxStyle}"
+                                 AutomationProperties.AutomationId="DriverEntryFullAddressTextBox"
+                                 Text="{Binding Draft.FullAddress, UpdateSourceTrigger=PropertyChanged}"/>
+                    </StackPanel>
+
+                    <StackPanel Grid.Row="7"
+                                Margin="0,0,10,0">
+                        <CheckBox Content="متأمن عليه في الشركة"
+                                  Margin="0,8,0,10"
+                                  IsChecked="{Binding Draft.IsCompanyInsured, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
+                        <CheckBox Content="السائق مفعل"
+                                  IsChecked="{Binding Draft.IsActive, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
+                    </StackPanel>
+
+                    <StackPanel Grid.Row="7"
+                                Grid.Column="1"
+                                Margin="10,0,0,0">
+                        <TextBlock Text="ملاحظات"
+                                   Style="{StaticResource DriverEntryLabelStyle}"/>
+                        <TextBox Style="{StaticResource AppTextBoxStyle}"
+                                 Height="78"
+                                 AcceptsReturn="True"
+                                 TextWrapping="Wrap"
+                                 VerticalScrollBarVisibility="Auto"
+                                 AutomationProperties.AutomationId="DriverEntryNotesTextBox"
+                                 Text="{Binding Draft.Notes, UpdateSourceTrigger=PropertyChanged}"/>
+                    </StackPanel>
+                </Grid>
+            </ScrollViewer>
+
+            <StackPanel Grid.Row="2"
+                        Orientation="Horizontal"
+                        HorizontalAlignment="Left"
+                        Margin="0,20,0,0">
+                <Button Style="{StaticResource PrimaryButtonStyle}"
+                        MinWidth="120"
+                        Click="SaveButton_Click">حفظ</Button>
+                <Button Style="{StaticResource SecondaryButtonStyle}"
+                        MinWidth="110"
+                        Margin="10,0,0,0"
+                        Click="CancelButton_Click">إلغاء</Button>
+            </StackPanel>
+        </Grid>
+    </Border>
+</Window>

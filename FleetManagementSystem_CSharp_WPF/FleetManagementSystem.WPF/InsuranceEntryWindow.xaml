@@ -85,7 +85,8 @@
                 <StackPanel Grid.Row="2"
                             Margin="0,0,10,12">
                     <TextBlock Text="بداية التأمين"/>
-                    <DatePicker Height="40"
+                    <DatePicker x:Name="StartDatePicker"
+                                Height="40"
                                 SelectedDate="{Binding Insurance.StartDate, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                                 Language="ar-EG"/>
                 </StackPanel>
@@ -94,7 +95,8 @@
                             Grid.Column="1"
                             Margin="10,0,0,12">
                     <TextBlock Text="نهاية التأمين"/>
-                    <DatePicker Height="40"
+                    <DatePicker x:Name="ExpiryDatePicker"
+                                Height="40"
                                 SelectedDate="{Binding Insurance.ExpiryDate, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                                 Language="ar-EG"/>
                 </StackPanel>

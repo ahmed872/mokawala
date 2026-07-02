@@ -1471,7 +1471,7 @@ public sealed class ReportingService(FleetDbContext context) : IReportingService
 
         if (reportType == "vehiclelicenses")
         {
-            var query = ApplyVehicleRegistrationDateFilter(_context.Vehicles.AsQueryable(), startDate, endExclusive);
+            var query = ApplyVehicleRegistrationOverlapDateFilter(_context.Vehicles.AsQueryable(), startDate, endExclusive);
 
             var vehicles = await query
                 .OrderBy(v => v.PlateNumber)
@@ -1660,6 +1660,9 @@ public sealed class ReportingService(FleetDbContext context) : IReportingService
                     var kmSinceOilChange = lastOilOdometer.HasValue
                         ? Math.Max(0, currentOdometer - lastOilOdometer.Value)
                         : (decimal?)null;
+                    var nextOilChangeOdometer = vehicle.OilChangeIntervalKm <= 0
+                        ? (decimal?)null
+                        : (lastOilOdometer ?? 0) + vehicle.OilChangeIntervalKm;
                     var alert = BuildVehicleOilSummaryAlert(vehicle.OilChangeIntervalKm, lastOilOdometer, currentOdometer, kmSinceOilChange);
 
                     return new
@@ -1672,6 +1675,7 @@ public sealed class ReportingService(FleetDbContext context) : IReportingService
                             ["عداد اليوم"] = currentOdometer,
                             ["المقطوع من آخر غيار"] = kmSinceOilChange.HasValue ? kmSinceOilChange.Value : string.Empty,
                             ["تغيير الزيت كل كام كم"] = vehicle.OilChangeIntervalKm,
+                            ["التغيير القادم"] = nextOilChangeOdometer.HasValue ? nextOilChangeOdometer.Value : string.Empty,
                             ["حالة الإنذار"] = alert
                         }
                     };
@@ -1689,7 +1693,7 @@ public sealed class ReportingService(FleetDbContext context) : IReportingService
                 ReportTitle = "تقرير الزيوت",
                 GeneratedDate = DateTime.UtcNow,
                 GeneratedBy = "System",
-                Columns = new List<string> { "رقم العربية", "آخر عداد غيار زيت", "عداد اليوم", "المقطوع من آخر غيار", "تغيير الزيت كل كام كم", "حالة الإنذار" },
+                Columns = new List<string> { "رقم العربية", "آخر عداد غيار زيت", "عداد اليوم", "المقطوع من آخر غيار", "تغيير الزيت كل كام كم", "التغيير القادم", "حالة الإنذار" },
                 Data = rows
             };
         }
@@ -1803,6 +1807,20 @@ public sealed class ReportingService(FleetDbContext context) : IReportingService
                 (v.RegistrationExpiryDate.HasValue &&
                  (!startDate.HasValue || v.RegistrationExpiryDate.Value >= startDate.Value) &&
                  (!endExclusive.HasValue || v.RegistrationExpiryDate.Value < endExclusive.Value)));
+        }
+
+        static IQueryable<Vehicle> ApplyVehicleRegistrationOverlapDateFilter(IQueryable<Vehicle> query, DateTime? startDate, DateTime? endExclusive)
+        {
+            if (!startDate.HasValue && !endExclusive.HasValue)
+            {
+                return query;
+            }
+
+            // Match licenses whose validity period overlaps the selected report range.
+            return query.Where(v =>
+                (v.RegistrationStartDate.HasValue || v.RegistrationExpiryDate.HasValue) &&
+                (!startDate.HasValue || (v.RegistrationExpiryDate ?? v.RegistrationStartDate) >= startDate.Value) &&
+                (!endExclusive.HasValue || (v.RegistrationStartDate ?? v.RegistrationExpiryDate) < endExclusive.Value));
         }
 
         static string DateOnly(DateTime? date) => date?.ToString("yyyy-MM-dd") ?? string.Empty;

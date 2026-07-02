@@ -32,6 +32,13 @@
                     <Button Style="{StaticResource SecondaryButtonStyle}"
                             MinWidth="90"
                             Click="ZoomOutButton_Click">تصغير</Button>
+                    <TextBlock x:Name="ZoomTextBlock"
+                               Width="58"
+                               Margin="4,0,4,0"
+                               VerticalAlignment="Center"
+                               TextAlignment="Center"
+                               FontWeight="SemiBold"
+                               Foreground="{StaticResource TextBrush}"/>
                     <Button Style="{StaticResource SecondaryButtonStyle}"
                             MinWidth="80"
                             Click="ResetZoomButton_Click">100%</Button>
@@ -55,7 +62,7 @@
                 Padding="8">
             <FlowDocumentReader x:Name="PreviewDocumentViewer"
                                 FlowDirection="RightToLeft"
-                                ViewingMode="Page"
+                                ViewingMode="Scroll"
                                 IsFindEnabled="False"
                                 Background="{StaticResource SurfaceAltBrush}"/>
         </Border>

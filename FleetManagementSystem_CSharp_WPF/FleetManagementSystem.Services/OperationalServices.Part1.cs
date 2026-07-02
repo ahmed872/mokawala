@@ -579,13 +579,7 @@ public sealed class DriverAttendanceService(FleetDbContext context, IAuditServic
 
             record.WorkLocation = ServiceHelpers.Clean(string.IsNullOrWhiteSpace(dto.WorkLocation) ? driver.WorkLocation : dto.WorkLocation);
             record.Status = status;
-            var reason = ServiceHelpers.Clean(dto.AbsenceReason);
-            record.AbsenceReason = status switch
-            {
-                "Present" => string.Empty,
-                "Rest" => string.IsNullOrWhiteSpace(reason) ? "راحة أسبوعية" : reason,
-                _ => reason
-            };
+            record.AbsenceReason = string.Empty;
             record.Notes = ServiceHelpers.Clean(dto.Notes);
             record.UpdatedAt = DateTime.UtcNow;
         }
@@ -627,21 +621,12 @@ public sealed class DriverAttendanceService(FleetDbContext context, IAuditServic
             var rows = attendance.Where(x => x.DriverId == driver.Id).ToList();
             var balanceRows = balanceAttendance.Where(x => x.DriverId == driver.Id).ToList();
             var presentDays = rows.Count(IsDriverPresent);
-            var absentRows = rows
-                .Where(IsDriverAbsent)
-                .ToList();
-            var leaveRows = rows
-                .Where(IsDriverLeave)
-                .ToList();
+            var absentDays = rows.Count(IsDriverAbsent);
+            var leaveDays = rows.Count(IsDriverLeave);
             var workedFridays = rows.Count(IsWorkedWeeklyRest);
             var earnedRestDays = workedFridays;
             var balanceEarnedRestDays = balanceRows.Count(IsWorkedWeeklyRest);
             var balanceUsedRestDays = balanceRows.Count(IsDriverLeave);
-            var reasons = absentRows.Concat(leaveRows)
-                .Select(x => x.AbsenceReason)
-                .Where(x => !string.IsNullOrWhiteSpace(x))
-                .Distinct(StringComparer.OrdinalIgnoreCase)
-                .ToList();
 
             return new DriverReportDto
             {
@@ -658,12 +643,12 @@ public sealed class DriverAttendanceService(FleetDbContext context, IAuditServic
                 TrafficUnit = driver.TrafficUnit,
                 WorkLocation = driver.WorkLocation,
                 PresentDays = presentDays,
-                AbsentDays = absentRows.Count,
-                LeaveDays = leaveRows.Count,
+                AbsentDays = absentDays,
+                LeaveDays = leaveDays,
                 WorkedFridays = workedFridays,
                 EarnedRestDays = earnedRestDays,
                 RemainingRestDays = Math.Max(0, balanceEarnedRestDays - balanceUsedRestDays),
-                AbsenceReasons = reasons.Count == 0 ? string.Empty : string.Join("، ", reasons)
+                AbsenceReasons = string.Empty
             };
         }).ToList();
     }
@@ -672,27 +657,17 @@ public sealed class DriverAttendanceService(FleetDbContext context, IAuditServic
         ServiceHelpers.AttendanceStatusStorage(attendance.Status) == "Present";
 
     private static bool IsDriverAbsent(DriverAttendance attendance) =>
-        ServiceHelpers.AttendanceStatusStorage(attendance.Status) == "Absent" &&
-        !IsDriverWeeklyRest(attendance) &&
-        !IsDriverLeave(attendance);
+        ServiceHelpers.AttendanceStatusStorage(attendance.Status) == "Absent";
 
     private static bool IsWorkedWeeklyRest(DriverAttendance attendance) =>
         attendance.WorkDate.DayOfWeek == DayOfWeek.Friday && IsDriverPresent(attendance);
 
     private static bool IsDriverWeeklyRest(DriverAttendance attendance) =>
-        ServiceHelpers.AttendanceStatusStorage(attendance.Status) == "Rest" ||
-        (attendance.WorkDate.DayOfWeek == DayOfWeek.Friday &&
-            !IsDriverPresent(attendance) &&
-            ContainsAny(attendance.AbsenceReason, "راحة", "اسبوعية", "أسبوعية"));
+        ServiceHelpers.AttendanceStatusStorage(attendance.Status) == "Rest";
 
     private static bool IsDriverLeave(DriverAttendance attendance) =>
         !IsDriverWeeklyRest(attendance) &&
-        (ServiceHelpers.AttendanceStatusStorage(attendance.Status) is "Leave" or "CompensatoryRest" ||
-            ContainsAny(attendance.AbsenceReason, "إجازة", "اجازة", "أجازة", "راحة مستحقة", "راحة تعويضية"));
-
-    private static bool ContainsAny(string? value, params string[] terms) =>
-        !string.IsNullOrWhiteSpace(value) &&
-        terms.Any(term => value.Contains(term, StringComparison.OrdinalIgnoreCase));
+        ServiceHelpers.AttendanceStatusStorage(attendance.Status) is "Leave" or "CompensatoryRest";
 
     public static DateTime StartOfDriverWeek(DateTime date)
     {

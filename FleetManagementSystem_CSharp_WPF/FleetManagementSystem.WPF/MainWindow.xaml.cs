@@ -31,6 +31,7 @@ public partial class MainWindow : Window
     private const double DateGridColumnWidth = 170;
     private const double WideGridColumnWidth = 260;
     private const double ExtraWideGridColumnWidth = 320;
+    private const string TemporarilyLockedModuleTooltip = "القسم مغلق مؤقتًا لحين مراجعة المنطق والبيانات.";
 
     private static readonly HashSet<string> HiddenColumns = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -46,6 +47,12 @@ public partial class MainWindow : Window
         "Items",
         "ConfirmPassword",
         "DriverId"
+    };
+
+    private static readonly HashSet<string> TemporarilyLockedModules = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "Treasury",
+        "Custody"
     };
 
     private static readonly Dictionary<string, string> ColumnHeaders = new(StringComparer.OrdinalIgnoreCase)
@@ -107,28 +114,19 @@ public partial class MainWindow : Window
         ["DayName"] = "اليوم",
         ["WorkDate"] = "التاريخ",
         ["DriverWorkLocation"] = "موقع عمل السائق",
-        ["AbsenceReason"] = "سبب الغياب",
         ["SaturdayStatus"] = "السبت",
-        ["SaturdayReason"] = "سبب السبت",
         ["SundayStatus"] = "الأحد",
-        ["SundayReason"] = "سبب الأحد",
         ["MondayStatus"] = "الاثنين",
-        ["MondayReason"] = "سبب الاثنين",
         ["TuesdayStatus"] = "الثلاثاء",
-        ["TuesdayReason"] = "سبب الثلاثاء",
         ["WednesdayStatus"] = "الأربعاء",
-        ["WednesdayReason"] = "سبب الأربعاء",
         ["ThursdayStatus"] = "الخميس",
-        ["ThursdayReason"] = "سبب الخميس",
         ["FridayStatus"] = "الجمعة",
-        ["FridayReason"] = "سبب الجمعة",
         ["PresentDays"] = "أيام الحضور",
         ["AbsentDays"] = "أيام الغياب",
         ["LeaveDays"] = "أيام الإجازة",
         ["WorkedFridays"] = "جمعات عمل",
         ["EarnedRestDays"] = "راحات مستحقة",
         ["RemainingRestDays"] = "رصيد الراحة",
-        ["AbsenceReasons"] = "أسباب الغياب والإجازات",
         ["EmployeeId"] = "كود الموظف",
         ["Department"] = "القسم",
         ["Position"] = "الوظيفة",
@@ -164,7 +162,7 @@ public partial class MainWindow : Window
         ["HandoverDate"] = "تاريخ التسليم",
         ["ReturnDate"] = "تاريخ الإرجاع",
         ["VehicleConditionRating"] = "تقييم الحالة",
-        ["NextOilChangeOdometer"] = "تغيير الزيت القادم",
+        ["NextOilChangeOdometer"] = "التغيير القادم",
         ["CurrentVehicleMileage"] = "عداد العربية الحالي",
         ["KmSinceOilChange"] = "المقطوع من آخر تغيير",
         ["RemainingKm"] = "المتبقي كم",
@@ -219,6 +217,18 @@ public partial class MainWindow : Window
     private readonly ObservableCollection<ServiceProviderDto> _serviceProviders = new();
     private readonly ObservableCollection<NotificationDto> _notifications = new();
     private readonly ObservableCollection<UserFormDto> _users = new();
+    private readonly IReadOnlyList<UserRoleOption> _userRoleOptions = new List<UserRoleOption>
+    {
+        new("Admin", "مدير النظام"),
+        new("OperationsManager", "مدير التشغيل"),
+        new("OperationsDataEntry", "إدخال بيانات التشغيل"),
+        new("MaintenanceOfficer", "مسؤول الصيانة"),
+        new("TreasuryOfficer", "مسؤول الخزينة"),
+        new("TripsLicensesOfficer", "مسؤول التشغيلات والتراخيص"),
+        new("InsuranceOfficer", "مسؤول التأمينات"),
+        new("Viewer", "عرض فقط"),
+        new("Staff", "موظف")
+    };
     private readonly List<DashboardAlertItem> _dashboardAlertItems = new();
 
     private UserDto? _currentUser;
@@ -230,6 +240,8 @@ public partial class MainWindow : Window
     private readonly DispatcherTimer _driverAttendanceAutoSaveTimer;
     private bool _isLoadingDriverAttendanceWeek;
     private bool _isSavingDriverAttendanceWeek;
+    private bool _isNormalizingDriverAttendanceWeekPicker;
+    private bool _isNormalizingDriverReportRange;
     private bool _isSavingDriver;
 
     public ObservableCollection<VehicleDto> VehiclesForBinding => _vehicles;
@@ -486,6 +498,7 @@ public partial class MainWindow : Window
         ReportVehicleComboBox.ItemsSource = _vehicles;
         DriverReportDriverComboBox.ItemsSource = _driverReportDriverOptions;
         DriverAttendanceWeekPicker.SelectedDate = StartOfDriverWeek(DateTime.Today);
+        UpdateDriverAttendanceWeekRangeText(StartOfDriverWeek(DateTime.Today));
         DriverReportStartDatePicker.SelectedDate = StartOfDriverWeek(DateTime.Today);
         DriverReportEndDatePicker.SelectedDate = StartOfDriverWeek(DateTime.Today).AddDays(6);
         UpdateReportVehicleFilterVisibility();
@@ -567,10 +580,10 @@ public partial class MainWindow : Window
         await LoadFuelAsync();
         await LoadExpensesAsync();
         await LoadOilChangesAsync();
-        await LoadTreasuryAsync();
+        await LoadTreasuryIfUnlockedAsync();
         await LoadLicensesAsync();
         await LoadInsuranceAsync();
-        await LoadCustodyAsync();
+        await LoadCustodyIfUnlockedAsync();
         await LoadMasterDataAsync();
         await LoadSettingsAsync();
         await LoadNotificationsAsync();
@@ -731,6 +744,7 @@ public partial class MainWindow : Window
         try
         {
             var weekStart = GetSelectedDriverWeekStart();
+            UpdateDriverAttendanceWeekRangeText(weekStart);
             var records = await _driverAttendanceService.GetWeekAsync(weekStart);
             var rows = _drivers
                 .Where(driver => driver.IsActive)
@@ -752,6 +766,86 @@ public partial class MainWindow : Window
     private DateTime GetSelectedDriverWeekStart() =>
         StartOfDriverWeek(DriverAttendanceWeekPicker.SelectedDate ?? DateTime.Today);
 
+    private async void DriverAttendanceWeekPicker_SelectedDateChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (_isNormalizingDriverAttendanceWeekPicker || DriverAttendanceWeekPicker.SelectedDate is not DateTime selectedDate)
+        {
+            return;
+        }
+
+        await SetDriverAttendanceWeekAsync(selectedDate, IsLoaded);
+    }
+
+    private async Task SetDriverAttendanceWeekAsync(DateTime selectedDate, bool reload)
+    {
+        var weekStart = StartOfDriverWeek(selectedDate);
+        if (DriverAttendanceWeekPicker.SelectedDate?.Date != weekStart)
+        {
+            _isNormalizingDriverAttendanceWeekPicker = true;
+            DriverAttendanceWeekPicker.SelectedDate = weekStart;
+            DriverAttendanceWeekPicker.DisplayDate = weekStart;
+            _isNormalizingDriverAttendanceWeekPicker = false;
+        }
+        else
+        {
+            DriverAttendanceWeekPicker.DisplayDate = weekStart;
+        }
+
+        UpdateDriverAttendanceWeekRangeText(weekStart);
+
+        if (!reload)
+        {
+            return;
+        }
+
+        _driverAttendanceAutoSaveTimer.Stop();
+        await RunSafeAsync(LoadDriverAttendanceWeekAsync);
+    }
+
+    private void UpdateDriverAttendanceWeekRangeText(DateTime weekStart)
+    {
+        DriverAttendanceWeekRangeTextBlock.Text =
+            $"الأسبوع: {weekStart:yyyy-MM-dd} إلى {weekStart.AddDays(6):yyyy-MM-dd}";
+    }
+
+    private async void PreviousDriverAttendanceWeekButton_Click(object sender, RoutedEventArgs e) =>
+        await SetDriverAttendanceWeekAsync(GetSelectedDriverWeekStart().AddDays(-7), true);
+
+    private async void NextDriverAttendanceWeekButton_Click(object sender, RoutedEventArgs e) =>
+        await SetDriverAttendanceWeekAsync(GetSelectedDriverWeekStart().AddDays(7), true);
+
+    private void DriverReportStartDatePicker_SelectedDateChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (_isNormalizingDriverReportRange || DriverReportStartDatePicker.SelectedDate is not DateTime selectedDate)
+        {
+            return;
+        }
+
+        var start = selectedDate.Date;
+        if (DriverReportEndDatePicker.SelectedDate is null || DriverReportEndDatePicker.SelectedDate.Value.Date < start)
+        {
+            _isNormalizingDriverReportRange = true;
+            DriverReportEndDatePicker.SelectedDate = start;
+            _isNormalizingDriverReportRange = false;
+        }
+    }
+
+    private void DriverReportEndDatePicker_SelectedDateChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (_isNormalizingDriverReportRange || DriverReportEndDatePicker.SelectedDate is not DateTime selectedDate)
+        {
+            return;
+        }
+
+        var end = selectedDate.Date;
+        if (DriverReportStartDatePicker.SelectedDate is null || DriverReportStartDatePicker.SelectedDate.Value.Date > end)
+        {
+            _isNormalizingDriverReportRange = true;
+            DriverReportStartDatePicker.SelectedDate = end;
+            _isNormalizingDriverReportRange = false;
+        }
+    }
+
     private static DateTime StartOfDriverWeek(DateTime date)
     {
         var value = date.Date;
@@ -769,9 +863,7 @@ public partial class MainWindow : Window
         {
             DriverId = driver.Id,
             DriverName = driver.FullName,
-            WorkLocation = driver.WorkLocation,
-            FridayStatus = "غائب",
-            FridayReason = "راحة أسبوعية"
+            WorkLocation = driver.WorkLocation
         };
 
         for (var dayOffset = 0; dayOffset < 7; dayOffset++)
@@ -783,7 +875,7 @@ public partial class MainWindow : Window
                 continue;
             }
 
-            SetDriverDayValues(row, dayOffset, record.Status, record.AbsenceReason);
+            SetDriverDayValues(row, dayOffset, record.Status);
             if (!string.IsNullOrWhiteSpace(record.WorkLocation))
             {
                 row.WorkLocation = record.WorkLocation;
@@ -793,40 +885,32 @@ public partial class MainWindow : Window
         return row;
     }
 
-    private static void SetDriverDayValues(DriverWeeklyAttendanceRow row, int dayOffset, string status, string reason)
+    private static void SetDriverDayValues(DriverWeeklyAttendanceRow row, int dayOffset, string status)
     {
         var displayStatus = NormalizeDriverAttendanceStatusForUi(status);
-        var displayReason = NormalizeDriverAttendanceReasonForUi(status, reason, dayOffset);
 
         switch (dayOffset)
         {
             case 0:
                 row.SaturdayStatus = displayStatus;
-                row.SaturdayReason = displayReason;
                 break;
             case 1:
                 row.SundayStatus = displayStatus;
-                row.SundayReason = displayReason;
                 break;
             case 2:
                 row.MondayStatus = displayStatus;
-                row.MondayReason = displayReason;
                 break;
             case 3:
                 row.TuesdayStatus = displayStatus;
-                row.TuesdayReason = displayReason;
                 break;
             case 4:
                 row.WednesdayStatus = displayStatus;
-                row.WednesdayReason = displayReason;
                 break;
             case 5:
                 row.ThursdayStatus = displayStatus;
-                row.ThursdayReason = displayReason;
                 break;
             case 6:
-                row.FridayStatus = string.IsNullOrWhiteSpace(displayStatus) ? "غائب" : displayStatus;
-                row.FridayReason = string.IsNullOrWhiteSpace(displayReason) ? "راحة أسبوعية" : displayReason;
+                row.FridayStatus = displayStatus;
                 break;
         }
     }
@@ -840,25 +924,9 @@ public partial class MainWindow : Window
             "Absent" => "غائب",
             "Leave" => "إجازة",
             "CompensatoryRest" => "إجازة",
-            "Rest" => "غائب",
-            _ => string.IsNullOrWhiteSpace(normalized) ? "حاضر" : status
+            "Rest" => string.Empty,
+            _ => string.IsNullOrWhiteSpace(normalized) ? string.Empty : status
         };
-    }
-
-    private static string NormalizeDriverAttendanceReasonForUi(string status, string reason, int dayOffset)
-    {
-        var normalized = DriverAttendanceStatusStorage(status);
-        if (normalized == "Present")
-        {
-            return string.Empty;
-        }
-
-        if (!string.IsNullOrWhiteSpace(reason))
-        {
-            return reason;
-        }
-
-        return string.Empty;
     }
 
     private static string DriverAttendanceStatusStorage(string status)
@@ -879,23 +947,21 @@ public partial class MainWindow : Window
     {
         var values = new[]
         {
-            (Offset: 0, Status: row.SaturdayStatus, Reason: row.SaturdayReason),
-            (Offset: 1, Status: row.SundayStatus, Reason: row.SundayReason),
-            (Offset: 2, Status: row.MondayStatus, Reason: row.MondayReason),
-            (Offset: 3, Status: row.TuesdayStatus, Reason: row.TuesdayReason),
-            (Offset: 4, Status: row.WednesdayStatus, Reason: row.WednesdayReason),
-            (Offset: 5, Status: row.ThursdayStatus, Reason: row.ThursdayReason),
-            (Offset: 6, Status: row.FridayStatus, Reason: row.FridayReason)
+            (Offset: 0, Status: row.SaturdayStatus),
+            (Offset: 1, Status: row.SundayStatus),
+            (Offset: 2, Status: row.MondayStatus),
+            (Offset: 3, Status: row.TuesdayStatus),
+            (Offset: 4, Status: row.WednesdayStatus),
+            (Offset: 5, Status: row.ThursdayStatus),
+            (Offset: 6, Status: row.FridayStatus)
         };
 
         foreach (var value in values)
         {
-            if (string.IsNullOrWhiteSpace(value.Status) && string.IsNullOrWhiteSpace(value.Reason))
+            if (string.IsNullOrWhiteSpace(value.Status))
             {
                 continue;
             }
-
-            var status = DriverAttendanceStatusStorage(value.Status);
 
             yield return new DriverAttendanceFormDto
             {
@@ -903,7 +969,7 @@ public partial class MainWindow : Window
                 WorkDate = weekStart.AddDays(value.Offset),
                 WorkLocation = row.WorkLocation,
                 Status = value.Status,
-                AbsenceReason = status == "Present" ? string.Empty : value.Reason
+                AbsenceReason = string.Empty
             };
         }
     }
@@ -936,6 +1002,9 @@ public partial class MainWindow : Window
     private async Task LoadExpensesAsync() => ReplaceCollection(_expenses, await _expenseService.GetAllAsync());
     private async Task LoadOilChangesAsync() => ReplaceCollection(_oilChanges, await _oilChangeService.GetAllAsync());
     private async Task LoadTreasuryAsync() => ReplaceCollection(_treasuryTransactions, await _treasuryService.GetAllAsync());
+    private Task LoadTreasuryIfUnlockedAsync() =>
+        IsModuleTemporarilyLocked("Treasury") ? Task.CompletedTask : LoadTreasuryAsync();
+
     private Task LoadLicensesAsync()
     {
         ReplaceCollection(_vehicleLicenses, _vehicles.Select(VehicleLicenseRow.FromVehicle));
@@ -943,6 +1012,9 @@ public partial class MainWindow : Window
     }
     private async Task LoadInsuranceAsync() => ReplaceCollection(_insurance, await _insuranceService.GetAllAsync());
     private async Task LoadCustodyAsync() => ReplaceCollection(_custodies, await _custodyService.GetAllAsync());
+    private Task LoadCustodyIfUnlockedAsync() =>
+        IsModuleTemporarilyLocked("Custody") ? Task.CompletedTask : LoadCustodyAsync();
+
     private async Task LoadUsersAsync()
     {
         var users = await _authenticationService.GetUsersAsync();
@@ -1072,14 +1144,16 @@ public partial class MainWindow : Window
                 continue;
             }
 
-            tab.Visibility = allowed.Contains(module) ? Visibility.Visible : Visibility.Collapsed;
+            tab.Visibility = allowed.Contains(module) && !IsModuleTemporarilyLocked(module)
+                ? Visibility.Visible
+                : Visibility.Collapsed;
         }
 
         DashboardTripsShortcutButton.Visibility = allowed.Contains("Trips") ? Visibility.Visible : Visibility.Collapsed;
         DashboardLicensesInsuranceShortcutButton.Visibility =
             allowed.Contains("Licenses") || allowed.Contains("Insurance") ? Visibility.Visible : Visibility.Collapsed;
-        DashboardCustodyShortcutButton.Visibility = allowed.Contains("Custody") ? Visibility.Visible : Visibility.Collapsed;
-        DashboardTreasuryShortcutButton.Visibility = allowed.Contains("Treasury") ? Visibility.Visible : Visibility.Collapsed;
+        ApplyDashboardShortcutAccess(DashboardCustodyShortcutButton, allowed, "Custody");
+        ApplyDashboardShortcutAccess(DashboardTreasuryShortcutButton, allowed, "Treasury");
         DashboardReportsShortcutButton.Visibility = allowed.Contains("Reports") ? Visibility.Visible : Visibility.Collapsed;
         DashboardDriversShortcutButton.Visibility = allowed.Contains("Drivers") ? Visibility.Visible : Visibility.Collapsed;
         OpenInsuranceFromLicensesButton.Visibility = allowed.Contains("Insurance") ? Visibility.Visible : Visibility.Collapsed;
@@ -1104,6 +1178,24 @@ public partial class MainWindow : Window
                 grid.IsReadOnly = true;
             }
         }
+    }
+
+    private static bool IsModuleTemporarilyLocked(string? module) =>
+        !string.IsNullOrWhiteSpace(module) && TemporarilyLockedModules.Contains(module);
+
+    private static void ApplyDashboardShortcutAccess(Button button, ISet<string> allowedModules, string module)
+    {
+        if (!allowedModules.Contains(module))
+        {
+            button.Visibility = Visibility.Collapsed;
+            return;
+        }
+
+        button.Visibility = Visibility.Visible;
+        var isLocked = IsModuleTemporarilyLocked(module);
+        button.IsEnabled = !isLocked;
+        button.ToolTip = isLocked ? TemporarilyLockedModuleTooltip : null;
+        AutomationProperties.SetHelpText(button, isLocked ? TemporarilyLockedModuleTooltip : string.Empty);
     }
 
     private static IEnumerable<T> FindVisualChildren<T>(DependencyObject dependencyObject) where T : DependencyObject
@@ -1457,20 +1549,13 @@ public partial class MainWindow : Window
         public int DriverId { get; set; }
         public string DriverName { get; set; } = string.Empty;
         public string WorkLocation { get; set; } = string.Empty;
-        public string SaturdayStatus { get; set; } = "حاضر";
-        public string SaturdayReason { get; set; } = string.Empty;
-        public string SundayStatus { get; set; } = "حاضر";
-        public string SundayReason { get; set; } = string.Empty;
-        public string MondayStatus { get; set; } = "حاضر";
-        public string MondayReason { get; set; } = string.Empty;
-        public string TuesdayStatus { get; set; } = "حاضر";
-        public string TuesdayReason { get; set; } = string.Empty;
-        public string WednesdayStatus { get; set; } = "حاضر";
-        public string WednesdayReason { get; set; } = string.Empty;
-        public string ThursdayStatus { get; set; } = "حاضر";
-        public string ThursdayReason { get; set; } = string.Empty;
-        public string FridayStatus { get; set; } = "غائب";
-        public string FridayReason { get; set; } = "راحة أسبوعية";
+        public string SaturdayStatus { get; set; } = string.Empty;
+        public string SundayStatus { get; set; } = string.Empty;
+        public string MondayStatus { get; set; } = string.Empty;
+        public string TuesdayStatus { get; set; } = string.Empty;
+        public string WednesdayStatus { get; set; } = string.Empty;
+        public string ThursdayStatus { get; set; } = string.Empty;
+        public string FridayStatus { get; set; } = string.Empty;
     }
 
     private static ReportDataDto BuildSelectedReportRowSnapshot(ReportDataDto source, DataRowView selectedRow)
@@ -1651,6 +1736,11 @@ public partial class MainWindow : Window
             return 140;
         }
 
+        if (normalized.Contains("الأسباب", StringComparison.OrdinalIgnoreCase))
+        {
+            return 280;
+        }
+
         if (normalized.Contains("الغرض", StringComparison.OrdinalIgnoreCase) ||
             normalized.Contains("ملاحظات", StringComparison.OrdinalIgnoreCase) ||
             normalized.Contains("تفاصيل", StringComparison.OrdinalIgnoreCase) ||
@@ -1688,11 +1778,24 @@ public partial class MainWindow : Window
 
     private static TableCell CreateReportCell(string value, bool isHeader)
     {
-        return new TableCell(new Paragraph(new Run(value))
+        var paragraph = new Paragraph
         {
             Margin = new Thickness(0),
             TextAlignment = TextAlignment.Right
-        })
+        };
+
+        var lines = (value ?? string.Empty).Replace("\r\n", "\n").Split('\n');
+        for (var index = 0; index < lines.Length; index++)
+        {
+            if (index > 0)
+            {
+                paragraph.Inlines.Add(new LineBreak());
+            }
+
+            paragraph.Inlines.Add(new Run(lines[index]));
+        }
+
+        return new TableCell(paragraph)
         {
             Padding = new Thickness(6),
             BorderBrush = System.Windows.Media.Brushes.LightGray,
@@ -2112,6 +2215,7 @@ public partial class MainWindow : Window
                 "عداد اليوم",
                 "المقطوع من آخر غيار",
                 "تغيير الزيت كل كام كم",
+                "التغيير القادم",
                 "حالة الإنذار"
             },
             Data = vehicles.Select(vehicle =>
@@ -2139,6 +2243,9 @@ public partial class MainWindow : Window
                 var kmSinceOilChange = lastOilOdometer.HasValue
                     ? Math.Max(0, currentOdometer - lastOilOdometer.Value)
                     : (decimal?)null;
+                var nextOilChangeOdometer = vehicle.OilChangeIntervalKm <= 0
+                    ? (decimal?)null
+                    : (lastOilOdometer ?? 0) + vehicle.OilChangeIntervalKm;
                 var alert = BuildVehicleOilSummaryAlert(vehicle, lastOilOdometer, currentOdometer, kmSinceOilChange);
 
                 return new Dictionary<string, object>
@@ -2148,6 +2255,7 @@ public partial class MainWindow : Window
                     ["عداد اليوم"] = currentOdometer,
                     ["المقطوع من آخر غيار"] = kmSinceOilChange.HasValue ? kmSinceOilChange.Value : string.Empty,
                     ["تغيير الزيت كل كام كم"] = vehicle.OilChangeIntervalKm,
+                    ["التغيير القادم"] = nextOilChangeOdometer.HasValue ? nextOilChangeOdometer.Value : string.Empty,
                     ["حالة الإنذار"] = alert
                 };
             }).ToList()
@@ -2236,8 +2344,7 @@ public partial class MainWindow : Window
                 "أيام الإجازة",
                 "جمعات عمل",
                 "راحات مستحقة",
-                "رصيد الراحة",
-                "أسباب الغياب والإجازات"
+                "رصيد الراحة"
             },
             Data = rows.Select(row => new Dictionary<string, object>
             {
@@ -2257,8 +2364,7 @@ public partial class MainWindow : Window
                 ["أيام الإجازة"] = row.LeaveDays,
                 ["جمعات عمل"] = row.WorkedFridays,
                 ["راحات مستحقة"] = row.EarnedRestDays,
-                ["رصيد الراحة"] = row.RemainingRestDays,
-                ["أسباب الغياب والإجازات"] = row.AbsenceReasons
+                ["رصيد الراحة"] = row.RemainingRestDays
             }).ToList()
         };
     }
@@ -2324,19 +2430,12 @@ public partial class MainWindow : Window
                 "اسم السائق",
                 "موقع العمل",
                 "السبت",
-                "سبب السبت",
                 "الأحد",
-                "سبب الأحد",
                 "الاثنين",
-                "سبب الاثنين",
                 "الثلاثاء",
-                "سبب الثلاثاء",
                 "الأربعاء",
-                "سبب الأربعاء",
                 "الخميس",
-                "سبب الخميس",
-                "الجمعة",
-                "سبب الجمعة"
+                "الجمعة"
             },
             Data = rows.Select((row, index) => new Dictionary<string, object>
             {
@@ -2344,19 +2443,12 @@ public partial class MainWindow : Window
                 ["اسم السائق"] = row.DriverName,
                 ["موقع العمل"] = row.WorkLocation,
                 ["السبت"] = row.SaturdayStatus,
-                ["سبب السبت"] = row.SaturdayReason,
                 ["الأحد"] = row.SundayStatus,
-                ["سبب الأحد"] = row.SundayReason,
                 ["الاثنين"] = row.MondayStatus,
-                ["سبب الاثنين"] = row.MondayReason,
                 ["الثلاثاء"] = row.TuesdayStatus,
-                ["سبب الثلاثاء"] = row.TuesdayReason,
                 ["الأربعاء"] = row.WednesdayStatus,
-                ["سبب الأربعاء"] = row.WednesdayReason,
                 ["الخميس"] = row.ThursdayStatus,
-                ["سبب الخميس"] = row.ThursdayReason,
-                ["الجمعة"] = row.FridayStatus,
-                ["سبب الجمعة"] = row.FridayReason
+                ["الجمعة"] = row.FridayStatus
             }).ToList()
         };
     }
@@ -2778,6 +2870,24 @@ public partial class MainWindow : Window
             return;
         }
 
+        if (ReferenceEquals(sender, UsersGrid) && e.PropertyName.Equals("Role", StringComparison.OrdinalIgnoreCase))
+        {
+            e.Column = new DataGridComboBoxColumn
+            {
+                Header = ColumnHeaders.TryGetValue(e.PropertyName, out var roleHeader) ? roleHeader : "الدور",
+                ItemsSource = _userRoleOptions,
+                DisplayMemberPath = nameof(UserRoleOption.DisplayName),
+                SelectedValuePath = nameof(UserRoleOption.Value),
+                SelectedValueBinding = new Binding(e.PropertyName)
+                {
+                    Mode = BindingMode.TwoWay,
+                    UpdateSourceTrigger = UpdateSourceTrigger.PropertyChanged
+                },
+                Width = new DataGridLength(WideGridColumnWidth)
+            };
+            return;
+        }
+
         if (TryCreateLookupColumn(e.PropertyName, out var lookupColumn))
         {
             e.Column = lookupColumn;
@@ -2837,6 +2947,11 @@ public partial class MainWindow : Window
 
     private void SelectTabByTag(string tag)
     {
+        if (IsModuleTemporarilyLocked(tag))
+        {
+            return;
+        }
+
         var tab = MainTabs.Items
             .OfType<TabItem>()
             .FirstOrDefault(item => string.Equals(item.Tag?.ToString(), tag, StringComparison.OrdinalIgnoreCase) && item.Visibility == Visibility.Visible);
@@ -2849,6 +2964,7 @@ public partial class MainWindow : Window
     }
 
     private bool CanAccessModule(string module) =>
+        !IsModuleTemporarilyLocked(module) &&
         _currentUser?.AllowedModules.Any(allowed => string.Equals(allowed, module, StringComparison.OrdinalIgnoreCase)) == true;
 
     private void QuickOpenTripsButton_Click(object sender, RoutedEventArgs e) => SelectTabByTag("Trips");
@@ -3089,20 +3205,136 @@ public partial class MainWindow : Window
     });
 
     private async void RefreshDriversButton_Click(object sender, RoutedEventArgs e) => await RunSafeAsync(LoadDriversAsync);
-    private void AddDriverButton_Click(object sender, RoutedEventArgs e)
+    private async void AddDriverButton_Click(object sender, RoutedEventArgs e) => await AddDriverFromPopupAsync();
+    private async void EditDriverButton_Click(object sender, RoutedEventArgs e) => await RunSafeAsync(async () =>
     {
-        var driver = new DriverDto
-        {
-            DateOfBirth = DateTime.Today.AddYears(-30),
-            LicenseStartDate = DateTime.Today,
-            LicenseExpiryDate = DateTime.Today.AddYears(1),
-            IsActive = true,
-            WorkLocation = "الموقع الرئيسي"
-        };
+        var driver = SelectDriverFromSender(sender) ?? throw new InvalidOperationException("اختر سائقًا أولًا.");
+        await EditDriverFromPopupAsync(driver);
+    });
 
-        AddNewItem(_drivers, DriversGrid, driver);
-        ApplyDriverFilters();
+    private async Task AddDriverFromPopupAsync()
+    {
+        var form = CreateNewDriverForm();
+
+        while (true)
+        {
+            var window = new DriverEntryWindow(form)
+            {
+                Owner = this
+            };
+
+            if (window.ShowDialog() != true || window.DriverForm is null)
+            {
+                return;
+            }
+
+            form = window.DriverForm;
+            try
+            {
+                Mouse.OverrideCursor = Cursors.Wait;
+                _isSavingDriver = true;
+                var saved = await _driverService.SaveAsync(form);
+                await LoadDriversAsync();
+                var reselected = _drivers.FirstOrDefault(x => x.Id == saved.Id);
+                if (reselected is not null)
+                {
+                    DriversGrid.SelectedItem = reselected;
+                    DriversGrid.ScrollIntoView(reselected);
+                }
+
+                await LoadDriverAttendanceWeekAsync();
+                await LoadDashboardAsync();
+                await LoadNotificationsAsync();
+                return;
+            }
+            catch (InvalidOperationException ex)
+            {
+                MessageBox.Show(ex.Message, "تعذر حفظ السائق", MessageBoxButton.OK, MessageBoxImage.Warning);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"لم يتم حفظ السائق:\n{ex.Message}", "تعذر حفظ السائق", MessageBoxButton.OK, MessageBoxImage.Warning);
+            }
+            finally
+            {
+                _isSavingDriver = false;
+                Mouse.OverrideCursor = null;
+            }
+        }
     }
+
+    private async Task EditDriverFromPopupAsync(DriverDto driver)
+    {
+        var form = ToForm(driver);
+
+        while (true)
+        {
+            var window = new DriverEntryWindow(form, true)
+            {
+                Owner = this
+            };
+
+            if (window.ShowDialog() != true || window.DriverForm is null)
+            {
+                return;
+            }
+
+            form = window.DriverForm;
+            try
+            {
+                Mouse.OverrideCursor = Cursors.Wait;
+                _isSavingDriver = true;
+                var saved = await _driverService.SaveAsync(form);
+                await LoadDriversAsync();
+                var reselected = _drivers.FirstOrDefault(x => x.Id == saved.Id);
+                if (reselected is not null)
+                {
+                    DriversGrid.SelectedItem = reselected;
+                    DriversGrid.ScrollIntoView(reselected);
+                }
+
+                await LoadDriverAttendanceWeekAsync();
+                await LoadDashboardAsync();
+                await LoadNotificationsAsync();
+                return;
+            }
+            catch (InvalidOperationException ex)
+            {
+                MessageBox.Show(ex.Message, "تعذر تعديل السائق", MessageBoxButton.OK, MessageBoxImage.Warning);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"لم يتم تعديل السائق:\n{ex.Message}", "تعذر تعديل السائق", MessageBoxButton.OK, MessageBoxImage.Warning);
+            }
+            finally
+            {
+                _isSavingDriver = false;
+                Mouse.OverrideCursor = null;
+            }
+        }
+    }
+
+    private DriverDto? SelectDriverFromSender(object sender)
+    {
+        var item = (sender as FrameworkElement)?.DataContext as DriverDto ?? Selected<DriverDto>(DriversGrid);
+        if (item is not null)
+        {
+            DriversGrid.SelectedItem = item;
+            DriversGrid.ScrollIntoView(item);
+        }
+
+        return item;
+    }
+
+    private static DriverFormDto CreateNewDriverForm() => new()
+    {
+        DateOfBirth = DateTime.Today.AddYears(-30),
+        LicenseStartDate = DateTime.Today,
+        LicenseExpiryDate = DateTime.Today.AddYears(1),
+        LicenseType = "خاصة",
+        IsActive = true,
+        WorkLocation = "الموقع الرئيسي"
+    };
 
     private async void SaveDriverButton_Click(object sender, RoutedEventArgs e) => await RunSafeAsync(async () =>
     {
@@ -3205,7 +3437,8 @@ public partial class MainWindow : Window
         target.Notes = saved.Notes;
     }
 
-    private async void LoadDriverAttendanceWeekButton_Click(object sender, RoutedEventArgs e) => await RunSafeAsync(LoadDriverAttendanceWeekAsync);
+    private async void LoadDriverAttendanceWeekButton_Click(object sender, RoutedEventArgs e) =>
+        await SetDriverAttendanceWeekAsync(DriverAttendanceWeekPicker.SelectedDate ?? DateTime.Today, true);
 
     private async void SaveDriverAttendanceWeekButton_Click(object sender, RoutedEventArgs e) => await RunSafeAsync(async () =>
     {
@@ -3221,11 +3454,6 @@ public partial class MainWindow : Window
             return;
         }
 
-        if (sender is ComboBox comboBox && DriverAttendanceStatusStorage(comboBox.SelectedItem?.ToString() ?? string.Empty) == "Present")
-        {
-            ClearAttendanceReasonInCurrentCell(comboBox);
-        }
-
         if (sender is Control control && !control.IsKeyboardFocusWithin && !control.IsMouseOver)
         {
             return;
@@ -3233,28 +3461,6 @@ public partial class MainWindow : Window
 
         _driverAttendanceAutoSaveTimer.Stop();
         _driverAttendanceAutoSaveTimer.Start();
-    }
-
-    private static void ClearAttendanceReasonInCurrentCell(DependencyObject source)
-    {
-        var parent = System.Windows.Media.VisualTreeHelper.GetParent(source);
-        while (parent is not null && parent is not Grid)
-        {
-            parent = System.Windows.Media.VisualTreeHelper.GetParent(parent);
-        }
-
-        if (parent is null)
-        {
-            return;
-        }
-
-        foreach (var textBox in FindVisualChildren<TextBox>(parent))
-        {
-            if (!string.IsNullOrEmpty(textBox.Text))
-            {
-                textBox.Clear();
-            }
-        }
     }
 
     private async Task SaveDriverAttendanceWeekSilentlyAsync()
@@ -3285,8 +3491,10 @@ public partial class MainWindow : Window
 
     private async Task GenerateDriverReportAsync()
     {
-        var start = DriverReportStartDatePicker.SelectedDate ?? StartOfDriverWeek(DateTime.Today);
-        var end = DriverReportEndDatePicker.SelectedDate ?? start.AddDays(6);
+        var start = (DriverReportStartDatePicker.SelectedDate ?? StartOfDriverWeek(DateTime.Today)).Date;
+        var end = (DriverReportEndDatePicker.SelectedDate ?? start.AddDays(6)).Date;
+        DriverReportStartDatePicker.SelectedDate = start;
+        DriverReportEndDatePicker.SelectedDate = end;
         var driverId = DriverReportDriverComboBox.SelectedValue is int selectedDriverId && selectedDriverId > 0
             ? selectedDriverId
             : (int?)null;
@@ -3375,17 +3583,14 @@ public partial class MainWindow : Window
 
         return TextFilterMatches(DriverAttendanceFilterName, row.DriverName)
             && TextFilterMatches(DriverAttendanceFilterWorkLocation, row.WorkLocation)
-            && TextFilterMatches(DriverAttendanceFilterSaturday, DriverAttendanceDayFilterText(row.SaturdayStatus, row.SaturdayReason))
-            && TextFilterMatches(DriverAttendanceFilterSunday, DriverAttendanceDayFilterText(row.SundayStatus, row.SundayReason))
-            && TextFilterMatches(DriverAttendanceFilterMonday, DriverAttendanceDayFilterText(row.MondayStatus, row.MondayReason))
-            && TextFilterMatches(DriverAttendanceFilterTuesday, DriverAttendanceDayFilterText(row.TuesdayStatus, row.TuesdayReason))
-            && TextFilterMatches(DriverAttendanceFilterWednesday, DriverAttendanceDayFilterText(row.WednesdayStatus, row.WednesdayReason))
-            && TextFilterMatches(DriverAttendanceFilterThursday, DriverAttendanceDayFilterText(row.ThursdayStatus, row.ThursdayReason))
-            && TextFilterMatches(DriverAttendanceFilterFriday, DriverAttendanceDayFilterText(row.FridayStatus, row.FridayReason));
+            && TextFilterMatches(DriverAttendanceFilterSaturday, row.SaturdayStatus)
+            && TextFilterMatches(DriverAttendanceFilterSunday, row.SundayStatus)
+            && TextFilterMatches(DriverAttendanceFilterMonday, row.MondayStatus)
+            && TextFilterMatches(DriverAttendanceFilterTuesday, row.TuesdayStatus)
+            && TextFilterMatches(DriverAttendanceFilterWednesday, row.WednesdayStatus)
+            && TextFilterMatches(DriverAttendanceFilterThursday, row.ThursdayStatus)
+            && TextFilterMatches(DriverAttendanceFilterFriday, row.FridayStatus);
     }
-
-    private static string DriverAttendanceDayFilterText(string status, string reason) =>
-        string.Join(' ', status, reason);
 
     private async void PrintDriverAttendanceButton_Click(object sender, RoutedEventArgs e) => await RunSafeAsync(async () =>
     {
@@ -3437,8 +3642,7 @@ public partial class MainWindow : Window
             && TextFilterMatches(DriverReportFilterLeave, row.LeaveDays.ToString(CultureInfo.InvariantCulture))
             && TextFilterMatches(DriverReportFilterWorkedFridays, row.WorkedFridays.ToString(CultureInfo.InvariantCulture))
             && TextFilterMatches(DriverReportFilterEarnedRest, row.EarnedRestDays.ToString(CultureInfo.InvariantCulture))
-            && TextFilterMatches(DriverReportFilterRemainingRest, row.RemainingRestDays.ToString(CultureInfo.InvariantCulture))
-            && TextFilterMatches(DriverReportFilterReasons, row.AbsenceReasons);
+            && TextFilterMatches(DriverReportFilterRemainingRest, row.RemainingRestDays.ToString(CultureInfo.InvariantCulture));
     }
 
     private async void PrintDriverReportButton_Click(object sender, RoutedEventArgs e) => await RunSafeAsync(async () =>
@@ -3464,11 +3668,6 @@ public partial class MainWindow : Window
             ? fallback.ToList()
             : view.Cast<object>().OfType<T>().ToList();
     }
-
-    private static bool IsDriverSelectableForTrip(DriverDto driver) =>
-        driver.IsActive
-        && !string.IsNullOrWhiteSpace(driver.LicenseNumber)
-        && driver.LicenseExpiryDate.Date >= DateTime.Today;
 
     private async void RefreshEmployeesButton_Click(object sender, RoutedEventArgs e) => await RunSafeAsync(LoadEmployeesAsync);
     private void AddEmployeeButton_Click(object sender, RoutedEventArgs e) => AddNewItem(_employees, EmployeesGrid, new EmployeeDto { HireDate = DateTime.Today, Status = "Active" });
@@ -3849,20 +4048,21 @@ public partial class MainWindow : Window
             return;
         }
 
-        var selectableDrivers = _drivers
-            .Where(IsDriverSelectableForTrip)
+        var tripDrivers = _drivers
+            .Where(driver => !string.IsNullOrWhiteSpace(driver.FullName))
+            .OrderBy(driver => driver.FullName)
             .ToList();
-        if (selectableDrivers.Count == 0)
+        if (tripDrivers.Count == 0)
         {
             MessageBox.Show(
-                "لا يوجد سائق مفعل برخصة سارية يمكن إسناد تشغيلة له. راجع شاشة السائقين وفعل السائق وسجل بيانات الرخصة.",
+                "لا يوجد سائقين مسجلين. أضف سائقًا من شاشة السائقين ثم افتح التشغيلات مرة أخرى.",
                 "تنبيه واضح",
                 MessageBoxButton.OK,
                 MessageBoxImage.Information);
             return;
         }
 
-        var window = new TripEntryWindow(_vehicles.ToList(), selectableDrivers, _employees.ToList())
+        var window = new TripEntryWindow(_vehicles.ToList(), tripDrivers, _employees.ToList())
         {
             Owner = this
         };
@@ -4159,7 +4359,7 @@ public partial class MainWindow : Window
             await LoadTripsAsync();
             await LoadVehiclesAsync();
             await LoadOilChangesAsync();
-            await LoadTreasuryAsync();
+            await LoadTreasuryIfUnlockedAsync();
             await LoadDashboardAsync();
             await LoadNotificationsAsync();
         });
@@ -4182,7 +4382,7 @@ public partial class MainWindow : Window
         SelectFuelFromSender(sender);
         await DeleteSelectedAsync(FuelGrid, _fuel, x => x.Id, _fuelService.DeleteAsync, LoadFuelAsync);
         await LoadTripsAsync();
-        await LoadTreasuryAsync();
+        await LoadTreasuryIfUnlockedAsync();
         await LoadDashboardAsync();
     });
 
@@ -4222,8 +4422,8 @@ public partial class MainWindow : Window
 
     private async void RefreshExpensesButton_Click(object sender, RoutedEventArgs e) => await RunSafeAsync(LoadExpensesAsync);
     private void AddExpenseButton_Click(object sender, RoutedEventArgs e) => AddNewItem(_expenses, ExpensesGrid, new ExpenseDto { VehicleId = _vehicles.FirstOrDefault()?.Id ?? 0, ExpenseDate = DateTime.Today, Status = "Pending" });
-    private async void SaveExpenseButton_Click(object sender, RoutedEventArgs e) => await RunSafeAsync(async () => { var item = Selected<ExpenseDto>(ExpensesGrid) ?? throw new InvalidOperationException("اختر مصروفًا أولًا."); await _expenseService.SaveAsync(ToForm(item)); await LoadExpensesAsync(); await LoadTreasuryAsync(); await LoadDashboardAsync(); });
-    private async void DeleteExpenseButton_Click(object sender, RoutedEventArgs e) => await RunSafeAsync(async () => { await DeleteSelectedAsync(ExpensesGrid, _expenses, x => x.Id, _expenseService.DeleteAsync, LoadExpensesAsync); await LoadTreasuryAsync(); });
+    private async void SaveExpenseButton_Click(object sender, RoutedEventArgs e) => await RunSafeAsync(async () => { var item = Selected<ExpenseDto>(ExpensesGrid) ?? throw new InvalidOperationException("اختر مصروفًا أولًا."); await _expenseService.SaveAsync(ToForm(item)); await LoadExpensesAsync(); await LoadTreasuryIfUnlockedAsync(); await LoadDashboardAsync(); });
+    private async void DeleteExpenseButton_Click(object sender, RoutedEventArgs e) => await RunSafeAsync(async () => { await DeleteSelectedAsync(ExpensesGrid, _expenses, x => x.Id, _expenseService.DeleteAsync, LoadExpensesAsync); await LoadTreasuryIfUnlockedAsync(); });
 
     private async void RefreshOilChangesButton_Click(object sender, RoutedEventArgs e) => await RunSafeAsync(LoadOilChangesAsync);
     private void AddOilChangeButton_Click(object sender, RoutedEventArgs e)
@@ -4328,9 +4528,14 @@ public partial class MainWindow : Window
         });
     });
 
-    private async void RefreshTreasuryButton_Click(object sender, RoutedEventArgs e) => await RunSafeAsync(LoadTreasuryAsync);
+    private async void RefreshTreasuryButton_Click(object sender, RoutedEventArgs e) => await RunSafeAsync(LoadTreasuryIfUnlockedAsync);
     private async void AddTreasuryButton_Click(object sender, RoutedEventArgs e)
     {
+        if (IsModuleTemporarilyLocked("Treasury"))
+        {
+            return;
+        }
+
         var window = new TreasuryEntryWindow(new TreasuryTransactionDto
         {
             TransactionDate = DateTime.Today,
@@ -4349,7 +4554,7 @@ public partial class MainWindow : Window
         await RunSafeAsync(async () =>
         {
             await _treasuryService.SaveAsync(window.TreasuryForm);
-            await LoadTreasuryAsync();
+            await LoadTreasuryIfUnlockedAsync();
             await LoadDashboardAsync();
             await LoadNotificationsAsync();
         });
@@ -4357,6 +4562,11 @@ public partial class MainWindow : Window
 
     private async void SaveTreasuryButton_Click(object sender, RoutedEventArgs e)
     {
+        if (IsModuleTemporarilyLocked("Treasury"))
+        {
+            return;
+        }
+
         var item = SelectTreasuryFromSender(sender);
         if (item is null)
         {
@@ -4377,7 +4587,7 @@ public partial class MainWindow : Window
         await RunSafeAsync(async () =>
         {
             await _treasuryService.SaveAsync(window.TreasuryForm);
-            await LoadTreasuryAsync();
+            await LoadTreasuryIfUnlockedAsync();
             await LoadDashboardAsync();
             await LoadNotificationsAsync();
         });
@@ -4385,8 +4595,13 @@ public partial class MainWindow : Window
 
     private async void DeleteTreasuryButton_Click(object sender, RoutedEventArgs e) => await RunSafeAsync(() =>
     {
+        if (IsModuleTemporarilyLocked("Treasury"))
+        {
+            return Task.CompletedTask;
+        }
+
         SelectTreasuryFromSender(sender);
-        return DeleteSelectedAsync(TreasuryGrid, _treasuryTransactions, x => x.Id, _treasuryService.DeleteAsync, LoadTreasuryAsync);
+        return DeleteSelectedAsync(TreasuryGrid, _treasuryTransactions, x => x.Id, _treasuryService.DeleteAsync, LoadTreasuryIfUnlockedAsync);
     });
 
     private async void RefreshLicensesButton_Click(object sender, RoutedEventArgs e) => await RunSafeAsync(async () =>
@@ -4640,9 +4855,14 @@ public partial class MainWindow : Window
         await LoadInsuranceAsync();
     });
 
-    private async void RefreshCustodyButton_Click(object sender, RoutedEventArgs e) => await RunSafeAsync(LoadCustodyAsync);
+    private async void RefreshCustodyButton_Click(object sender, RoutedEventArgs e) => await RunSafeAsync(LoadCustodyIfUnlockedAsync);
     private async void AddCustodyButton_Click(object sender, RoutedEventArgs e)
     {
+        if (IsModuleTemporarilyLocked("Custody"))
+        {
+            return;
+        }
+
         var selectedVehicleId = Selected<CustodyDto>(CustodyGrid)?.VehicleId;
         var window = new CustodyEntryWindow(_vehicles, selectedVehicleId)
         {
@@ -4657,7 +4877,7 @@ public partial class MainWindow : Window
         await RunSafeAsync(async () =>
         {
             await _custodyService.SaveAsync(window.CustodyForm);
-            await LoadCustodyAsync();
+            await LoadCustodyIfUnlockedAsync();
             await LoadDashboardAsync();
             await LoadNotificationsAsync();
         });
@@ -4665,6 +4885,11 @@ public partial class MainWindow : Window
 
     private async void SaveCustodyButton_Click(object sender, RoutedEventArgs e)
     {
+        if (IsModuleTemporarilyLocked("Custody"))
+        {
+            return;
+        }
+
         var item = SelectCustodyFromSender(sender);
         if (item is null)
         {
@@ -4686,7 +4911,7 @@ public partial class MainWindow : Window
         {
             EnsureVehicleExists(window.CustodyForm.VehicleId, "سجل العهدة");
             await _custodyService.SaveAsync(window.CustodyForm);
-            await LoadCustodyAsync();
+            await LoadCustodyIfUnlockedAsync();
             await LoadDashboardAsync();
             await LoadNotificationsAsync();
         });
@@ -4694,12 +4919,22 @@ public partial class MainWindow : Window
 
     private async void DeleteCustodyButton_Click(object sender, RoutedEventArgs e) => await RunSafeAsync(() =>
     {
+        if (IsModuleTemporarilyLocked("Custody"))
+        {
+            return Task.CompletedTask;
+        }
+
         SelectCustodyFromSender(sender);
-        return DeleteSelectedAsync(CustodyGrid, _custodies, x => x.Id, _custodyService.DeleteAsync, LoadCustodyAsync);
+        return DeleteSelectedAsync(CustodyGrid, _custodies, x => x.Id, _custodyService.DeleteAsync, LoadCustodyIfUnlockedAsync);
     });
 
     private async void AttachCustodyDocumentButton_Click(object sender, RoutedEventArgs e) => await RunSafeAsync(async () =>
     {
+        if (IsModuleTemporarilyLocked("Custody"))
+        {
+            return;
+        }
+
         var item = SelectCustodyFromSender(sender) ?? throw new InvalidOperationException("اختر سجل عهدة أولًا.");
         var filePath = PickDocumentPath();
         if (string.IsNullOrWhiteSpace(filePath))
@@ -4709,7 +4944,7 @@ public partial class MainWindow : Window
 
         item.DocumentUrl = filePath;
         await _custodyService.SaveAsync(ToForm(item));
-        await LoadCustodyAsync();
+        await LoadCustodyIfUnlockedAsync();
     });
 
     private void AddVehicleTypeButton_Click(object sender, RoutedEventArgs e) => AddNewItem(_vehicleTypes, VehicleTypesGrid, new VehicleTypeDto { IsActive = true });
@@ -5101,4 +5336,6 @@ public partial class MainWindow : Window
     });
 
     private async void RefreshNotificationsButton_Click(object sender, RoutedEventArgs e) => await RunSafeAsync(LoadNotificationsAsync);
+
+    private sealed record UserRoleOption(string Value, string DisplayName);
 }

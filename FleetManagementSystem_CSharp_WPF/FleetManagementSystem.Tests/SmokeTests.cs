@@ -109,9 +109,61 @@ public class SmokeTests
         Assert.Equal(1, report.WorkedFridays);
         Assert.Equal(1, report.EarnedRestDays);
         Assert.Equal(0, report.RemainingRestDays);
-        Assert.Contains("ظرف مرضي", report.AbsenceReasons);
-        Assert.Contains("إجازة سنوية", report.AbsenceReasons);
+        Assert.Empty(report.AbsenceReasons);
+        Assert.All(weeklyRows.Where(x => x.DriverId == driver.Id), row => Assert.Empty(row.AbsenceReason));
         Assert.Contains(alerts, a => a.RelatedEntityType == "Driver" && a.Title.Contains("رخصة سائق"));
+    }
+
+    [Fact]
+    public async Task DriverAttendanceService_GeneratesMultiWeekDriverReport()
+    {
+        await using var harness = await TestHarness.CreateAsync();
+
+        var driver = await harness.DriverService.SaveAsync(new DriverFormDto
+        {
+            FullName = "سائق تقرير فترة",
+            NationalId = "2990101000101",
+            LicenseNumber = "DRV-ATT-002",
+            LicenseStartDate = DateTime.Today.AddYears(-1),
+            LicenseExpiryDate = DateTime.Today.AddYears(1),
+            LicenseType = "خاصة",
+            IsCompanyInsured = true,
+            Governorate = "القاهرة",
+            FullAddress = "مدينة نصر - شارع التقرير",
+            TrafficUnit = "مرور مدينة نصر",
+            WorkLocation = "محطة التجمع",
+            IsActive = true
+        });
+
+        var weekStart = DateTime.Today;
+        while (weekStart.DayOfWeek != DayOfWeek.Saturday)
+        {
+            weekStart = weekStart.AddDays(-1);
+        }
+
+        await harness.DriverAttendanceService.SaveWeekAsync(weekStart, new[]
+        {
+            new DriverAttendanceFormDto { DriverId = driver.Id, WorkDate = weekStart.AddDays(1), WorkLocation = "محطة التجمع", Status = "إجازة" },
+            new DriverAttendanceFormDto { DriverId = driver.Id, WorkDate = weekStart.AddDays(6), WorkLocation = "محطة التجمع", Status = "حاضر" }
+        });
+
+        await harness.DriverAttendanceService.SaveWeekAsync(weekStart.AddDays(7), new[]
+        {
+            new DriverAttendanceFormDto { DriverId = driver.Id, WorkDate = weekStart.AddDays(9), WorkLocation = "محطة التجمع", Status = "حاضر" },
+            new DriverAttendanceFormDto { DriverId = driver.Id, WorkDate = weekStart.AddDays(10), WorkLocation = "محطة التجمع", Status = "غائب" },
+            new DriverAttendanceFormDto { DriverId = driver.Id, WorkDate = weekStart.AddDays(11), WorkLocation = "محطة التجمع", Status = "إجازة" },
+            new DriverAttendanceFormDto { DriverId = driver.Id, WorkDate = weekStart.AddDays(13), WorkLocation = "محطة التجمع", Status = "حاضر" }
+        });
+
+        var report = Assert.Single(await harness.DriverAttendanceService.GenerateReportAsync(weekStart, weekStart.AddDays(13), driver.Id));
+
+        Assert.Equal(3, report.PresentDays);
+        Assert.Equal(1, report.AbsentDays);
+        Assert.Equal(2, report.LeaveDays);
+        Assert.Equal(2, report.WorkedFridays);
+        Assert.Equal(2, report.EarnedRestDays);
+        Assert.Equal(0, report.RemainingRestDays);
+        Assert.Empty(report.AbsenceReasons);
     }
 
     [Fact]
@@ -745,6 +797,49 @@ public class SmokeTests
         Assert.Equal("تقرير التأمينات", report.ReportTitle);
         Assert.Contains(report.Data, row => row["رقم الوثيقة"].ToString() == "INS-IN-RANGE");
         Assert.DoesNotContain(report.Data, row => row["رقم الوثيقة"].ToString() == "INS-OUT-RANGE");
+    }
+
+    [Fact]
+    public async Task ReportingService_VehicleLicenseReport_IncludesLicensesOverlappingSelectedDateRange()
+    {
+        await using var harness = await TestHarness.CreateAsync();
+        var vehicleTypeId = await harness.Context.VehicleTypes.Select(x => x.Id).FirstAsync();
+
+        await harness.VehicleService.SaveAsync(new VehicleFormDto
+        {
+            PlateNumber = "LIC-SPAN-RANGE",
+            VehicleTypeId = vehicleTypeId,
+            Model = "Toyota Hiace",
+            Year = 2024,
+            Manufacturer = "Toyota",
+            Status = "Available",
+            CurrentMileage = 1000,
+            RegistrationStartDate = DateTime.Today.AddDays(-60),
+            RegistrationExpiryDate = DateTime.Today.AddDays(60)
+        });
+
+        await harness.VehicleService.SaveAsync(new VehicleFormDto
+        {
+            PlateNumber = "LIC-FUTURE-RANGE",
+            VehicleTypeId = vehicleTypeId,
+            Model = "Toyota Hiace",
+            Year = 2024,
+            Manufacturer = "Toyota",
+            Status = "Available",
+            CurrentMileage = 1000,
+            RegistrationStartDate = DateTime.Today.AddDays(40),
+            RegistrationExpiryDate = DateTime.Today.AddDays(80)
+        });
+
+        var report = await harness.ReportingService.GenerateReportAsync(new ReportFilterDto
+        {
+            ReportType = "vehiclelicenses",
+            StartDate = DateTime.Today,
+            EndDate = DateTime.Today.AddDays(7)
+        });
+
+        Assert.Contains(report.Data, row => row["رقم السيارة"].ToString() == "LIC-SPAN-RANGE");
+        Assert.DoesNotContain(report.Data, row => row["رقم السيارة"].ToString() == "LIC-FUTURE-RANGE");
     }
 
     private static Task EnsureActiveInsuranceAsync(TestHarness harness, int vehicleId, string suffix) =>

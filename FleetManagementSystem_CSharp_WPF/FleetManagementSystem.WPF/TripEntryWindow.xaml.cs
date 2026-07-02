@@ -26,8 +26,8 @@ public partial class TripEntryWindow : Window
             .OrderBy(vehicle => vehicle.PlateNumber)
             .ToList();
 
-        var activeDrivers = drivers
-            .Where(driver => driver.IsActive)
+        var driverOptions = drivers
+            .Where(driver => !string.IsNullOrWhiteSpace(driver.FullName))
             .OrderBy(driver => driver.FullName)
             .ToList();
 
@@ -39,7 +39,7 @@ public partial class TripEntryWindow : Window
         _supervisors = activeEmployees;
 
         VehicleComboBox.ItemsSource = _vehicles;
-        DriverComboBox.ItemsSource = activeDrivers;
+        DriverComboBox.ItemsSource = driverOptions;
         SupervisorComboBox.ItemsSource = _supervisors;
         TripDatePicker.SelectedDate = DateTime.Today;
         TripTimeTextBox.Text = DateTime.Now.ToString("HH:mm");

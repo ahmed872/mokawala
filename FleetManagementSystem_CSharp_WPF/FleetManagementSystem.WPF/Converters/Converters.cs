@@ -113,7 +113,8 @@ namespace FleetManagementSystem.WPF.Converters
         public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
         {
             var status = value?.ToString()?.Trim();
-            return !string.Equals(status, "حاضر", StringComparison.OrdinalIgnoreCase)
+            return !string.IsNullOrWhiteSpace(status)
+                && !string.Equals(status, "حاضر", StringComparison.OrdinalIgnoreCase)
                 && !string.Equals(status, "Present", StringComparison.OrdinalIgnoreCase);
         }
 

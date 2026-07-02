@@ -22,8 +22,6 @@
             <sys:String>غائب</sys:String>
             <sys:String>إجازة</sys:String>
         </x:Array>
-        <converters:AttendanceReasonEnabledConverter x:Key="AttendanceReasonEnabledConverter"/>
-
         <Style x:Key="BaseButtonStyle"
                TargetType="Button">
             <Setter Property="Height"
@@ -288,38 +286,6 @@
                     Value="SemiBold"/>
             <Setter Property="Padding"
                     Value="8,2"/>
-        </Style>
-
-        <Style x:Key="DriverAttendanceReasonTextBoxStyle"
-               TargetType="TextBox"
-               BasedOn="{StaticResource AppTextBoxStyle}">
-            <Setter Property="Height"
-                    Value="30"/>
-            <Setter Property="FontSize"
-                    Value="12"/>
-            <Setter Property="Padding"
-                    Value="9,2"/>
-            <Setter Property="Margin"
-                    Value="0,6,0,0"/>
-            <Setter Property="Background"
-                    Value="White"/>
-            <Setter Property="BorderBrush"
-                    Value="#D6E4EC"/>
-            <Setter Property="BorderThickness"
-                    Value="1"/>
-            <Setter Property="VerticalContentAlignment"
-                    Value="Center"/>
-            <Style.Triggers>
-                <Trigger Property="IsEnabled"
-                         Value="False">
-                    <Setter Property="Background"
-                            Value="#F1F5F7"/>
-                    <Setter Property="Foreground"
-                            Value="{StaticResource MutedBrush}"/>
-                    <Setter Property="BorderBrush"
-                            Value="#E1E9EE"/>
-                </Trigger>
-            </Style.Triggers>
         </Style>
 
         <Style x:Key="WrappingCellTextStyle"
@@ -1612,6 +1578,7 @@
                                 </Border>
                                 <DataGrid x:Name="DriversGrid"
                                           AutomationProperties.AutomationId="DriversGrid"
+                                          IsReadOnly="True"
                                           CellEditEnding="DriversGrid_CellEditEnding"
                                           CurrentCellChanged="DriversGrid_CurrentCellChanged"
                                           SelectedCellsChanged="DriversGrid_SelectedCellsChanged"
@@ -1621,6 +1588,24 @@
                                           MinRowHeight="38"
                                           ColumnHeaderHeight="75">
                                     <DataGrid.Columns>
+                                        <DataGridTemplateColumn Width="58"
+                                                                IsReadOnly="True">
+                                            <DataGridTemplateColumn.Header>
+                                                <TextBlock Text="تعديل"
+                                                           HorizontalAlignment="Center"
+                                                           FontWeight="Bold"/>
+                                            </DataGridTemplateColumn.Header>
+                                            <DataGridTemplateColumn.CellTemplate>
+                                                <DataTemplate>
+                                                    <Button Style="{StaticResource GridRowActionButtonStyle}"
+                                                            Content="{Binding}"
+                                                            ContentTemplate="{StaticResource GridEditActionIconTemplate}"
+                                                            ToolTip="تعديل بيانات السائق"
+                                                            AutomationProperties.Name="تعديل بيانات السائق"
+                                                            Click="EditDriverButton_Click"/>
+                                                </DataTemplate>
+                                            </DataGridTemplateColumn.CellTemplate>
+                                        </DataGridTemplateColumn>
                                         <DataGridTextColumn Binding="{Binding FullName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                                                             Width="220">
                                             <DataGridTextColumn.Header>
@@ -1837,10 +1822,24 @@
                                                 <DatePicker x:Name="DriverAttendanceWeekPicker"
                                                             Height="42"
                                                             Language="ar-EG"
-                                                            Style="{StaticResource FilterDatePickerStyle}"/>
+                                                            FirstDayOfWeek="Saturday"
+                                                            Style="{StaticResource FilterDatePickerStyle}"
+                                                            SelectedDateChanged="DriverAttendanceWeekPicker_SelectedDateChanged"/>
+                                                <TextBlock x:Name="DriverAttendanceWeekRangeTextBlock"
+                                                           Margin="6,6,6,0"
+                                                           FontSize="12"
+                                                           FontWeight="SemiBold"
+                                                           Foreground="{StaticResource AccentBrush}"
+                                                           TextWrapping="Wrap"/>
                                             </StackPanel>
                                             <Button Style="{StaticResource SecondaryButtonStyle}"
+                                                    MinWidth="92"
+                                                    Click="PreviousDriverAttendanceWeekButton_Click">الأسبوع السابق</Button>
+                                            <Button Style="{StaticResource SecondaryButtonStyle}"
                                                     Click="LoadDriverAttendanceWeekButton_Click">تحميل الأسبوع</Button>
+                                            <Button Style="{StaticResource SecondaryButtonStyle}"
+                                                    MinWidth="92"
+                                                    Click="NextDriverAttendanceWeekButton_Click">الأسبوع التالي</Button>
                                         </WrapPanel>
                                     </Grid>
                                 </Border>
@@ -1848,8 +1847,8 @@
                                           Grid.Row="1"
                                           AutomationProperties.AutomationId="DriverAttendanceGrid"
                                           AutomationProperties.Name="جدول حضور وغياب السائقين"
-                                          RowHeight="92"
-                                          MinRowHeight="92"
+                                          RowHeight="58"
+                                          MinRowHeight="58"
                                           AlternationCount="2"
                                           GridLinesVisibility="None"
                                           AutoGenerateColumns="False"
@@ -1884,7 +1883,7 @@
                                                 </StackPanel>
                                             </DataGridTextColumn.Header>
                                         </DataGridTextColumn>
-                                        <DataGridTemplateColumn Width="190">
+                                        <DataGridTemplateColumn Width="150">
                                             <DataGridTemplateColumn.Header>
                                                 <StackPanel Orientation="Vertical" HorizontalAlignment="Stretch">
                                                     <TextBlock Text="السبت" HorizontalAlignment="Center" FontWeight="Bold" Margin="0,0,0,8"/>
@@ -1898,30 +1897,17 @@
                                             <DataGridTemplateColumn.CellTemplate>
                                                 <DataTemplate>
                                                     <Border Style="{StaticResource DriverAttendanceDayCellBorderStyle}">
-                                                        <Grid>
-                                                            <Grid.RowDefinitions>
-                                                                <RowDefinition Height="Auto"/>
-                                                                <RowDefinition Height="Auto"/>
-                                                            </Grid.RowDefinitions>
-                                                            <ComboBox ItemsSource="{StaticResource DriverAttendanceStatuses}"
-                                                                      SelectedItem="{Binding SaturdayStatus, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                                                                      SelectionChanged="DriverAttendanceInput_Changed"
-                                                                      Style="{StaticResource DriverAttendanceStatusComboBoxStyle}"
-                                                                      ToolTip="حالة السبت"
-                                                                      AutomationProperties.Name="حالة السبت"/>
-                                                            <TextBox Grid.Row="1"
-                                                                     Text="{Binding SaturdayReason, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                                                                     IsEnabled="{Binding SaturdayStatus, Converter={StaticResource AttendanceReasonEnabledConverter}}"
-                                                                     TextChanged="DriverAttendanceInput_Changed"
-                                                                     Style="{StaticResource DriverAttendanceReasonTextBoxStyle}"
-                                                                     ToolTip="سبب السبت"
-                                                                     AutomationProperties.Name="سبب السبت"/>
-                                                        </Grid>
+                                                        <ComboBox ItemsSource="{StaticResource DriverAttendanceStatuses}"
+                                                                  SelectedItem="{Binding SaturdayStatus, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                                                  SelectionChanged="DriverAttendanceInput_Changed"
+                                                                  Style="{StaticResource DriverAttendanceStatusComboBoxStyle}"
+                                                                  ToolTip="حالة السبت"
+                                                                  AutomationProperties.Name="حالة السبت"/>
                                                     </Border>
                                                 </DataTemplate>
                                             </DataGridTemplateColumn.CellTemplate>
                                         </DataGridTemplateColumn>
-                                        <DataGridTemplateColumn Width="190">
+                                        <DataGridTemplateColumn Width="150">
                                             <DataGridTemplateColumn.Header>
                                                 <StackPanel Orientation="Vertical" HorizontalAlignment="Stretch">
                                                     <TextBlock Text="الأحد" HorizontalAlignment="Center" FontWeight="Bold" Margin="0,0,0,8"/>
@@ -1935,30 +1921,17 @@
                                             <DataGridTemplateColumn.CellTemplate>
                                                 <DataTemplate>
                                                     <Border Style="{StaticResource DriverAttendanceDayCellBorderStyle}">
-                                                        <Grid>
-                                                            <Grid.RowDefinitions>
-                                                                <RowDefinition Height="Auto"/>
-                                                                <RowDefinition Height="Auto"/>
-                                                            </Grid.RowDefinitions>
-                                                            <ComboBox ItemsSource="{StaticResource DriverAttendanceStatuses}"
-                                                                      SelectedItem="{Binding SundayStatus, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                                                                      SelectionChanged="DriverAttendanceInput_Changed"
-                                                                      Style="{StaticResource DriverAttendanceStatusComboBoxStyle}"
-                                                                      ToolTip="حالة الأحد"
-                                                                      AutomationProperties.Name="حالة الأحد"/>
-                                                            <TextBox Grid.Row="1"
-                                                                     Text="{Binding SundayReason, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                                                                     IsEnabled="{Binding SundayStatus, Converter={StaticResource AttendanceReasonEnabledConverter}}"
-                                                                     TextChanged="DriverAttendanceInput_Changed"
-                                                                     Style="{StaticResource DriverAttendanceReasonTextBoxStyle}"
-                                                                     ToolTip="سبب الأحد"
-                                                                     AutomationProperties.Name="سبب الأحد"/>
-                                                        </Grid>
+                                                        <ComboBox ItemsSource="{StaticResource DriverAttendanceStatuses}"
+                                                                  SelectedItem="{Binding SundayStatus, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                                                  SelectionChanged="DriverAttendanceInput_Changed"
+                                                                  Style="{StaticResource DriverAttendanceStatusComboBoxStyle}"
+                                                                  ToolTip="حالة الأحد"
+                                                                  AutomationProperties.Name="حالة الأحد"/>
                                                     </Border>
                                                 </DataTemplate>
                                             </DataGridTemplateColumn.CellTemplate>
                                         </DataGridTemplateColumn>
-                                        <DataGridTemplateColumn Width="190">
+                                        <DataGridTemplateColumn Width="150">
                                             <DataGridTemplateColumn.Header>
                                                 <StackPanel Orientation="Vertical" HorizontalAlignment="Stretch">
                                                     <TextBlock Text="الاثنين" HorizontalAlignment="Center" FontWeight="Bold" Margin="0,0,0,8"/>
@@ -1972,30 +1945,17 @@
                                             <DataGridTemplateColumn.CellTemplate>
                                                 <DataTemplate>
                                                     <Border Style="{StaticResource DriverAttendanceDayCellBorderStyle}">
-                                                        <Grid>
-                                                            <Grid.RowDefinitions>
-                                                                <RowDefinition Height="Auto"/>
-                                                                <RowDefinition Height="Auto"/>
-                                                            </Grid.RowDefinitions>
-                                                            <ComboBox ItemsSource="{StaticResource DriverAttendanceStatuses}"
-                                                                      SelectedItem="{Binding MondayStatus, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                                                                      SelectionChanged="DriverAttendanceInput_Changed"
-                                                                      Style="{StaticResource DriverAttendanceStatusComboBoxStyle}"
-                                                                      ToolTip="حالة الاثنين"
-                                                                      AutomationProperties.Name="حالة الاثنين"/>
-                                                            <TextBox Grid.Row="1"
-                                                                     Text="{Binding MondayReason, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                                                                     IsEnabled="{Binding MondayStatus, Converter={StaticResource AttendanceReasonEnabledConverter}}"
-                                                                     TextChanged="DriverAttendanceInput_Changed"
-                                                                     Style="{StaticResource DriverAttendanceReasonTextBoxStyle}"
-                                                                     ToolTip="سبب الاثنين"
-                                                                     AutomationProperties.Name="سبب الاثنين"/>
-                                                        </Grid>
+                                                        <ComboBox ItemsSource="{StaticResource DriverAttendanceStatuses}"
+                                                                  SelectedItem="{Binding MondayStatus, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                                                  SelectionChanged="DriverAttendanceInput_Changed"
+                                                                  Style="{StaticResource DriverAttendanceStatusComboBoxStyle}"
+                                                                  ToolTip="حالة الاثنين"
+                                                                  AutomationProperties.Name="حالة الاثنين"/>
                                                     </Border>
                                                 </DataTemplate>
                                             </DataGridTemplateColumn.CellTemplate>
                                         </DataGridTemplateColumn>
-                                        <DataGridTemplateColumn Width="190">
+                                        <DataGridTemplateColumn Width="150">
                                             <DataGridTemplateColumn.Header>
                                                 <StackPanel Orientation="Vertical" HorizontalAlignment="Stretch">
                                                     <TextBlock Text="الثلاثاء" HorizontalAlignment="Center" FontWeight="Bold" Margin="0,0,0,8"/>
@@ -2009,30 +1969,17 @@
                                             <DataGridTemplateColumn.CellTemplate>
                                                 <DataTemplate>
                                                     <Border Style="{StaticResource DriverAttendanceDayCellBorderStyle}">
-                                                        <Grid>
-                                                            <Grid.RowDefinitions>
-                                                                <RowDefinition Height="Auto"/>
-                                                                <RowDefinition Height="Auto"/>
-                                                            </Grid.RowDefinitions>
-                                                            <ComboBox ItemsSource="{StaticResource DriverAttendanceStatuses}"
-                                                                      SelectedItem="{Binding TuesdayStatus, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                                                                      SelectionChanged="DriverAttendanceInput_Changed"
-                                                                      Style="{StaticResource DriverAttendanceStatusComboBoxStyle}"
-                                                                      ToolTip="حالة الثلاثاء"
-                                                                      AutomationProperties.Name="حالة الثلاثاء"/>
-                                                            <TextBox Grid.Row="1"
-                                                                     Text="{Binding TuesdayReason, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                                                                     IsEnabled="{Binding TuesdayStatus, Converter={StaticResource AttendanceReasonEnabledConverter}}"
-                                                                     TextChanged="DriverAttendanceInput_Changed"
-                                                                     Style="{StaticResource DriverAttendanceReasonTextBoxStyle}"
-                                                                     ToolTip="سبب الثلاثاء"
-                                                                     AutomationProperties.Name="سبب الثلاثاء"/>
-                                                        </Grid>
+                                                        <ComboBox ItemsSource="{StaticResource DriverAttendanceStatuses}"
+                                                                  SelectedItem="{Binding TuesdayStatus, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                                                  SelectionChanged="DriverAttendanceInput_Changed"
+                                                                  Style="{StaticResource DriverAttendanceStatusComboBoxStyle}"
+                                                                  ToolTip="حالة الثلاثاء"
+                                                                  AutomationProperties.Name="حالة الثلاثاء"/>
                                                     </Border>
                                                 </DataTemplate>
                                             </DataGridTemplateColumn.CellTemplate>
                                         </DataGridTemplateColumn>
-                                        <DataGridTemplateColumn Width="190">
+                                        <DataGridTemplateColumn Width="150">
                                             <DataGridTemplateColumn.Header>
                                                 <StackPanel Orientation="Vertical" HorizontalAlignment="Stretch">
                                                     <TextBlock Text="الأربعاء" HorizontalAlignment="Center" FontWeight="Bold" Margin="0,0,0,8"/>
@@ -2046,30 +1993,17 @@
                                             <DataGridTemplateColumn.CellTemplate>
                                                 <DataTemplate>
                                                     <Border Style="{StaticResource DriverAttendanceDayCellBorderStyle}">
-                                                        <Grid>
-                                                            <Grid.RowDefinitions>
-                                                                <RowDefinition Height="Auto"/>
-                                                                <RowDefinition Height="Auto"/>
-                                                            </Grid.RowDefinitions>
-                                                            <ComboBox ItemsSource="{StaticResource DriverAttendanceStatuses}"
-                                                                      SelectedItem="{Binding WednesdayStatus, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                                                                      SelectionChanged="DriverAttendanceInput_Changed"
-                                                                      Style="{StaticResource DriverAttendanceStatusComboBoxStyle}"
-                                                                      ToolTip="حالة الأربعاء"
-                                                                      AutomationProperties.Name="حالة الأربعاء"/>
-                                                            <TextBox Grid.Row="1"
-                                                                     Text="{Binding WednesdayReason, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                                                                     IsEnabled="{Binding WednesdayStatus, Converter={StaticResource AttendanceReasonEnabledConverter}}"
-                                                                     TextChanged="DriverAttendanceInput_Changed"
-                                                                     Style="{StaticResource DriverAttendanceReasonTextBoxStyle}"
-                                                                     ToolTip="سبب الأربعاء"
-                                                                     AutomationProperties.Name="سبب الأربعاء"/>
-                                                        </Grid>
+                                                        <ComboBox ItemsSource="{StaticResource DriverAttendanceStatuses}"
+                                                                  SelectedItem="{Binding WednesdayStatus, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                                                  SelectionChanged="DriverAttendanceInput_Changed"
+                                                                  Style="{StaticResource DriverAttendanceStatusComboBoxStyle}"
+                                                                  ToolTip="حالة الأربعاء"
+                                                                  AutomationProperties.Name="حالة الأربعاء"/>
                                                     </Border>
                                                 </DataTemplate>
                                             </DataGridTemplateColumn.CellTemplate>
                                         </DataGridTemplateColumn>
-                                        <DataGridTemplateColumn Width="190">
+                                        <DataGridTemplateColumn Width="150">
                                             <DataGridTemplateColumn.Header>
                                                 <StackPanel Orientation="Vertical" HorizontalAlignment="Stretch">
                                                     <TextBlock Text="الخميس" HorizontalAlignment="Center" FontWeight="Bold" Margin="0,0,0,8"/>
@@ -2083,30 +2017,17 @@
                                             <DataGridTemplateColumn.CellTemplate>
                                                 <DataTemplate>
                                                     <Border Style="{StaticResource DriverAttendanceDayCellBorderStyle}">
-                                                        <Grid>
-                                                            <Grid.RowDefinitions>
-                                                                <RowDefinition Height="Auto"/>
-                                                                <RowDefinition Height="Auto"/>
-                                                            </Grid.RowDefinitions>
-                                                            <ComboBox ItemsSource="{StaticResource DriverAttendanceStatuses}"
-                                                                      SelectedItem="{Binding ThursdayStatus, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                                                                      SelectionChanged="DriverAttendanceInput_Changed"
-                                                                      Style="{StaticResource DriverAttendanceStatusComboBoxStyle}"
-                                                                      ToolTip="حالة الخميس"
-                                                                      AutomationProperties.Name="حالة الخميس"/>
-                                                            <TextBox Grid.Row="1"
-                                                                     Text="{Binding ThursdayReason, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                                                                     IsEnabled="{Binding ThursdayStatus, Converter={StaticResource AttendanceReasonEnabledConverter}}"
-                                                                     TextChanged="DriverAttendanceInput_Changed"
-                                                                     Style="{StaticResource DriverAttendanceReasonTextBoxStyle}"
-                                                                     ToolTip="سبب الخميس"
-                                                                     AutomationProperties.Name="سبب الخميس"/>
-                                                        </Grid>
+                                                        <ComboBox ItemsSource="{StaticResource DriverAttendanceStatuses}"
+                                                                  SelectedItem="{Binding ThursdayStatus, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                                                  SelectionChanged="DriverAttendanceInput_Changed"
+                                                                  Style="{StaticResource DriverAttendanceStatusComboBoxStyle}"
+                                                                  ToolTip="حالة الخميس"
+                                                                  AutomationProperties.Name="حالة الخميس"/>
                                                     </Border>
                                                 </DataTemplate>
                                             </DataGridTemplateColumn.CellTemplate>
                                         </DataGridTemplateColumn>
-                                        <DataGridTemplateColumn Width="190">
+                                        <DataGridTemplateColumn Width="150">
                                             <DataGridTemplateColumn.Header>
                                                 <StackPanel Orientation="Vertical" HorizontalAlignment="Stretch">
                                                     <TextBlock Text="الجمعة" HorizontalAlignment="Center" FontWeight="Bold" Margin="0,0,0,8"/>
@@ -2120,25 +2041,12 @@
                                             <DataGridTemplateColumn.CellTemplate>
                                                 <DataTemplate>
                                                     <Border Style="{StaticResource DriverAttendanceDayCellBorderStyle}">
-                                                        <Grid>
-                                                            <Grid.RowDefinitions>
-                                                                <RowDefinition Height="Auto"/>
-                                                                <RowDefinition Height="Auto"/>
-                                                            </Grid.RowDefinitions>
-                                                            <ComboBox ItemsSource="{StaticResource DriverAttendanceStatuses}"
-                                                                      SelectedItem="{Binding FridayStatus, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                                                                      SelectionChanged="DriverAttendanceInput_Changed"
-                                                                      Style="{StaticResource DriverAttendanceStatusComboBoxStyle}"
-                                                                      ToolTip="حالة الجمعة"
-                                                                      AutomationProperties.Name="حالة الجمعة"/>
-                                                            <TextBox Grid.Row="1"
-                                                                     Text="{Binding FridayReason, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                                                                     IsEnabled="{Binding FridayStatus, Converter={StaticResource AttendanceReasonEnabledConverter}}"
-                                                                     TextChanged="DriverAttendanceInput_Changed"
-                                                                     Style="{StaticResource DriverAttendanceReasonTextBoxStyle}"
-                                                                     ToolTip="سبب الجمعة"
-                                                                     AutomationProperties.Name="سبب الجمعة"/>
-                                                        </Grid>
+                                                        <ComboBox ItemsSource="{StaticResource DriverAttendanceStatuses}"
+                                                                  SelectedItem="{Binding FridayStatus, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                                                  SelectionChanged="DriverAttendanceInput_Changed"
+                                                                  Style="{StaticResource DriverAttendanceStatusComboBoxStyle}"
+                                                                  ToolTip="حالة الجمعة"
+                                                                  AutomationProperties.Name="حالة الجمعة"/>
                                                     </Border>
                                                 </DataTemplate>
                                             </DataGridTemplateColumn.CellTemplate>
@@ -2177,7 +2085,8 @@
                                                 <DatePicker x:Name="DriverReportStartDatePicker"
                                                             Height="42"
                                                             Language="ar-EG"
-                                                            Style="{StaticResource FilterDatePickerStyle}"/>
+                                                            Style="{StaticResource FilterDatePickerStyle}"
+                                                            SelectedDateChanged="DriverReportStartDatePicker_SelectedDateChanged"/>
                                             </StackPanel>
                                             <StackPanel Width="150"
                                                         Margin="0,0,10,0">
@@ -2189,7 +2098,8 @@
                                                 <DatePicker x:Name="DriverReportEndDatePicker"
                                                             Height="42"
                                                             Language="ar-EG"
-                                                            Style="{StaticResource FilterDatePickerStyle}"/>
+                                                            Style="{StaticResource FilterDatePickerStyle}"
+                                                            SelectedDateChanged="DriverReportEndDatePicker_SelectedDateChanged"/>
                                             </StackPanel>
                                             <StackPanel Width="240"
                                                         Margin="0,0,10,0">
@@ -2442,19 +2352,6 @@
                                                     <TextBlock Text="رصيد الراحة" HorizontalAlignment="Center" FontWeight="Bold" Margin="0,0,0,8"/>
                                                     <TextBox x:Name="DriverReportFilterRemainingRest"
                                                              AutomationProperties.AutomationId="DriverReportFilterRemainingRest"
-                                                             HorizontalAlignment="Stretch"
-                                                             Style="{StaticResource FilterTextBoxStyle}"
-                                                             TextChanged="DriverReportFilter_Changed"/>
-                                                </StackPanel>
-                                            </DataGridTextColumn.Header>
-                                        </DataGridTextColumn>
-                                        <DataGridTextColumn Binding="{Binding AbsenceReasons}"
-                                                            Width="260">
-                                            <DataGridTextColumn.Header>
-                                                <StackPanel Orientation="Vertical" HorizontalAlignment="Stretch">
-                                                    <TextBlock Text="الأسباب" HorizontalAlignment="Center" FontWeight="Bold" Margin="0,0,0,8"/>
-                                                    <TextBox x:Name="DriverReportFilterReasons"
-                                                             AutomationProperties.AutomationId="DriverReportFilterReasons"
                                                              HorizontalAlignment="Stretch"
                                                              Style="{StaticResource FilterTextBoxStyle}"
                                                              TextChanged="DriverReportFilter_Changed"/>
@@ -3177,7 +3074,7 @@
                                 <DataGridTextColumn Binding="{Binding NextOilChangeOdometer, StringFormat=0.##}" Width="175">
                                     <DataGridTextColumn.Header>
                                         <StackPanel Orientation="Vertical" HorizontalAlignment="Stretch">
-                                            <TextBlock Text="التغيير القادم" HorizontalAlignment="Center" FontWeight="Bold" Margin="0,0,0,8"/>
+                                            <TextBlock Text="التغيير القادم" HorizontalAlignment="Center" FontWeight="Bold" Margin="0,0,0,8" TextWrapping="Wrap"/>
                                             <TextBox x:Name="OilFilterNext" AutomationProperties.AutomationId="OilFilterNext" HorizontalAlignment="Stretch" Style="{StaticResource FilterTextBoxStyle}" TextChanged="OilFilter_Changed"/>
                                         </StackPanel>
                                     </DataGridTextColumn.Header>
