@@ -1,0 +1,583 @@
+[
+  {
+    "Test": "UI-001-dashboard-visible",
+    "Status": "PASS",
+    "Window": "نظام إدارة الأسطول",
+    "Screenshot": "D:\\saper\\ui-test-UI-001-dashboard-visible.png"
+  },
+  {
+    "Test": "UI-002-open-trips",
+    "Status": "PASS",
+    "Window": "نظام إدارة الأسطول",
+    "Screenshot": "D:\\saper\\ui-test-UI-002-open-trips.png"
+  },
+  {
+    "Test": "UI-003-open-trip-a5-first-row",
+    "Status": "PASS",
+    "Window": "نظام إدارة الأسطول",
+    "Screenshot": "D:\\saper\\ui-test-UI-003-open-trip-a5-first-row.png"
+  },
+  {
+    "Test": "UI-004-print-trips-report",
+    "Status": "PASS",
+    "Window": "نظام إدارة الأسطول",
+    "Screenshot": "D:\\saper\\ui-test-UI-004-print-trips-report.png"
+  },
+  {
+    "Test": "UI-005-open-fuel-from-trip",
+    "Status": "PASS",
+    "Window": "نظام إدارة الأسطول",
+    "Screenshot": "D:\\saper\\ui-test-UI-005-open-fuel-from-trip.png"
+  },
+  {
+    "Test": "UI-006-back-from-fuel-to-trips",
+    "Status": "PASS",
+    "Window": "نظام إدارة الأسطول",
+    "Screenshot": "D:\\saper\\ui-test-UI-006-back-from-fuel-to-trips.png"
+  },
+  {
+    "Test": "UI-007-open-oil-from-trip",
+    "Status": "PASS",
+    "Window": "نظام إدارة الأسطول",
+    "Screenshot": "D:\\saper\\ui-test-UI-007-open-oil-from-trip.png"
+  },
+  {
+    "Test": "UI-008-back-from-oil-to-trips",
+    "Status": "PASS",
+    "Window": "نظام إدارة الأسطول",
+    "Screenshot": "D:\\saper\\ui-test-UI-008-back-from-oil-to-trips.png"
+  },
+  {
+    "Test": "UI-009-back-dashboard-from-trips",
+    "Status": "PASS",
+    "Window": "نظام إدارة الأسطول",
+    "Screenshot": "D:\\saper\\ui-test-UI-009-back-dashboard-from-trips.png"
+  },
+  {
+    "Test": "UI-010-open-licenses",
+    "Status": "PASS",
+    "Window": "نظام إدارة الأسطول",
+    "Screenshot": "D:\\saper\\ui-test-UI-010-open-licenses.png"
+  },
+  {
+    "Test": "UI-011-open-insurance-from-licenses",
+    "Status": "PASS",
+    "Window": "نظام إدارة الأسطول",
+    "Screenshot": "D:\\saper\\ui-test-UI-011-open-insurance-from-licenses.png"
+  },
+  {
+    "Test": "UI-012-back-insurance-to-licenses",
+    "Status": "PASS",
+    "Window": "نظام إدارة الأسطول",
+    "Screenshot": "D:\\saper\\ui-test-UI-012-back-insurance-to-licenses.png"
+  },
+  {
+    "Test": "UI-013-back-dashboard-from-licenses",
+    "Status": "PASS",
+    "Window": "نظام إدارة الأسطول",
+    "Screenshot": "D:\\saper\\ui-test-UI-013-back-dashboard-from-licenses.png"
+  },
+  {
+    "Test": "UI-014-open-reports",
+    "Status": "PASS",
+    "Window": "نظام إدارة الأسطول",
+    "Screenshot": "D:\\saper\\ui-test-UI-014-open-reports.png"
+  },
+  {
+    "Test": "UI-015-generate-report",
+    "Status": "PASS",
+    "Window": "نظام إدارة الأسطول",
+    "Screenshot": "D:\\saper\\ui-test-UI-015-generate-report.png"
+  },
+  {
+    "Test": "UI-016-print-report-preview",
+    "Status": "PASS",
+    "Window": "نظام إدارة الأسطول",
+    "Screenshot": "D:\\saper\\ui-test-UI-016-print-report-preview.png"
+  },
+  {
+    "Test": "UI-017-back-dashboard-from-reports",
+    "Status": "FAIL_EXCEPTION",
+    "Window": "",
+    "Screenshot": "",
+    "Error": "Cannot find a process with the name \"FleetManagementSystem.WPF\". Verify the process name and call the cmdlet again."
+  },
+  {
+    "Test": "UI-018-open-reports-fresh",
+    "Status": "PASS",
+    "Window": "نظام إدارة الأسطول",
+    "Screenshot": "D:\\saper\\ui-test-UI-018-open-reports-fresh.png"
+  },
+  {
+    "Test": "UI-019-select-all-trips-report-type",
+    "Status": "PASS",
+    "Window": "نظام إدارة الأسطول",
+    "Screenshot": "D:\\saper\\ui-test-UI-019-select-all-trips-report-type.png"
+  },
+  {
+    "Test": "UI-020-generate-all-trips-report",
+    "Status": "PASS",
+    "Window": "نظام إدارة الأسطول",
+    "Screenshot": "D:\\saper\\ui-test-UI-020-generate-all-trips-report.png"
+  },
+  {
+    "Test": "UI-021-open-report-button-preview",
+    "Status": "PASS",
+    "Window": "نظام إدارة الأسطول",
+    "Screenshot": "D:\\saper\\ui-test-UI-021-open-report-button-preview.png"
+  },
+  {
+    "Test": "UI-022-open-print-report-preview",
+    "Status": "PASS",
+    "Window": "نظام إدارة الأسطول",
+    "Screenshot": "D:\\saper\\ui-test-UI-022-open-print-report-preview.png"
+  },
+  {
+    "Test": "UI-023-report-page-still-responsive",
+    "Status": "PASS",
+    "Window": "نظام إدارة الأسطول",
+    "Screenshot": "D:\\saper\\ui-test-UI-023-report-page-still-responsive.png"
+  },
+  {
+    "Test": "UI-024-dashboard-via-top-button",
+    "Status": "PASS",
+    "Window": "نظام إدارة الأسطول",
+    "OpenWindows": "نافذة نظام إدارة الأسطول",
+    "Screenshot": "D:\\saper\\ui-test-UI-024-dashboard-via-top-button.png"
+  },
+  {
+    "Test": "UI-025-open-licenses-page",
+    "Status": "PASS",
+    "Window": "نظام إدارة الأسطول",
+    "OpenWindows": "نافذة نظام إدارة الأسطول",
+    "Screenshot": "D:\\saper\\ui-test-UI-025-open-licenses-page.png"
+  },
+  {
+    "Test": "UI-026-add-vehicle-license-dialog-opens-no-crash",
+    "Status": "PASS",
+    "Window": "نظام إدارة الأسطول",
+    "OpenWindows": "نافذة نظام إدارة الأسطول",
+    "Screenshot": "D:\\saper\\ui-test-UI-026-add-vehicle-license-dialog-opens-no-crash.png"
+  },
+  {
+    "Test": "UI-027-license-page-after-closing-add-dialog",
+    "Status": "PASS",
+    "Window": "نظام إدارة الأسطول",
+    "OpenWindows": "نافذة نظام إدارة الأسطول",
+    "Screenshot": "D:\\saper\\ui-test-UI-027-license-page-after-closing-add-dialog.png"
+  },
+  {
+    "Test": "UI-028-edit-license-dialog-opens-no-crash",
+    "Status": "PASS",
+    "Window": "نظام إدارة الأسطول",
+    "OpenWindows": "نافذة نظام إدارة الأسطول",
+    "Screenshot": "D:\\saper\\ui-test-UI-028-edit-license-dialog-opens-no-crash.png"
+  },
+  {
+    "Test": "UI-029-add-insurance-for-vehicle-dialog-opens-no-crash",
+    "Status": "FAIL_EXCEPTION",
+    "Error": "Cannot find a process with the name \"FleetManagementSystem.WPF\". Verify the process name and call the cmdlet again."
+  },
+  {
+    "Test": "UI-030-open-insurance-page",
+    "Status": "FAIL_EXCEPTION",
+    "Error": "Cannot find a process with the name \"FleetManagementSystem.WPF\". Verify the process name and call the cmdlet again."
+  },
+  {
+    "Test": "UI-031-add-insurance-dialog-opens-no-crash",
+    "Status": "FAIL_EXCEPTION",
+    "Error": "Cannot find a process with the name \"FleetManagementSystem.WPF\". Verify the process name and call the cmdlet again."
+  },
+  {
+    "Test": "UI-032-back-insurance-to-licenses-button",
+    "Status": "FAIL_EXCEPTION",
+    "Error": "Cannot find a process with the name \"FleetManagementSystem.WPF\". Verify the process name and call the cmdlet again."
+  },
+  {
+    "Test": "UI-029R-open-licenses-page",
+    "Status": "PASS",
+    "Window": "نظام إدارة الأسطول",
+    "Screenshot": "D:\\saper\\ui-test-UI-029R-open-licenses-page.png"
+  },
+  {
+    "Test": "UI-030R-add-insurance-for-vehicle-dialog-opens-no-crash",
+    "Status": "PASS",
+    "Window": "نظام إدارة الأسطول",
+    "Screenshot": "D:\\saper\\ui-test-UI-030R-add-insurance-for-vehicle-dialog-opens-no-crash.png"
+  },
+  {
+    "Test": "UI-031R-open-insurance-page",
+    "Status": "FAIL_EXCEPTION",
+    "Error": "Cannot find a process with the name \"FleetManagementSystem.WPF\". Verify the process name and call the cmdlet again."
+  },
+  {
+    "Test": "UI-032R-add-insurance-dialog-opens-no-crash",
+    "Status": "FAIL_EXCEPTION",
+    "Error": "Cannot find a process with the name \"FleetManagementSystem.WPF\". Verify the process name and call the cmdlet again."
+  },
+  {
+    "Test": "UI-033R-back-insurance-to-licenses-button",
+    "Status": "FAIL_EXCEPTION",
+    "Error": "Cannot find a process with the name \"FleetManagementSystem.WPF\". Verify the process name and call the cmdlet again."
+  },
+  {
+    "Test": "UI-033-safe-select-license-row",
+    "Status": "PASS",
+    "Window": "نظام إدارة الأسطول",
+    "Screenshot": "D:\\saper\\ui-test-UI-033-safe-select-license-row.png"
+  },
+  {
+    "Test": "UI-034-safe-edit-license-dialog",
+    "Status": "PASS",
+    "Window": "نظام إدارة الأسطول",
+    "Screenshot": "D:\\saper\\ui-test-UI-034-safe-edit-license-dialog.png"
+  },
+  {
+    "Test": "UI-035-safe-add-insurance-selected-license-dialog",
+    "Status": "PASS",
+    "Window": "نظام إدارة الأسطول",
+    "Screenshot": "D:\\saper\\ui-test-UI-035-safe-add-insurance-selected-license-dialog.png"
+  },
+  {
+    "Test": "UI-036-safe-open-insurance-tab",
+    "Status": "PASS",
+    "Window": "نظام إدارة الأسطول",
+    "Screenshot": "D:\\saper\\ui-test-UI-036-safe-open-insurance-tab.png"
+  },
+  {
+    "Test": "UI-037-safe-add-insurance-dialog",
+    "Status": "PASS",
+    "Window": "نظام إدارة الأسطول",
+    "Screenshot": "D:\\saper\\ui-test-UI-037-safe-add-insurance-dialog.png"
+  },
+  {
+    "Test": "UI-038-safe-back-to-licenses",
+    "Status": "PASS",
+    "Window": "نظام إدارة الأسطول",
+    "Screenshot": "D:\\saper\\ui-test-UI-038-safe-back-to-licenses.png"
+  },
+  {
+    "Test": "UI-039-safe-license-a5-first-row",
+    "Status": "PASS",
+    "Window": "نظام إدارة الأسطول",
+    "Screenshot": "D:\\saper\\ui-test-UI-039-safe-license-a5-first-row.png"
+  },
+  {
+    "Test": "UI-040-safe-open-reports",
+    "Status": "PASS",
+    "Window": "نظام إدارة الأسطول",
+    "Screenshot": "D:\\saper\\ui-test-UI-040-safe-open-reports.png"
+  },
+  {
+    "Test": "UI-041-safe-report-generate-vehicles",
+    "Status": "PASS",
+    "Window": "نظام إدارة الأسطول",
+    "Screenshot": "D:\\saper\\ui-test-UI-041-safe-report-generate-vehicles.png"
+  },
+  {
+    "Test": "UI-042-safe-report-preview-button",
+    "Status": "PASS",
+    "Window": "نظام إدارة الأسطول",
+    "Screenshot": "D:\\saper\\ui-test-UI-042-safe-report-preview-button.png"
+  },
+  {
+    "Test": "UI-043-safe-report-print-preview-button",
+    "Status": "PASS",
+    "Window": "نظام إدارة الأسطول",
+    "Screenshot": "D:\\saper\\ui-test-UI-043-safe-report-print-preview-button.png"
+  },
+  {
+    "Test": "UI-044-safe-report-csv-button-opens-dialog-or-stays",
+    "Status": "PASS",
+    "Window": "نظام إدارة الأسطول",
+    "Screenshot": "D:\\saper\\ui-test-UI-044-safe-report-csv-button-opens-dialog-or-stays.png"
+  },
+  {
+    "Test": "UI-045-safe-report-excel-button-opens-dialog-or-stays",
+    "Status": "PASS",
+    "Window": "نظام إدارة الأسطول",
+    "Screenshot": "D:\\saper\\ui-test-UI-045-safe-report-excel-button-opens-dialog-or-stays.png"
+  },
+  {
+    "Test": "UI-046-dashboard-return-before-trips",
+    "Status": "PASS",
+    "Window": "نظام إدارة الأسطول",
+    "Screenshot": "D:\\saper\\ui-test-UI-046-dashboard-return-before-trips.png"
+  },
+  {
+    "Test": "UI-047-open-trips-from-dashboard",
+    "Status": "PASS",
+    "Window": "نظام إدارة الأسطول",
+    "Screenshot": "D:\\saper\\ui-test-UI-047-open-trips-from-dashboard.png"
+  },
+  {
+    "Test": "UI-048-trip-horizontal-scroll-right",
+    "Status": "PASS",
+    "Window": "نظام إدارة الأسطول",
+    "Screenshot": "D:\\saper\\ui-test-UI-048-trip-horizontal-scroll-right.png"
+  },
+  {
+    "Test": "UI-049-trip-horizontal-scroll-left",
+    "Status": "PASS",
+    "Window": "نظام إدارة الأسطول",
+    "Screenshot": "D:\\saper\\ui-test-UI-049-trip-horizontal-scroll-left.png"
+  },
+  {
+    "Test": "UI-050-trip-serial-filter-type-1",
+    "Status": "PASS",
+    "Window": "نظام إدارة الأسطول",
+    "Screenshot": "D:\\saper\\ui-test-UI-050-trip-serial-filter-type-1.png"
+  },
+  {
+    "Test": "UI-051-trip-clear-serial-filter",
+    "Status": "PASS",
+    "Window": "نظام إدارة الأسطول",
+    "Screenshot": "D:\\saper\\ui-test-UI-051-trip-clear-serial-filter.png"
+  },
+  {
+    "Test": "UI-052-trip-plate-filter-type-7782",
+    "Status": "PASS",
+    "Window": "نظام إدارة الأسطول",
+    "Screenshot": "D:\\saper\\ui-test-UI-052-trip-plate-filter-type-7782.png"
+  },
+  {
+    "Test": "UI-053-trip-clear-plate-filter",
+    "Status": "PASS",
+    "Window": "نظام إدارة الأسطول",
+    "Screenshot": "D:\\saper\\ui-test-UI-053-trip-clear-plate-filter.png"
+  },
+  {
+    "Test": "UI-054-trip-a5-first-row-preview",
+    "Status": "PASS",
+    "Window": "نظام إدارة الأسطول",
+    "Screenshot": "D:\\saper\\ui-test-UI-054-trip-a5-first-row-preview.png"
+  },
+  {
+    "Test": "UI-055-trip-print-report-preview",
+    "Status": "PASS",
+    "Window": "نظام إدارة الأسطول",
+    "Screenshot": "D:\\saper\\ui-test-UI-055-trip-print-report-preview.png"
+  },
+  {
+    "Test": "UI-056-trip-open-fuel-page",
+    "Status": "PASS",
+    "Window": "نظام إدارة الأسطول",
+    "Screenshot": "D:\\saper\\ui-test-UI-056-trip-open-fuel-page.png"
+  },
+  {
+    "Test": "UI-057-fuel-add-draft",
+    "Status": "PASS",
+    "Window": "نظام إدارة الأسطول",
+    "Screenshot": "D:\\saper\\ui-test-UI-057-fuel-add-draft.png"
+  },
+  {
+    "Test": "UI-058-fuel-back-to-trips",
+    "Status": "PASS",
+    "Window": "نظام إدارة الأسطول",
+    "Screenshot": "D:\\saper\\ui-test-UI-058-fuel-back-to-trips.png"
+  },
+  {
+    "Test": "UI-059-trip-open-oil-page",
+    "Status": "PASS",
+    "Window": "نظام إدارة الأسطول",
+    "Screenshot": "D:\\saper\\ui-test-UI-059-trip-open-oil-page.png"
+  },
+  {
+    "Test": "UI-060-oil-add-draft",
+    "Status": "PASS",
+    "Window": "نظام إدارة الأسطول",
+    "Screenshot": "D:\\saper\\ui-test-UI-060-oil-add-draft.png"
+  },
+  {
+    "Test": "UI-061-oil-back-to-trips",
+    "Status": "PASS",
+    "Window": "نظام إدارة الأسطول",
+    "Screenshot": "D:\\saper\\ui-test-UI-061-oil-back-to-trips.png"
+  },
+  {
+    "Test": "UI-062-trip-close-edit-dialog",
+    "Status": "PASS",
+    "Window": "نظام إدارة الأسطول",
+    "Screenshot": "D:\\saper\\ui-test-UI-062-trip-close-edit-dialog.png"
+  },
+  {
+    "Test": "UI-063-trip-delete-without-selection-handled",
+    "Status": "PASS",
+    "Window": "نظام إدارة الأسطول",
+    "Screenshot": "D:\\saper\\ui-test-UI-063-trip-delete-without-selection-handled.png"
+  },
+  {
+    "Test": "UI-046R-dashboard-return-before-trips",
+    "Status": "PASS",
+    "Window": "نظام إدارة الأسطول",
+    "Screenshot": "D:\\saper\\ui-test-UI-046R-dashboard-return-before-trips.png"
+  },
+  {
+    "Test": "UI-047R-open-trips-from-dashboard",
+    "Status": "PASS",
+    "Window": "نظام إدارة الأسطول",
+    "Screenshot": "D:\\saper\\ui-test-UI-047R-open-trips-from-dashboard.png"
+  },
+  {
+    "Test": "UI-048R-trip-horizontal-scroll-right",
+    "Status": "PASS",
+    "Window": "نظام إدارة الأسطول",
+    "Screenshot": "D:\\saper\\ui-test-UI-048R-trip-horizontal-scroll-right.png"
+  },
+  {
+    "Test": "UI-049R-trip-horizontal-scroll-left",
+    "Status": "PASS",
+    "Window": "نظام إدارة الأسطول",
+    "Screenshot": "D:\\saper\\ui-test-UI-049R-trip-horizontal-scroll-left.png"
+  },
+  {
+    "Test": "UI-050R-trip-serial-filter-type-1",
+    "Status": "PASS",
+    "Window": "نظام إدارة الأسطول",
+    "Screenshot": "D:\\saper\\ui-test-UI-050R-trip-serial-filter-type-1.png"
+  },
+  {
+    "Test": "UI-051R-trip-clear-serial-filter",
+    "Status": "PASS",
+    "Window": "نظام إدارة الأسطول",
+    "Screenshot": "D:\\saper\\ui-test-UI-051R-trip-clear-serial-filter.png"
+  },
+  {
+    "Test": "UI-052R-trip-plate-filter-type-7782",
+    "Status": "PASS",
+    "Window": "نظام إدارة الأسطول",
+    "Screenshot": "D:\\saper\\ui-test-UI-052R-trip-plate-filter-type-7782.png"
+  },
+  {
+    "Test": "UI-053R-trip-clear-plate-filter",
+    "Status": "PASS",
+    "Window": "نظام إدارة الأسطول",
+    "Screenshot": "D:\\saper\\ui-test-UI-053R-trip-clear-plate-filter.png"
+  },
+  {
+    "Test": "UI-054R-trip-a5-first-row-preview",
+    "Status": "PASS",
+    "Window": "نظام إدارة الأسطول",
+    "Screenshot": "D:\\saper\\ui-test-UI-054R-trip-a5-first-row-preview.png"
+  },
+  {
+    "Test": "UI-055R-trip-print-report-preview",
+    "Status": "PASS",
+    "Window": "نظام إدارة الأسطول",
+    "Screenshot": "D:\\saper\\ui-test-UI-055R-trip-print-report-preview.png"
+  },
+  {
+    "Test": "UI-056R-trip-open-fuel-page",
+    "Status": "PASS",
+    "Window": "نظام إدارة الأسطول",
+    "Screenshot": "D:\\saper\\ui-test-UI-056R-trip-open-fuel-page.png"
+  },
+  {
+    "Test": "UI-057R-fuel-add-draft",
+    "Status": "PASS",
+    "Window": "نظام إدارة الأسطول",
+    "Screenshot": "D:\\saper\\ui-test-UI-057R-fuel-add-draft.png"
+  },
+  {
+    "Test": "UI-058R-fuel-back-to-trips",
+    "Status": "PASS",
+    "Window": "نظام إدارة الأسطول",
+    "Screenshot": "D:\\saper\\ui-test-UI-058R-fuel-back-to-trips.png"
+  },
+  {
+    "Test": "UI-059R-trip-open-oil-page",
+    "Status": "PASS",
+    "Window": "نظام إدارة الأسطول",
+    "Screenshot": "D:\\saper\\ui-test-UI-059R-trip-open-oil-page.png"
+  },
+  {
+    "Test": "UI-060R-oil-add-draft",
+    "Status": "PASS",
+    "Window": "نظام إدارة الأسطول",
+    "Screenshot": "D:\\saper\\ui-test-UI-060R-oil-add-draft.png"
+  },
+  {
+    "Test": "UI-061R-oil-back-to-trips",
+    "Status": "PASS",
+    "Window": "نظام إدارة الأسطول",
+    "Screenshot": "D:\\saper\\ui-test-UI-061R-oil-back-to-trips.png"
+  },
+  {
+    "Test": "UI-062R-trip-close-edit-dialog",
+    "Status": "PASS",
+    "Window": "نظام إدارة الأسطول",
+    "Screenshot": "D:\\saper\\ui-test-UI-062R-trip-close-edit-dialog.png"
+  },
+  {
+    "Test": "UI-063R-trip-page-after-close-dialog",
+    "Status": "PASS",
+    "Window": "نظام إدارة الأسطول",
+    "Screenshot": "D:\\saper\\ui-test-UI-063R-trip-page-after-close-dialog.png"
+  },
+  {
+    "Test": "UI-064-dashboard-visible-for-alerts",
+    "Status": "PASS",
+    "Window": "نظام إدارة الأسطول",
+    "Screenshot": "D:\\saper\\ui-test-UI-064-dashboard-visible-for-alerts.png"
+  },
+  {
+    "Test": "UI-065-dashboard-alert-month-filter-open",
+    "Status": "PASS",
+    "Window": "نظام إدارة الأسطول",
+    "Screenshot": "D:\\saper\\ui-test-UI-065-dashboard-alert-month-filter-open.png"
+  },
+  {
+    "Test": "UI-066-dashboard-alert-month-filter-select-current",
+    "Status": "PASS",
+    "Window": "نظام إدارة الأسطول",
+    "Screenshot": "D:\\saper\\ui-test-UI-066-dashboard-alert-month-filter-select-current.png"
+  },
+  {
+    "Test": "UI-067-open-custody-page",
+    "Status": "PASS",
+    "Window": "نظام إدارة الأسطول",
+    "Screenshot": "D:\\saper\\ui-test-UI-067-open-custody-page.png"
+  },
+  {
+    "Test": "UI-068-custody-add-dialog-or-row",
+    "Status": "PASS",
+    "Window": "نظام إدارة الأسطول",
+    "Screenshot": "D:\\saper\\ui-test-UI-068-custody-add-dialog-or-row.png"
+  },
+  {
+    "Test": "UI-069-custody-delete-without-crash",
+    "Status": "PASS",
+    "Window": "نظام إدارة الأسطول",
+    "Screenshot": "D:\\saper\\ui-test-UI-069-custody-delete-without-crash.png"
+  },
+  {
+    "Test": "UI-070-dashboard-before-treasury",
+    "Status": "PASS",
+    "Window": "نظام إدارة الأسطول",
+    "Screenshot": "D:\\saper\\ui-test-UI-070-dashboard-before-treasury.png"
+  },
+  {
+    "Test": "UI-071-open-treasury-page",
+    "Status": "PASS",
+    "Window": "نظام إدارة الأسطول",
+    "Screenshot": "D:\\saper\\ui-test-UI-071-open-treasury-page.png"
+  },
+  {
+    "Test": "UI-072-treasury-add-row",
+    "Status": "PASS",
+    "Window": "نظام إدارة الأسطول",
+    "Screenshot": "D:\\saper\\ui-test-UI-072-treasury-add-row.png"
+  },
+  {
+    "Test": "UI-073-treasury-delete-without-crash",
+    "Status": "PASS",
+    "Window": "نظام إدارة الأسطول",
+    "Screenshot": "D:\\saper\\ui-test-UI-073-treasury-delete-without-crash.png"
+  },
+  {
+    "Test": "UI-074-dashboard-after-treasury",
+    "Status": "PASS",
+    "Window": "نظام إدارة الأسطول",
+    "Screenshot": "D:\\saper\\ui-test-UI-074-dashboard-after-treasury.png"
+  }
+]

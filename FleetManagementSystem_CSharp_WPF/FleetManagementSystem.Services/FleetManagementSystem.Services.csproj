@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="BCrypt.Net-Next" Version="4.0.3" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\FleetManagementSystem.Core\FleetManagementSystem.Core.csproj" />
+    <ProjectReference Include="..\FleetManagementSystem.Data\FleetManagementSystem.Data.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Remove="AllServices.cs" />
+  </ItemGroup>
+
+</Project>

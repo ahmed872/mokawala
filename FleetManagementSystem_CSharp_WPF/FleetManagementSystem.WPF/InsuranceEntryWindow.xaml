@@ -1,0 +1,170 @@
+<Window x:Class="FleetManagementSystem.WPF.InsuranceEntryWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="بيانات التأمين"
+        Width="760"
+        SizeToContent="Height"
+        MinHeight="560"
+        WindowStartupLocation="CenterOwner"
+        FlowDirection="RightToLeft"
+        Background="{StaticResource SurfaceBrush}"
+        FontFamily="Cairo, Segoe UI, Tahoma">
+    <Border Margin="22"
+            Padding="24"
+            Background="White"
+            BorderBrush="{StaticResource BorderBrush}"
+            BorderThickness="1"
+            CornerRadius="12">
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+
+            <StackPanel>
+                <TextBlock Text="بيانات التأمين"
+                           FontSize="22"
+                           FontWeight="Bold"
+                           Foreground="{StaticResource TextBrush}"/>
+                <TextBlock Margin="0,6,0,18"
+                           Text="سجل وثيقة التأمين ككيان مستقل مرتبط بعربية محددة."
+                           Foreground="{StaticResource MutedBrush}"
+                           TextWrapping="Wrap"/>
+            </StackPanel>
+
+            <Grid Grid.Row="1">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+
+                <StackPanel Margin="0,0,10,12">
+                    <TextBlock Text="العربية"/>
+                    <ComboBox x:Name="VehicleComboBox"
+                              Height="40"
+                              ItemsSource="{Binding Vehicles}"
+                              DisplayMemberPath="PlateNumber"
+                              SelectedValuePath="Id"
+                              SelectedValue="{Binding Insurance.VehicleId, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                              SelectionChanged="VehicleComboBox_SelectionChanged"
+                              Style="{StaticResource AppComboBoxStyle}"/>
+                </StackPanel>
+
+                <StackPanel Grid.Column="1"
+                            Margin="10,0,0,12">
+                    <TextBlock Text="نوع الوثيقة"/>
+                    <TextBox Style="{StaticResource AppTextBoxStyle}"
+                             Text="{Binding Insurance.PolicyType, UpdateSourceTrigger=PropertyChanged}"/>
+                </StackPanel>
+
+                <StackPanel Grid.Row="1"
+                            Margin="0,0,10,12">
+                    <TextBlock Text="رقم الوثيقة"/>
+                    <TextBox Style="{StaticResource AppTextBoxStyle}"
+                             Text="{Binding Insurance.PolicyNumber, UpdateSourceTrigger=PropertyChanged}"/>
+                </StackPanel>
+
+                <StackPanel Grid.Row="1"
+                            Grid.Column="1"
+                            Margin="10,0,0,12">
+                    <TextBlock Text="شركة التأمين"/>
+                    <TextBox Style="{StaticResource AppTextBoxStyle}"
+                             Text="{Binding Insurance.InsuranceCompany, UpdateSourceTrigger=PropertyChanged}"/>
+                </StackPanel>
+
+                <StackPanel Grid.Row="2"
+                            Margin="0,0,10,12">
+                    <TextBlock Text="بداية التأمين"/>
+                    <DatePicker x:Name="StartDatePicker"
+                                Height="40"
+                                SelectedDate="{Binding Insurance.StartDate, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                Language="ar-EG"/>
+                </StackPanel>
+
+                <StackPanel Grid.Row="2"
+                            Grid.Column="1"
+                            Margin="10,0,0,12">
+                    <TextBlock Text="نهاية التأمين"/>
+                    <DatePicker x:Name="ExpiryDatePicker"
+                                Height="40"
+                                SelectedDate="{Binding Insurance.ExpiryDate, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                Language="ar-EG"/>
+                </StackPanel>
+
+                <StackPanel Grid.Row="3"
+                            Margin="0,0,10,12">
+                    <TextBlock Text="القسط"/>
+                    <TextBox Style="{StaticResource AppTextBoxStyle}"
+                             Text="{Binding Insurance.PremiumAmount, UpdateSourceTrigger=PropertyChanged}"/>
+                </StackPanel>
+
+                <StackPanel Grid.Row="3"
+                            Grid.Column="1"
+                            Margin="10,0,0,12">
+                    <TextBlock Text="مبلغ التغطية"/>
+                    <TextBox Style="{StaticResource AppTextBoxStyle}"
+                             Text="{Binding Insurance.CoverageAmount, UpdateSourceTrigger=PropertyChanged}"/>
+                </StackPanel>
+
+                <StackPanel Grid.Row="4"
+                            Margin="0,0,10,12">
+                    <TextBlock Text="مندوب التأمين"/>
+                    <TextBox Style="{StaticResource AppTextBoxStyle}"
+                             Text="{Binding Insurance.AgentName, UpdateSourceTrigger=PropertyChanged}"/>
+                </StackPanel>
+
+                <StackPanel Grid.Row="4"
+                            Grid.Column="1"
+                            Margin="10,0,0,12">
+                    <TextBlock Text="هاتف المندوب"/>
+                    <TextBox Style="{StaticResource AppTextBoxStyle}"
+                             Text="{Binding Insurance.AgentPhoneNumber, UpdateSourceTrigger=PropertyChanged}"/>
+                </StackPanel>
+
+                <StackPanel Grid.Row="5"
+                            Grid.ColumnSpan="2"
+                            Margin="0,0,0,12">
+                    <TextBlock Text="تفاصيل التغطية"/>
+                    <TextBox Style="{StaticResource AppTextBoxStyle}"
+                             MinHeight="64"
+                             TextWrapping="Wrap"
+                             AcceptsReturn="True"
+                             Text="{Binding Insurance.CoverageDetails, UpdateSourceTrigger=PropertyChanged}"/>
+                </StackPanel>
+
+                <StackPanel Grid.Row="6"
+                            Grid.ColumnSpan="2">
+                    <TextBlock Text="ملاحظات"/>
+                    <TextBox Style="{StaticResource AppTextBoxStyle}"
+                             MinHeight="64"
+                             TextWrapping="Wrap"
+                             AcceptsReturn="True"
+                             Text="{Binding Insurance.Notes, UpdateSourceTrigger=PropertyChanged}"/>
+                </StackPanel>
+            </Grid>
+
+            <StackPanel Grid.Row="2"
+                        Orientation="Horizontal"
+                        HorizontalAlignment="Left"
+                        Margin="0,20,0,0">
+                <Button Style="{StaticResource PrimaryButtonStyle}"
+                        MinWidth="120"
+                        Click="SaveButton_Click">حفظ</Button>
+                <Button Style="{StaticResource SecondaryButtonStyle}"
+                        MinWidth="110"
+                        Margin="10,0,0,0"
+                        Click="CancelButton_Click">إلغاء</Button>
+            </StackPanel>
+        </Grid>
+    </Border>
+</Window>
