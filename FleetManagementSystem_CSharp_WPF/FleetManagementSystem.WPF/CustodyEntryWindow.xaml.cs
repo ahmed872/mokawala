@@ -34,7 +34,6 @@ public partial class CustodyEntryWindow : Window
             ConditionRatingTextBox.Text = source.VehicleConditionRating <= 0
                 ? "5"
                 : source.VehicleConditionRating.ToString("0.##", CultureInfo.InvariantCulture);
-            AmountTextBox.Text = source.Amount <= 0 ? "0" : source.Amount.ToString("0.##", CultureInfo.InvariantCulture);
             NotesTextBox.Text = source.Notes;
             SelectStatus(source.Status);
             VehicleComboBox.SelectedValue = source.VehicleId;
@@ -44,7 +43,6 @@ public partial class CustodyEntryWindow : Window
             CustodyNumberTextBox.Text = $"CU-{DateTime.Now:yyyyMMdd-HHmm}";
             HandoverDatePicker.SelectedDate = DateTime.Today;
             ConditionRatingTextBox.Text = "5";
-            AmountTextBox.Text = "0";
         }
 
         if (source is null && preselectedVehicleId.HasValue)
@@ -102,10 +100,6 @@ public partial class CustodyEntryWindow : Window
             return;
         }
 
-        decimal amount = 0;
-        if (!string.IsNullOrWhiteSpace(AmountTextBox.Text))
-            decimal.TryParse(AmountTextBox.Text.Trim(), NumberStyles.Number, CultureInfo.InvariantCulture, out amount);
-
         CustodyForm = new CustodyFormDto
         {
             Id = _source?.Id ?? 0,
@@ -117,7 +111,6 @@ public partial class CustodyEntryWindow : Window
             ReturnDate = returnDate,
             Status = (StatusComboBox.SelectedItem as ComboBoxItem)?.Tag?.ToString() ?? "Active",
             VehicleConditionRating = rating,
-            Amount = amount,
             Notes = NotesTextBox.Text.Trim()
         };
 

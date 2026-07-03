@@ -11,71 +11,41 @@
         FlowDirection="RightToLeft"
         Background="#F6F8FB">
     <Window.Resources>
-        <SolidColorBrush x:Key="TreasuryPopupSurfaceBrush"
-                Color="#FFFFFF"/>
-        <SolidColorBrush x:Key="TreasuryPopupAltBrush"
-                Color="#EEF4F7"/>
-        <SolidColorBrush x:Key="TreasuryPopupAccentBrush"
-                Color="#123B53"/>
-        <SolidColorBrush x:Key="TreasuryPopupAccentPaleBrush"
-                Color="#EAF2F7"/>
-        <SolidColorBrush x:Key="TreasuryPopupTextBrush"
-                Color="#1F2D3A"/>
-        <SolidColorBrush x:Key="TreasuryPopupMutedBrush"
-                Color="#6A7880"/>
-        <SolidColorBrush x:Key="TreasuryPopupBorderBrush"
-                Color="#D6E4EC"/>
+        <SolidColorBrush x:Key="TreasuryPopupSurfaceBrush" Color="#FFFFFF"/>
+        <SolidColorBrush x:Key="TreasuryPopupAltBrush" Color="#EEF4F7"/>
+        <SolidColorBrush x:Key="TreasuryPopupAccentBrush" Color="#123B53"/>
+        <SolidColorBrush x:Key="TreasuryPopupAccentPaleBrush" Color="#EAF2F7"/>
+        <SolidColorBrush x:Key="TreasuryPopupTextBrush" Color="#1F2D3A"/>
+        <SolidColorBrush x:Key="TreasuryPopupMutedBrush" Color="#6A7880"/>
+        <SolidColorBrush x:Key="TreasuryPopupBorderBrush" Color="#D6E4EC"/>
 
-        <Style x:Key="TreasuryPopupCardStyle"
-                TargetType="Border">
-            <Setter Property="Background"
-                    Value="{StaticResource TreasuryPopupSurfaceBrush}"/>
-            <Setter Property="BorderBrush"
-                    Value="{StaticResource TreasuryPopupBorderBrush}"/>
-            <Setter Property="BorderThickness"
-                    Value="1"/>
-            <Setter Property="CornerRadius"
-                    Value="20"/>
-            <Setter Property="Padding"
-                    Value="20"/>
+        <Style x:Key="TreasuryPopupCardStyle" TargetType="Border">
+            <Setter Property="Background" Value="{StaticResource TreasuryPopupSurfaceBrush}"/>
+            <Setter Property="BorderBrush" Value="{StaticResource TreasuryPopupBorderBrush}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="CornerRadius" Value="20"/>
+            <Setter Property="Padding" Value="20"/>
         </Style>
 
-        <Style x:Key="TreasuryPopupLabelStyle"
-                TargetType="TextBlock">
-            <Setter Property="Foreground"
-                    Value="{StaticResource TreasuryPopupTextBrush}"/>
-            <Setter Property="FontSize"
-                    Value="13"/>
-            <Setter Property="FontWeight"
-                    Value="SemiBold"/>
-            <Setter Property="Margin"
-                    Value="0,0,0,8"/>
+        <Style x:Key="TreasuryPopupLabelStyle" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="{StaticResource TreasuryPopupTextBrush}"/>
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Margin" Value="0,0,0,8"/>
         </Style>
 
-        <Style x:Key="TreasuryPopupPrimaryButtonStyle"
-                TargetType="Button">
-            <Setter Property="Height"
-                    Value="44"/>
-            <Setter Property="MinWidth"
-                    Value="118"/>
-            <Setter Property="Margin"
-                    Value="0,0,10,0"/>
-            <Setter Property="Padding"
-                    Value="18,8"/>
-            <Setter Property="FontSize"
-                    Value="15"/>
-            <Setter Property="FontWeight"
-                    Value="Bold"/>
-            <Setter Property="Foreground"
-                    Value="White"/>
-            <Setter Property="Background"
-                    Value="{StaticResource TreasuryPopupAccentBrush}"/>
-            <Setter Property="BorderBrush"
-                    Value="{StaticResource TreasuryPopupAccentBrush}"/>
-            <Setter Property="BorderThickness"
-                    Value="1"/>
-            <Setter Property="Cursor"
-                    Value="Hand"/>
+        <Style x:Key="TreasuryPopupPrimaryButtonStyle" TargetType="Button">
+            <Setter Property="Height" Value="44"/>
+            <Setter Property="MinWidth" Value="118"/>
+            <Setter Property="Margin" Value="0,0,10,0"/>
+            <Setter Property="Padding" Value="18,8"/>
+            <Setter Property="FontSize" Value="15"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="Background" Value="{StaticResource TreasuryPopupAccentBrush}"/>
+            <Setter Property="BorderBrush" Value="{StaticResource TreasuryPopupAccentBrush}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Cursor" Value="Hand"/>
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
@@ -89,17 +59,11 @@
                                               Margin="{TemplateBinding Padding}"/>
                         </Border>
                         <ControlTemplate.Triggers>
-                            <Trigger Property="IsMouseOver"
-                                    Value="True">
-                                <Setter TargetName="ButtonBorder"
-                                        Property="Opacity"
-                                        Value="0.92"/>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="ButtonBorder" Property="Opacity" Value="0.92"/>
                             </Trigger>
-                            <Trigger Property="IsPressed"
-                                    Value="True">
-                                <Setter TargetName="ButtonBorder"
-                                        Property="Opacity"
-                                        Value="0.82"/>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="ButtonBorder" Property="Opacity" Value="0.82"/>
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -107,15 +71,10 @@
             </Setter>
         </Style>
 
-        <Style x:Key="TreasuryPopupSecondaryButtonStyle"
-                TargetType="Button"
-                BasedOn="{StaticResource TreasuryPopupPrimaryButtonStyle}">
-            <Setter Property="Foreground"
-                    Value="{StaticResource TreasuryPopupTextBrush}"/>
-            <Setter Property="Background"
-                    Value="{StaticResource TreasuryPopupAltBrush}"/>
-            <Setter Property="BorderBrush"
-                    Value="{StaticResource TreasuryPopupBorderBrush}"/>
+        <Style x:Key="TreasuryPopupSecondaryButtonStyle" TargetType="Button" BasedOn="{StaticResource TreasuryPopupPrimaryButtonStyle}">
+            <Setter Property="Foreground" Value="{StaticResource TreasuryPopupTextBrush}"/>
+            <Setter Property="Background" Value="{StaticResource TreasuryPopupAltBrush}"/>
+            <Setter Property="BorderBrush" Value="{StaticResource TreasuryPopupBorderBrush}"/>
         </Style>
     </Window.Resources>
 
@@ -178,17 +137,14 @@
                 </Grid.RowDefinitions>
 
                 <StackPanel Margin="0,0,12,14">
-                    <TextBlock Text="التاريخ"
-                            Style="{StaticResource TreasuryPopupLabelStyle}"/>
+                    <TextBlock Text="التاريخ" Style="{StaticResource TreasuryPopupLabelStyle}"/>
                     <DatePicker x:Name="TransactionDatePicker"
                                 AutomationProperties.AutomationId="TreasuryTransactionDatePicker"
                                 SelectedDateFormat="Short"/>
                 </StackPanel>
 
-                <StackPanel Grid.Column="1"
-                        Margin="0,0,0,14">
-                    <TextBlock Text="نوع الحركة"
-                            Style="{StaticResource TreasuryPopupLabelStyle}"/>
+                <StackPanel Grid.Column="1" Margin="0,0,0,14">
+                    <TextBlock Text="نوع الحركة" Style="{StaticResource TreasuryPopupLabelStyle}"/>
                     <ComboBox x:Name="TransactionTypeComboBox"
                               AutomationProperties.AutomationId="TreasuryTransactionTypeComboBox"
                               Style="{StaticResource AppComboBoxStyle}">
@@ -197,20 +153,15 @@
                     </ComboBox>
                 </StackPanel>
 
-                <StackPanel Grid.Row="1"
-                        Margin="0,0,12,14">
-                    <TextBlock Text="المبلغ"
-                            Style="{StaticResource TreasuryPopupLabelStyle}"/>
+                <StackPanel Grid.Row="1" Margin="0,0,12,14">
+                    <TextBlock Text="المبلغ" Style="{StaticResource TreasuryPopupLabelStyle}"/>
                     <TextBox x:Name="AmountTextBox"
                              AutomationProperties.AutomationId="TreasuryAmountTextBox"
                              Style="{StaticResource AppTextBoxStyle}"/>
                 </StackPanel>
 
-                <StackPanel Grid.Row="1"
-                        Grid.Column="1"
-                        Margin="0,0,0,14">
-                    <TextBlock Text="طريقة الدفع"
-                            Style="{StaticResource TreasuryPopupLabelStyle}"/>
+                <StackPanel Grid.Row="1" Grid.Column="1" Margin="0,0,0,14">
+                    <TextBlock Text="طريقة الدفع" Style="{StaticResource TreasuryPopupLabelStyle}"/>
                     <ComboBox x:Name="PaymentMethodComboBox"
                               AutomationProperties.AutomationId="TreasuryPaymentMethodComboBox"
                               Style="{StaticResource AppComboBoxStyle}">
@@ -220,34 +171,22 @@
                     </ComboBox>
                 </StackPanel>
 
-                <StackPanel Grid.Row="2"
-                        Grid.ColumnSpan="2"
-                        Margin="0,0,0,14">
-                    <TextBlock Text="الوصف"
-                            Style="{StaticResource TreasuryPopupLabelStyle}"/>
+                <StackPanel Grid.Row="2" Grid.ColumnSpan="2" Margin="0,0,0,14">
+                    <TextBlock Text="الوصف" Style="{StaticResource TreasuryPopupLabelStyle}"/>
                     <TextBox x:Name="DescriptionTextBox"
                              AutomationProperties.AutomationId="TreasuryDescriptionTextBox"
-                             Style="{StaticResource AppTextBoxStyle}"
-                             Height="72"
-                             TextWrapping="Wrap"
-                             VerticalContentAlignment="Top"
-                             Padding="12,8"/>
+                             Style="{StaticResource AppTextBoxStyle}"/>
                 </StackPanel>
 
-                <StackPanel Grid.Row="3"
-                        Margin="0,0,12,0">
-                    <TextBlock Text="مرتبط بـ"
-                            Style="{StaticResource TreasuryPopupLabelStyle}"/>
+                <StackPanel Grid.Row="3" Margin="0,0,12,0">
+                    <TextBlock Text="مرتبط بـ" Style="{StaticResource TreasuryPopupLabelStyle}"/>
                     <TextBox x:Name="RelatedEntityTypeTextBox"
                              AutomationProperties.AutomationId="TreasuryRelatedEntityTypeTextBox"
                              Style="{StaticResource AppTextBoxStyle}"/>
                 </StackPanel>
 
-                <StackPanel Grid.Row="3"
-                        Grid.Column="1"
-                        Margin="0,0,0,0">
-                    <TextBlock Text="رقم المرتبط"
-                            Style="{StaticResource TreasuryPopupLabelStyle}"/>
+                <StackPanel Grid.Row="3" Grid.Column="1" Margin="0,0,0,0">
+                    <TextBlock Text="رقم المرتبط" Style="{StaticResource TreasuryPopupLabelStyle}"/>
                     <TextBox x:Name="RelatedEntityIdTextBox"
                              AutomationProperties.AutomationId="TreasuryRelatedEntityIdTextBox"
                              Style="{StaticResource AppTextBoxStyle}"/>
@@ -264,8 +203,7 @@
                     <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
                 <StackPanel>
-                    <TextBlock Text="ملاحظات"
-                            Style="{StaticResource TreasuryPopupLabelStyle}"/>
+                    <TextBlock Text="ملاحظات" Style="{StaticResource TreasuryPopupLabelStyle}"/>
                     <TextBox x:Name="NotesTextBox"
                              AutomationProperties.AutomationId="TreasuryNotesTextBox"
                              MinHeight="58"

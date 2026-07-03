@@ -54,7 +54,6 @@ public interface IDriverAttendanceService
     Task<List<DriverAttendanceDto>> GetWeekAsync(DateTime weekStart);
     Task<List<DriverAttendanceDto>> SaveWeekAsync(DateTime weekStart, IEnumerable<DriverAttendanceFormDto> records);
     Task<List<DriverReportDto>> GenerateReportAsync(DateTime startDate, DateTime endDate, int? driverId = null);
-    Task<List<DriverAttendanceDto>> GetDriverAbsencesAsync(int driverId, DateTime from, DateTime to);
 }
 
 public interface IEmployeeService
