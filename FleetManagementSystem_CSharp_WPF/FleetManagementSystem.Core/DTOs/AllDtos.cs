@@ -1108,73 +1108,61 @@ namespace FleetManagementSystem.Core.DTOs
     // ========================================================================
 
     /// <summary>
-    /// Custody DTO for list view.
+    /// Custody DTO for list view. The custodian is always a human actor (driver or employee).
     /// </summary>
     public class CustodyListItemDto
     {
         public int Id { get; set; }
         public string CustodyNumber { get; set; } = string.Empty;
-        public string VehiclePlateNumber { get; set; } = string.Empty;
         public string CustodianName { get; set; } = string.Empty;
+        public string CustodianType { get; set; } = string.Empty;
+        public decimal Amount { get; set; }
         public DateTime HandoverDate { get; set; }
         public DateTime? ReturnDate { get; set; }
         public string Status { get; set; } = string.Empty;
     }
 
     /// <summary>
-    /// Custody DTO for detail view.
+    /// Custody DTO for detail view. Exactly one of DriverId/EmployeeId identifies the custodian;
+    /// CustodianName and CustodianType are resolved from that entity by the service layer.
     /// </summary>
     public class CustodyDto
     {
         public int Id { get; set; }
-        public int VehicleId { get; set; }
-        public string VehiclePlateNumber { get; set; } = string.Empty;
-        public string CustodyNumber { get; set; } = string.Empty;
+        public int? DriverId { get; set; }
+        public int? EmployeeId { get; set; }
         public string CustodianName { get; set; } = string.Empty;
-        public string CustodianPosition { get; set; } = string.Empty;
+        public string CustodianType { get; set; } = string.Empty;
+        public string CustodyNumber { get; set; } = string.Empty;
+        public decimal Amount { get; set; }
         public DateTime HandoverDate { get; set; }
         public DateTime? ReturnDate { get; set; }
         public string Status { get; set; } = string.Empty;
-        public decimal VehicleConditionRating { get; set; }
-        public decimal Amount { get; set; }
+        public bool PaidFromTreasury { get; set; }
+        public int? TreasuryTransactionId { get; set; }
         public string Notes { get; set; } = string.Empty;
         public string DocumentUrl { get; set; } = string.Empty;
-        public List<CustodyItemDto> Items { get; set; } = new List<CustodyItemDto>();
     }
 
     /// <summary>
-    /// Custody DTO for create/edit form.
+    /// Custody DTO for create/edit form. Exactly one of DriverId/EmployeeId must be provided;
+    /// the service layer rejects forms that set both or neither, and rejects negative amounts.
+    /// When PaidFromTreasury is true the disbursement is posted to the treasury inside the same
+    /// unit of work as the custody itself.
     /// </summary>
     public class CustodyFormDto
     {
         public int Id { get; set; }
-        public int VehicleId { get; set; }
+        public int? DriverId { get; set; }
+        public int? EmployeeId { get; set; }
         public string CustodyNumber { get; set; } = string.Empty;
-        public string CustodianName { get; set; } = string.Empty;
-        public string CustodianPosition { get; set; } = string.Empty;
+        public decimal Amount { get; set; }
         public DateTime HandoverDate { get; set; }
         public DateTime? ReturnDate { get; set; }
         public string Status { get; set; } = "Active";
-        public decimal VehicleConditionRating { get; set; } = 5;
-        public decimal Amount { get; set; } = 0;
+        public bool PaidFromTreasury { get; set; } = true;
         public string Notes { get; set; } = string.Empty;
         public string DocumentUrl { get; set; } = string.Empty;
-    }
-
-    /// <summary>
-    /// Custody item DTO.
-    /// </summary>
-    public class CustodyItemDto
-    {
-        public int Id { get; set; }
-        public int CustodyId { get; set; }
-        public string ItemName { get; set; } = string.Empty;
-        public string ItemDescription { get; set; } = string.Empty;
-        public int Quantity { get; set; }
-        public string SerialNumber { get; set; } = string.Empty;
-        public bool IsReturned { get; set; }
-        public DateTime? ReturnDate { get; set; }
-        public string Condition { get; set; } = "Good";
     }
 
     // ========================================================================
