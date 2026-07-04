@@ -16,8 +16,4 @@
     <ProjectReference Include="..\FleetManagementSystem.Data\FleetManagementSystem.Data.csproj" />
   </ItemGroup>
 
-  <ItemGroup>
-    <Compile Remove="AllServices.cs" />
-  </ItemGroup>
-
 </Project>

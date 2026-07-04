@@ -157,8 +157,7 @@ public sealed class VehicleService(FleetDbContext context, IAuditService auditSe
             await _context.Trips.AnyAsync(x => x.VehicleId == id) ||
             await _context.FuelTransactions.AnyAsync(x => x.VehicleId == id) ||
             await _context.Expenses.AnyAsync(x => x.VehicleId == id) ||
-            await _context.Insurances.AnyAsync(x => x.VehicleId == id) ||
-            await _context.Custodies.AnyAsync(x => x.VehicleId == id);
+            await _context.Insurances.AnyAsync(x => x.VehicleId == id);
 
         if (hasDependents)
         {
@@ -770,13 +769,11 @@ public sealed class EmployeeService(FleetDbContext context, IAuditService auditS
         var entity = await _context.Employees.FirstOrDefaultAsync(e => e.Id == id)
             ?? throw new InvalidOperationException("الموظف غير موجود.");
 
-        var hasDependents =
-            await _context.Custodies.AnyAsync(c => c.EmployeeId == id) ||
-            await _context.Trips.AnyAsync(t => t.RequesterEmployeeId == id || t.SupervisorEmployeeId == id);
+        var hasDependents = await _context.Trips.AnyAsync(t => t.RequesterEmployeeId == id || t.SupervisorEmployeeId == id);
 
         if (hasDependents)
         {
-            throw new InvalidOperationException("لا يمكن حذف الموظف لارتباطه بسجلات عهدة أو رحلات.");
+            throw new InvalidOperationException("لا يمكن حذف الموظف لارتباطه برحلات.");
         }
 
         _context.Employees.Remove(entity);

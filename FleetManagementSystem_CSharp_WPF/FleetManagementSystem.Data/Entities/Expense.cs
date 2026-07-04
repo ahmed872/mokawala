@@ -5,7 +5,8 @@ namespace FleetManagementSystem.Data.Entities
     public class Expense
     {
         public int Id { get; set; }
-        public int VehicleId { get; set; }
+        public int? VehicleId { get; set; }
+        public int? CustodyId { get; set; }
         public string Category { get; set; } = string.Empty;
         public decimal Amount { get; set; }
         public DateTime ExpenseDate { get; set; }
@@ -21,6 +22,7 @@ namespace FleetManagementSystem.Data.Entities
 
         // Foreign keys
         public Vehicle? Vehicle { get; set; }
+        public Custody? Custody { get; set; }
         public TreasuryTransaction? TreasuryTransaction { get; set; }
     }
 }

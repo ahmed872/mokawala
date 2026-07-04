@@ -46,7 +46,9 @@ public partial class MainWindow : Window
         "ServiceProvider",
         "Items",
         "ConfirmPassword",
-        "DriverId"
+        "DriverId",
+        "CustodyNumber",
+        "CustodyUserFullName"
     };
 
     private static readonly HashSet<string> TemporarilyLockedModules = new(StringComparer.OrdinalIgnoreCase);
@@ -153,11 +155,14 @@ public partial class MainWindow : Window
         ["AgentName"] = "مندوب التأمين",
         ["AgentPhoneNumber"] = "هاتف المندوب",
         ["CustodyNumber"] = "رقم العهدة",
-        ["CustodianName"] = "المستلم",
-        ["CustodianPosition"] = "وظيفة المستلم",
+        ["CustodyId"] = "رقم العهدة",
+        ["CustodyUserFullName"] = "صاحب العهدة",
+        ["UserFullName"] = "المستخدم",
+        ["SpentAmount"] = "تم صرفه",
+        ["ReturnedAmount"] = "تم إرجاعه",
+        ["RemainingAmount"] = "المتبقي",
         ["HandoverDate"] = "تاريخ التسليم",
         ["ReturnDate"] = "تاريخ الإرجاع",
-        ["VehicleConditionRating"] = "تقييم الحالة",
         ["NextOilChangeOdometer"] = "التغيير القادم",
         ["CurrentVehicleMileage"] = "عداد العربية الحالي",
         ["KmSinceOilChange"] = "المقطوع من آخر تغيير",
@@ -215,18 +220,6 @@ public partial class MainWindow : Window
     private readonly ObservableCollection<ServiceProviderDto> _serviceProviders = new();
     private readonly ObservableCollection<NotificationDto> _notifications = new();
     private readonly ObservableCollection<UserFormDto> _users = new();
-    private readonly IReadOnlyList<UserRoleOption> _userRoleOptions = new List<UserRoleOption>
-    {
-        new("Admin", "مدير النظام"),
-        new("OperationsManager", "مدير التشغيل"),
-        new("OperationsDataEntry", "إدخال بيانات التشغيل"),
-        new("MaintenanceOfficer", "مسؤول الصيانة"),
-        new("TreasuryOfficer", "مسؤول الخزينة"),
-        new("TripsLicensesOfficer", "مسؤول التشغيلات والتراخيص"),
-        new("InsuranceOfficer", "مسؤول التأمينات"),
-        new("Viewer", "عرض فقط"),
-        new("Staff", "موظف")
-    };
     private readonly List<DashboardAlertItem> _dashboardAlertItems = new();
 
     private UserDto? _currentUser;
@@ -560,6 +553,7 @@ public partial class MainWindow : Window
         ConnectionInfoTextBlock.Text = GetOperationalStatusText();
         DatabaseSettingsSummaryTextBlock.Text = GetConnectionSummaryText();
         ApplyRoleAccess(user);
+        UpdateMyCustodyCard();
         SelectTabByTag("Dashboard");
         UpdateShellForSelectedTab();
     }
@@ -1048,14 +1042,36 @@ public partial class MainWindow : Window
     private void UpdateCustodySummary()
     {
         var total = _custodies.Count;
-        var active = _custodies.Count(c =>
-            !string.Equals(c.Status, "Returned", StringComparison.OrdinalIgnoreCase) &&
-            !string.Equals(c.Status, "مسترجعة", StringComparison.OrdinalIgnoreCase));
-        var returned = total - active;
+        var returned = _custodies.Count(c => string.Equals(c.Status, "مغلق", StringComparison.OrdinalIgnoreCase));
+        var active = total - returned;
 
         CustodyTotalCountTextBlock.Text = total.ToString();
         CustodyActiveCountTextBlock.Text = active.ToString();
         CustodyReturnedCountTextBlock.Text = returned.ToString();
+
+        UpdateMyCustodyCard();
+    }
+
+    private void UpdateMyCustodyCard()
+    {
+        if (_currentUser is null)
+        {
+            MyCustodyBorder.Visibility = Visibility.Collapsed;
+            return;
+        }
+
+        var mine = _custodies.Where(c => c.UserId == _currentUser.Id && c.RemainingAmount > 0).ToList();
+        if (mine.Count == 0)
+        {
+            MyCustodyBorder.Visibility = Visibility.Collapsed;
+            return;
+        }
+
+        var remaining = mine.Sum(c => c.RemainingAmount);
+        var taken = mine.Sum(c => c.Amount);
+        MyCustodyRemainingTextBlock.Text = $"المتبقي: {remaining:0.##}";
+        MyCustodyDetailsTextBlock.Text = $"من إجمالي عهدة بقيمة {taken:0.##}";
+        MyCustodyBorder.Visibility = Visibility.Visible;
     }
 
     private async Task LoadUsersAsync()
@@ -1479,6 +1495,20 @@ public partial class MainWindow : Window
         grid.ScrollIntoView(item);
     }
 
+    private bool TryEnsureCanEdit(string module)
+    {
+        try
+        {
+            EnsureCanEdit(module);
+            return true;
+        }
+        catch (InvalidOperationException ex)
+        {
+            MessageBox.Show(ex.Message, "تنبيه واضح", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return false;
+        }
+    }
+
     private static bool ConfirmDelete() =>
         MessageBox.Show("هل تريد حذف السجل المحدد؟", "تأكيد الحذف", MessageBoxButton.YesNo, MessageBoxImage.Question) == MessageBoxResult.Yes;
 
@@ -1711,7 +1741,20 @@ public partial class MainWindow : Window
         return builder.ToString();
     }
 
-    private static FlowDocument BuildReportDocument(ReportDataDto report)
+    private static readonly System.Windows.Media.Brush ReportAccentBrush = CreateFrozenBrush(0x12, 0x3B, 0x53);
+    private static readonly System.Windows.Media.Brush ReportBorderBrush = CreateFrozenBrush(0xC9, 0xD4, 0xDD);
+    private static readonly System.Windows.Media.Brush ReportAltRowBrush = CreateFrozenBrush(0xF4, 0xF8, 0xFB);
+    private static readonly System.Windows.Media.Brush ReportMutedBrush = CreateFrozenBrush(0x6B, 0x7A, 0x88);
+    private static readonly System.Windows.Media.Brush ReportInkBrush = CreateFrozenBrush(0x1F, 0x2D, 0x3A);
+
+    private static System.Windows.Media.Brush CreateFrozenBrush(byte r, byte g, byte b)
+    {
+        var brush = new SolidColorBrush(System.Windows.Media.Color.FromRgb(r, g, b));
+        brush.Freeze();
+        return brush;
+    }
+
+    private FlowDocument BuildReportDocument(ReportDataDto report)
     {
         var pageWidth = Math.Max(980, report.Columns.Sum(GetReportColumnPrintWidth) + 72);
         var document = new FlowDocument
@@ -1723,26 +1766,69 @@ public partial class MainWindow : Window
             PageWidth = pageWidth,
             MinPageWidth = pageWidth,
             MaxPageWidth = pageWidth,
-            ColumnWidth = pageWidth
+            ColumnWidth = pageWidth,
+            Foreground = ReportInkBrush
         };
+
+        var companyName = string.IsNullOrWhiteSpace(_settings?.CompanyName)
+            ? "شركة جوميكس للحركة والمعدات"
+            : _settings!.CompanyName.Trim();
+
+        document.Blocks.Add(new Paragraph(new Run(companyName))
+        {
+            FontSize = 13,
+            FontWeight = FontWeights.SemiBold,
+            Foreground = ReportMutedBrush,
+            TextAlignment = TextAlignment.Right,
+            Margin = new Thickness(0, 0, 0, 2)
+        });
 
         document.Blocks.Add(new Paragraph(new Run(report.ReportTitle))
         {
-            FontSize = 18,
+            FontSize = 21,
             FontWeight = FontWeights.Bold,
+            Foreground = ReportAccentBrush,
             TextAlignment = TextAlignment.Right,
-            Margin = new Thickness(0, 0, 0, 8)
+            Margin = new Thickness(0, 0, 0, 6),
+            BorderBrush = ReportAccentBrush,
+            BorderThickness = new Thickness(0, 0, 0, 2),
+            Padding = new Thickness(0, 0, 0, 6)
         });
 
-        document.Blocks.Add(new Paragraph(new Run($"تاريخ التوليد: {report.GeneratedDate.ToLocalTime():yyyy-MM-dd HH:mm} - عدد السجلات: {report.Data.Count}"))
+        var recordsLabel = report.Data.Count switch
+        {
+            0 => "لا توجد سجلات مطابقة",
+            1 => "سجل واحد",
+            2 => "سجلان",
+            <= 10 => $"{report.Data.Count} سجلات",
+            _ => $"{report.Data.Count} سجلًا"
+        };
+
+        document.Blocks.Add(new Paragraph(new Run($"تاريخ التوليد: {report.GeneratedDate.ToLocalTime():yyyy-MM-dd HH:mm}    |    عدد السجلات: {recordsLabel}"))
         {
             FontSize = 11,
-            Foreground = System.Windows.Media.Brushes.DimGray,
+            Foreground = ReportMutedBrush,
             TextAlignment = TextAlignment.Right,
-            Margin = new Thickness(0, 0, 0, 14)
+            Margin = new Thickness(0, 4, 0, 14)
         });
 
-        var table = new Table { CellSpacing = 0 };
+        if (report.Data.Count == 0)
+        {
+            document.Blocks.Add(new Paragraph(new Run("لا توجد بيانات مطابقة لعرضها في هذا التقرير. جرّب تعديل الفلاتر أو الفترة الزمنية ثم أعد توليد التقرير."))
+            {
+                FontSize = 13,
+                Foreground = ReportMutedBrush,
+                TextAlignment = TextAlignment.Center,
+                Padding = new Thickness(24),
+                Margin = new Thickness(0, 24, 0, 0),
+                BorderBrush = ReportBorderBrush,
+                BorderThickness = new Thickness(1)
+            });
+
+            return document;
+        }
+
+        var table = new Table { CellSpacing = 0, BorderBrush = ReportBorderBrush, BorderThickness = new Thickness(0.75) };
         foreach (var column in report.Columns)
         {
             table.Columns.Add(new TableColumn { Width = new GridLength(GetReportColumnPrintWidth(column)) });
@@ -1757,32 +1843,18 @@ public partial class MainWindow : Window
 
         rowGroup.Rows.Add(headerRow);
 
+        var rowIndex = 0;
         foreach (var row in report.Data)
         {
             var tableRow = new TableRow();
+            var isAlternate = rowIndex % 2 == 1;
             foreach (var column in report.Columns)
             {
-                tableRow.Cells.Add(CreateReportCell(GetReportValue(row, column), isHeader: false));
+                tableRow.Cells.Add(CreateReportCell(GetReportValue(row, column), isHeader: false, isAlternate));
             }
 
             rowGroup.Rows.Add(tableRow);
-        }
-
-        if (report.Data.Count == 0)
-        {
-            rowGroup.Rows.Add(new TableRow
-            {
-                Cells =
-                {
-                    new TableCell(new Paragraph(new Run("لا توجد بيانات.")))
-                    {
-                        ColumnSpan = Math.Max(report.Columns.Count, 1),
-                        Padding = new Thickness(8),
-                        BorderBrush = System.Windows.Media.Brushes.LightGray,
-                        BorderThickness = new Thickness(0.5)
-                    }
-                }
-            });
+            rowIndex++;
         }
 
         table.RowGroups.Add(rowGroup);
@@ -1851,7 +1923,7 @@ public partial class MainWindow : Window
         return 135;
     }
 
-    private static TableCell CreateReportCell(string value, bool isHeader)
+    private static TableCell CreateReportCell(string value, bool isHeader, bool isAlternate = false)
     {
         var paragraph = new Paragraph
         {
@@ -1872,11 +1944,14 @@ public partial class MainWindow : Window
 
         return new TableCell(paragraph)
         {
-            Padding = new Thickness(6),
-            BorderBrush = System.Windows.Media.Brushes.LightGray,
+            Padding = new Thickness(7, 6, 7, 6),
+            BorderBrush = ReportBorderBrush,
             BorderThickness = new Thickness(0.5),
-            Background = isHeader ? System.Windows.Media.Brushes.Gainsboro : System.Windows.Media.Brushes.Transparent,
-            FontWeight = isHeader ? FontWeights.SemiBold : FontWeights.Normal
+            Background = isHeader
+                ? ReportAccentBrush
+                : isAlternate ? ReportAltRowBrush : System.Windows.Media.Brushes.White,
+            Foreground = isHeader ? System.Windows.Media.Brushes.White : ReportInkBrush,
+            FontWeight = isHeader ? FontWeights.Bold : FontWeights.Normal
         };
     }
 
@@ -2777,6 +2852,7 @@ public partial class MainWindow : Window
     {
         Id = dto.Id,
         VehicleId = dto.VehicleId,
+        CustodyId = dto.CustodyId,
         ExpenseDate = dto.ExpenseDate,
         Category = dto.Category,
         Amount = dto.Amount,
@@ -2842,14 +2918,12 @@ public partial class MainWindow : Window
     private CustodyFormDto ToForm(CustodyDto dto) => new()
     {
         Id = dto.Id,
-        VehicleId = dto.VehicleId,
+        UserId = dto.UserId,
         CustodyNumber = dto.CustodyNumber,
-        CustodianName = dto.CustodianName,
-        CustodianPosition = dto.CustodianPosition,
         HandoverDate = dto.HandoverDate,
         ReturnDate = dto.ReturnDate,
-        Status = dto.Status,
-        VehicleConditionRating = dto.VehicleConditionRating,
+        Status = dto.Status == "مغلق" ? "Closed" : "Active",
+        Amount = dto.Amount,
         Notes = dto.Notes,
         DocumentUrl = dto.DocumentUrl
     };
@@ -2906,6 +2980,12 @@ public partial class MainWindow : Window
             return true;
         }
 
+        if (string.Equals(propertyName, "CustodyId", StringComparison.OrdinalIgnoreCase))
+        {
+            column = CreateLookupColumn(propertyName, "من عهدة (اختياري)", _custodies.Where(c => c.Status == "نشط").ToList(), "CustodyNumber", "Id");
+            return true;
+        }
+
         return false;
     }
 
@@ -2942,24 +3022,6 @@ public partial class MainWindow : Window
             e.Column.Header = CreateReportColumnHeader(e.PropertyName);
             e.Column.Width = new DataGridLength(DefaultGridColumnWidth);
             e.Column.MinWidth = CompactGridColumnWidth;
-            return;
-        }
-
-        if (ReferenceEquals(sender, UsersGrid) && e.PropertyName.Equals("Role", StringComparison.OrdinalIgnoreCase))
-        {
-            e.Column = new DataGridComboBoxColumn
-            {
-                Header = ColumnHeaders.TryGetValue(e.PropertyName, out var roleHeader) ? roleHeader : "الدور",
-                ItemsSource = _userRoleOptions,
-                DisplayMemberPath = nameof(UserRoleOption.DisplayName),
-                SelectedValuePath = nameof(UserRoleOption.Value),
-                SelectedValueBinding = new Binding(e.PropertyName)
-                {
-                    Mode = BindingMode.TwoWay,
-                    UpdateSourceTrigger = UpdateSourceTrigger.PropertyChanged
-                },
-                Width = new DataGridLength(WideGridColumnWidth)
-            };
             return;
         }
 
@@ -3041,6 +3103,61 @@ public partial class MainWindow : Window
     private bool CanAccessModule(string module) =>
         !IsModuleTemporarilyLocked(module) &&
         _currentUser?.AllowedModules.Any(allowed => string.Equals(allowed, module, StringComparison.OrdinalIgnoreCase)) == true;
+
+    // Modules any signed-in user with access to the tab may add/edit/delete in, beyond Admin (who can always edit everything).
+    private static readonly Dictionary<string, string[]> ModuleEditorRoles = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ["VehicleLicense"] = new[] { "TripsLicensesOfficer" },
+        ["Trips"] = new[] { "TripsLicensesOfficer" },
+        ["Insurance"] = new[] { "InsuranceOfficer", "MaintenanceOfficer" },
+        ["Maintenance"] = new[] { "MaintenanceOfficer" },
+        ["OilChanges"] = new[] { "MaintenanceOfficer" },
+        ["Treasury"] = new[] { "TreasuryOfficer" }
+    };
+
+    private static bool CanEditModule(string? role, string module)
+    {
+        if (string.Equals(role, "Admin", StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        return ModuleEditorRoles.TryGetValue(module, out var editors) &&
+            editors.Any(editor => string.Equals(editor, role, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private static readonly Dictionary<string, string> ModuleDisplayNames = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ["Vehicles"] = "المركبات",
+        ["VehicleLicense"] = "تراخيص المركبات",
+        ["Contracts"] = "العقود",
+        ["Maintenance"] = "الصيانة",
+        ["Drivers"] = "السائقين",
+        ["DriverAttendance"] = "حضور وغياب السائقين",
+        ["Employees"] = "الموظفين",
+        ["Trips"] = "التشغيلات",
+        ["Fuel"] = "الوقود",
+        ["Expenses"] = "المصروفات",
+        ["OilChanges"] = "تغيير الزيت",
+        ["Treasury"] = "الخزينة",
+        ["Insurance"] = "التأمين",
+        ["Custody"] = "العهد",
+        ["MasterData"] = "البيانات الأساسية",
+        ["Reports"] = "التقارير",
+        ["Settings"] = "الإعدادات",
+        ["Users"] = "المستخدمين"
+    };
+
+    private void EnsureCanEdit(string module)
+    {
+        if (CanEditModule(_currentUser?.Role, module))
+        {
+            return;
+        }
+
+        var displayName = ModuleDisplayNames.TryGetValue(module, out var name) ? name : module;
+        throw new InvalidOperationException($"مش معاك صلاحية الإضافة/التعديل في قسم {displayName}. القسم ده مخصص لمدير النظام{(ModuleEditorRoles.TryGetValue(module, out var editors) ? " أو المسؤول المختص" : string.Empty)}.");
+    }
 
     private void QuickOpenTripsButton_Click(object sender, RoutedEventArgs e) => SelectTabByTag("Trips");
     private void QuickOpenDriversButton_Click(object sender, RoutedEventArgs e) => SelectTabByTag("Drivers");
@@ -3239,16 +3356,25 @@ public partial class MainWindow : Window
     }
 
     private async void RefreshVehiclesButton_Click(object sender, RoutedEventArgs e) => await RunSafeAsync(LoadVehiclesAsync);
-    private void AddVehicleButton_Click(object sender, RoutedEventArgs e) => AddNewItem(_vehicles, VehiclesGrid, new VehicleDto { PurchaseDate = DateTime.Today, Year = DateTime.Today.Year, VehicleTypeId = _vehicleTypes.FirstOrDefault()?.Id ?? 1, Status = "Active", OilChangeIntervalKm = 10000, MaintenanceIntervalKm = 15000 });
-    private async void SaveVehicleButton_Click(object sender, RoutedEventArgs e) => await RunSafeAsync(async () => { var item = Selected<VehicleDto>(VehiclesGrid) ?? throw new InvalidOperationException("اختر مركبة أولًا."); await _vehicleService.SaveAsync(ToForm(item)); await LoadVehiclesAsync(); await LoadDashboardAsync(); await LoadNotificationsAsync(); });
-    private async void DeleteVehicleButton_Click(object sender, RoutedEventArgs e) => await RunSafeAsync(() => DeleteSelectedAsync(VehiclesGrid, _vehicles, x => x.Id, _vehicleService.DeleteAsync, LoadVehiclesAsync));
+    private void AddVehicleButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (!TryEnsureCanEdit("Vehicles")) return;
+        AddNewItem(_vehicles, VehiclesGrid, new VehicleDto { PurchaseDate = DateTime.Today, Year = DateTime.Today.Year, VehicleTypeId = _vehicleTypes.FirstOrDefault()?.Id ?? 1, Status = "Active", OilChangeIntervalKm = 10000, MaintenanceIntervalKm = 15000 });
+    }
+    private async void SaveVehicleButton_Click(object sender, RoutedEventArgs e) => await RunSafeAsync(async () => { EnsureCanEdit("Vehicles"); var item = Selected<VehicleDto>(VehiclesGrid) ?? throw new InvalidOperationException("اختر مركبة أولًا."); await _vehicleService.SaveAsync(ToForm(item)); await LoadVehiclesAsync(); await LoadDashboardAsync(); await LoadNotificationsAsync(); });
+    private async void DeleteVehicleButton_Click(object sender, RoutedEventArgs e) => await RunSafeAsync(() => { EnsureCanEdit("Vehicles"); return DeleteSelectedAsync(VehiclesGrid, _vehicles, x => x.Id, _vehicleService.DeleteAsync, LoadVehiclesAsync); });
 
     private async void RefreshContractsButton_Click(object sender, RoutedEventArgs e) => await RunSafeAsync(LoadContractsAsync);
-    private void AddContractButton_Click(object sender, RoutedEventArgs e) => AddNewItem(_contracts, ContractsGrid, new ContractDto { StartDate = DateTime.Today, EndDate = DateTime.Today.AddMonths(1), VehicleId = _vehicles.FirstOrDefault()?.Id ?? 0, ContractStatusId = _contractStatuses.FirstOrDefault()?.Id ?? 1 });
-    private async void SaveContractButton_Click(object sender, RoutedEventArgs e) => await RunSafeAsync(async () => { var item = Selected<ContractDto>(ContractsGrid) ?? throw new InvalidOperationException("اختر عقدًا أولًا."); await _contractService.SaveAsync(ToForm(item)); await LoadContractsAsync(); await LoadDashboardAsync(); await LoadNotificationsAsync(); });
-    private async void DeleteContractButton_Click(object sender, RoutedEventArgs e) => await RunSafeAsync(() => DeleteSelectedAsync(ContractsGrid, _contracts, x => x.Id, _contractService.DeleteAsync, LoadContractsAsync));
+    private void AddContractButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (!TryEnsureCanEdit("Contracts")) return;
+        AddNewItem(_contracts, ContractsGrid, new ContractDto { StartDate = DateTime.Today, EndDate = DateTime.Today.AddMonths(1), VehicleId = _vehicles.FirstOrDefault()?.Id ?? 0, ContractStatusId = _contractStatuses.FirstOrDefault()?.Id ?? 1 });
+    }
+    private async void SaveContractButton_Click(object sender, RoutedEventArgs e) => await RunSafeAsync(async () => { EnsureCanEdit("Contracts"); var item = Selected<ContractDto>(ContractsGrid) ?? throw new InvalidOperationException("اختر عقدًا أولًا."); await _contractService.SaveAsync(ToForm(item)); await LoadContractsAsync(); await LoadDashboardAsync(); await LoadNotificationsAsync(); });
+    private async void DeleteContractButton_Click(object sender, RoutedEventArgs e) => await RunSafeAsync(() => { EnsureCanEdit("Contracts"); return DeleteSelectedAsync(ContractsGrid, _contracts, x => x.Id, _contractService.DeleteAsync, LoadContractsAsync); });
     private async void AttachContractDocumentButton_Click(object sender, RoutedEventArgs e) => await RunSafeAsync(async () =>
     {
+        EnsureCanEdit("Contracts");
         var item = Selected<ContractDto>(ContractsGrid) ?? throw new InvalidOperationException("اختر عقدًا أولًا.");
         var filePath = PickDocumentPath();
         if (string.IsNullOrWhiteSpace(filePath))
@@ -3262,11 +3388,16 @@ public partial class MainWindow : Window
     });
 
     private async void RefreshMaintenanceButton_Click(object sender, RoutedEventArgs e) => await RunSafeAsync(LoadMaintenanceAsync);
-    private void AddMaintenanceButton_Click(object sender, RoutedEventArgs e) => AddNewItem(_maintenance, MaintenanceGrid, new MaintenanceRequestDto { VehicleId = _vehicles.FirstOrDefault()?.Id ?? 0, MaintenanceTypeId = _maintenanceTypes.FirstOrDefault()?.Id ?? 1, RequestDate = DateTime.Today, Status = "Open" });
-    private async void SaveMaintenanceButton_Click(object sender, RoutedEventArgs e) => await RunSafeAsync(async () => { var item = Selected<MaintenanceRequestDto>(MaintenanceGrid) ?? throw new InvalidOperationException("اختر طلب صيانة أولًا."); await _maintenanceService.SaveAsync(ToForm(item)); await LoadMaintenanceAsync(); await LoadDashboardAsync(); await LoadNotificationsAsync(); });
-    private async void DeleteMaintenanceButton_Click(object sender, RoutedEventArgs e) => await RunSafeAsync(() => DeleteSelectedAsync(MaintenanceGrid, _maintenance, x => x.Id, _maintenanceService.DeleteAsync, LoadMaintenanceAsync));
+    private void AddMaintenanceButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (!TryEnsureCanEdit("Maintenance")) return;
+        AddNewItem(_maintenance, MaintenanceGrid, new MaintenanceRequestDto { VehicleId = _vehicles.FirstOrDefault()?.Id ?? 0, MaintenanceTypeId = _maintenanceTypes.FirstOrDefault()?.Id ?? 1, RequestDate = DateTime.Today, Status = "Open" });
+    }
+    private async void SaveMaintenanceButton_Click(object sender, RoutedEventArgs e) => await RunSafeAsync(async () => { EnsureCanEdit("Maintenance"); var item = Selected<MaintenanceRequestDto>(MaintenanceGrid) ?? throw new InvalidOperationException("اختر طلب صيانة أولًا."); await _maintenanceService.SaveAsync(ToForm(item)); await LoadMaintenanceAsync(); await LoadDashboardAsync(); await LoadNotificationsAsync(); });
+    private async void DeleteMaintenanceButton_Click(object sender, RoutedEventArgs e) => await RunSafeAsync(() => { EnsureCanEdit("Maintenance"); return DeleteSelectedAsync(MaintenanceGrid, _maintenance, x => x.Id, _maintenanceService.DeleteAsync, LoadMaintenanceAsync); });
     private async void AttachMaintenanceDocumentButton_Click(object sender, RoutedEventArgs e) => await RunSafeAsync(async () =>
     {
+        EnsureCanEdit("Maintenance");
         var item = Selected<MaintenanceRequestDto>(MaintenanceGrid) ?? throw new InvalidOperationException("اختر طلب صيانة أولًا.");
         var filePath = PickDocumentPath();
         if (string.IsNullOrWhiteSpace(filePath))
@@ -3280,9 +3411,14 @@ public partial class MainWindow : Window
     });
 
     private async void RefreshDriversButton_Click(object sender, RoutedEventArgs e) => await RunSafeAsync(LoadDriversAsync);
-    private async void AddDriverButton_Click(object sender, RoutedEventArgs e) => await AddDriverFromPopupAsync();
+    private async void AddDriverButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (!TryEnsureCanEdit("Drivers")) return;
+        await AddDriverFromPopupAsync();
+    }
     private async void EditDriverButton_Click(object sender, RoutedEventArgs e) => await RunSafeAsync(async () =>
     {
+        EnsureCanEdit("Drivers");
         var driver = SelectDriverFromSender(sender) ?? throw new InvalidOperationException("اختر سائقًا أولًا.");
         await EditDriverFromPopupAsync(driver);
     });
@@ -3413,6 +3549,7 @@ public partial class MainWindow : Window
 
     private async void SaveDriverButton_Click(object sender, RoutedEventArgs e) => await RunSafeAsync(async () =>
     {
+        EnsureCanEdit("Drivers");
         await SaveSelectedDriverSilentlyAsync();
         var item = Selected<DriverDto>(DriversGrid) ?? throw new InvalidOperationException("اختر سائقًا أولًا.");
         if (item.Id == 0)
@@ -3432,7 +3569,7 @@ public partial class MainWindow : Window
         await LoadDriverAttendanceWeekAsync();
         await LoadDashboardAsync();
     });
-    private async void DeleteDriverButton_Click(object sender, RoutedEventArgs e) => await RunSafeAsync(() => DeleteSelectedAsync(DriversGrid, _drivers, x => x.Id, _driverService.DeleteAsync, LoadDriversAsync));
+    private async void DeleteDriverButton_Click(object sender, RoutedEventArgs e) => await RunSafeAsync(() => { EnsureCanEdit("Drivers"); return DeleteSelectedAsync(DriversGrid, _drivers, x => x.Id, _driverService.DeleteAsync, LoadDriversAsync); });
 
     private void DriversGrid_CellEditEnding(object sender, DataGridCellEditEndingEventArgs e) => ScheduleDriverAutoSave();
 
@@ -3453,7 +3590,7 @@ public partial class MainWindow : Window
 
     private async Task SaveSelectedDriverSilentlyAsync()
     {
-        if (_isSavingDriver)
+        if (_isSavingDriver || !CanEditModule(_currentUser?.Role, "Drivers"))
         {
             return;
         }
@@ -3517,6 +3654,7 @@ public partial class MainWindow : Window
 
     private async void SaveDriverAttendanceWeekButton_Click(object sender, RoutedEventArgs e) => await RunSafeAsync(async () =>
     {
+        EnsureCanEdit("DriverAttendance");
         await SaveDriverAttendanceWeekSilentlyAsync();
         await LoadDriverAttendanceWeekAsync();
         MessageBox.Show("تم حفظ حضور وغياب السائقين لهذا الأسبوع.", "تم", MessageBoxButton.OK, MessageBoxImage.Information);
@@ -3540,7 +3678,7 @@ public partial class MainWindow : Window
 
     private async Task SaveDriverAttendanceWeekSilentlyAsync()
     {
-        if (_isLoadingDriverAttendanceWeek || _isSavingDriverAttendanceWeek)
+        if (_isLoadingDriverAttendanceWeek || _isSavingDriverAttendanceWeek || !CanEditModule(_currentUser?.Role, "DriverAttendance"))
         {
             return;
         }
@@ -3596,6 +3734,7 @@ public partial class MainWindow : Window
 
     private async Task SaveDailyAttendanceAsync()
     {
+        EnsureCanEdit("DriverAttendance");
         CommitGridEdit(DailyAttendanceGrid);
         var weekStart = StartOfDriverWeek(DateTime.Today);
         var forms = _dailyAttendanceRows
@@ -3674,6 +3813,9 @@ public partial class MainWindow : Window
 
         view.Filter = DriverRowMatchesFilters;
         view.Refresh();
+
+        var visibleCount = _drivers.Count(DriverRowMatchesFilters);
+        DriversCountTextBlock.Text = $"عدد السائقين المعروضين: {visibleCount}";
     }
 
     private bool DriverRowMatchesFilters(object item)
@@ -3825,9 +3967,13 @@ public partial class MainWindow : Window
     }
 
     private async void RefreshEmployeesButton_Click(object sender, RoutedEventArgs e) => await RunSafeAsync(LoadEmployeesAsync);
-    private void AddEmployeeButton_Click(object sender, RoutedEventArgs e) => AddNewItem(_employees, EmployeesGrid, new EmployeeDto { HireDate = DateTime.Today, Status = "Active" });
-    private async void SaveEmployeeButton_Click(object sender, RoutedEventArgs e) => await RunSafeAsync(async () => { var item = Selected<EmployeeDto>(EmployeesGrid) ?? throw new InvalidOperationException("اختر موظفًا أولًا."); await _employeeService.SaveAsync(ToForm(item)); await LoadEmployeesAsync(); });
-    private async void DeleteEmployeeButton_Click(object sender, RoutedEventArgs e) => await RunSafeAsync(() => DeleteSelectedAsync(EmployeesGrid, _employees, x => x.Id, _employeeService.DeleteAsync, LoadEmployeesAsync));
+    private void AddEmployeeButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (!TryEnsureCanEdit("Employees")) return;
+        AddNewItem(_employees, EmployeesGrid, new EmployeeDto { HireDate = DateTime.Today, Status = "Active" });
+    }
+    private async void SaveEmployeeButton_Click(object sender, RoutedEventArgs e) => await RunSafeAsync(async () => { EnsureCanEdit("Employees"); var item = Selected<EmployeeDto>(EmployeesGrid) ?? throw new InvalidOperationException("اختر موظفًا أولًا."); await _employeeService.SaveAsync(ToForm(item)); await LoadEmployeesAsync(); });
+    private async void DeleteEmployeeButton_Click(object sender, RoutedEventArgs e) => await RunSafeAsync(() => { EnsureCanEdit("Employees"); return DeleteSelectedAsync(EmployeesGrid, _employees, x => x.Id, _employeeService.DeleteAsync, LoadEmployeesAsync); });
 
     private void TripFilter_Changed(object sender, RoutedEventArgs e)
     {
@@ -4079,14 +4225,11 @@ public partial class MainWindow : Window
         }
 
         return TextFilterMatches(CustodyFilterId, custody.Id.ToString(CultureInfo.InvariantCulture))
-            && TextFilterMatches(CustodyFilterPlate, custody.VehiclePlateNumber)
             && TextFilterMatches(CustodyFilterNumber, custody.CustodyNumber)
-            && TextFilterMatches(CustodyFilterCustodian, custody.CustodianName)
-            && TextFilterMatches(CustodyFilterPosition, custody.CustodianPosition)
+            && TextFilterMatches(CustodyFilterCustodian, custody.UserFullName)
             && DateFilterMatches(CustodyFilterHandoverDate, custody.HandoverDate)
             && DateFilterMatches(CustodyFilterReturnDate, custody.ReturnDate)
             && TextFilterMatches(CustodyFilterStatus, custody.Status)
-            && TextFilterMatches(CustodyFilterRating, custody.VehicleConditionRating.ToString("0.##", CultureInfo.InvariantCulture))
             && TextFilterMatches(CustodyFilterNotes, custody.Notes);
     }
 
@@ -4189,6 +4332,8 @@ public partial class MainWindow : Window
     private async void RefreshTripsButton_Click(object sender, RoutedEventArgs e) => await RunSafeAsync(LoadTripsAsync);
     private async void AddTripButton_Click(object sender, RoutedEventArgs e)
     {
+        if (!TryEnsureCanEdit("Trips")) return;
+
         var lookupDataLoaded = false;
         await RunSafeAsync(async () =>
         {
@@ -4241,12 +4386,14 @@ public partial class MainWindow : Window
     private async void DeleteTripButton_Click(object sender, RoutedEventArgs e) =>
         await RunSafeAsync(() =>
         {
+            EnsureCanEdit("Trips");
             SelectTripFromSender(sender);
             return DeleteSelectedAsync(TripsGrid, _trips, x => x.Id, _tripService.DeleteAsync, LoadTripsAsync);
         });
 
     private async void AddOilForSelectedTripVehicleButton_Click(object sender, RoutedEventArgs e) => await RunSafeAsync(() =>
     {
+        EnsureCanEdit("OilChanges");
         var trip = Selected<TripDto>(TripsGrid);
         var vehicle = trip is null
             ? _vehicles.FirstOrDefault()
@@ -4300,6 +4447,8 @@ public partial class MainWindow : Window
 
     private async void CloseTripButton_Click(object sender, RoutedEventArgs e)
     {
+        if (!TryEnsureCanEdit("Trips")) return;
+
         var trip = SelectTripFromSender(sender);
         if (trip is null)
         {
@@ -4496,6 +4645,8 @@ public partial class MainWindow : Window
 
     private async void OpenFuelEntry(FuelTransactionDto source)
     {
+        if (!TryEnsureCanEdit("Fuel")) return;
+
         SelectTabByTag("Fuel");
         var window = new FuelEntryWindow(_vehicles, _trips, source)
         {
@@ -4534,6 +4685,7 @@ public partial class MainWindow : Window
 
     private async void DeleteFuelButton_Click(object sender, RoutedEventArgs e) => await RunSafeAsync(async () =>
     {
+        EnsureCanEdit("Fuel");
         SelectFuelFromSender(sender);
         await DeleteSelectedAsync(FuelGrid, _fuel, x => x.Id, _fuelService.DeleteAsync, LoadFuelAsync);
         await LoadTripsAsync();
@@ -4576,9 +4728,13 @@ public partial class MainWindow : Window
     }
 
     private async void RefreshExpensesButton_Click(object sender, RoutedEventArgs e) => await RunSafeAsync(LoadExpensesAsync);
-    private void AddExpenseButton_Click(object sender, RoutedEventArgs e) => AddNewItem(_expenses, ExpensesGrid, new ExpenseDto { VehicleId = _vehicles.FirstOrDefault()?.Id ?? 0, ExpenseDate = DateTime.Today, Status = "Pending" });
-    private async void SaveExpenseButton_Click(object sender, RoutedEventArgs e) => await RunSafeAsync(async () => { var item = Selected<ExpenseDto>(ExpensesGrid) ?? throw new InvalidOperationException("اختر مصروفًا أولًا."); await _expenseService.SaveAsync(ToForm(item)); await LoadExpensesAsync(); await LoadTreasuryIfUnlockedAsync(); await LoadDashboardAsync(); });
-    private async void DeleteExpenseButton_Click(object sender, RoutedEventArgs e) => await RunSafeAsync(async () => { await DeleteSelectedAsync(ExpensesGrid, _expenses, x => x.Id, _expenseService.DeleteAsync, LoadExpensesAsync); await LoadTreasuryIfUnlockedAsync(); });
+    private void AddExpenseButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (!TryEnsureCanEdit("Expenses")) return;
+        AddNewItem(_expenses, ExpensesGrid, new ExpenseDto { VehicleId = _vehicles.FirstOrDefault()?.Id, ExpenseDate = DateTime.Today, Status = "Pending" });
+    }
+    private async void SaveExpenseButton_Click(object sender, RoutedEventArgs e) => await RunSafeAsync(async () => { EnsureCanEdit("Expenses"); var item = Selected<ExpenseDto>(ExpensesGrid) ?? throw new InvalidOperationException("اختر مصروفًا أولًا."); await _expenseService.SaveAsync(ToForm(item)); await LoadExpensesAsync(); await LoadTreasuryIfUnlockedAsync(); await LoadDashboardAsync(); });
+    private async void DeleteExpenseButton_Click(object sender, RoutedEventArgs e) => await RunSafeAsync(async () => { EnsureCanEdit("Expenses"); await DeleteSelectedAsync(ExpensesGrid, _expenses, x => x.Id, _expenseService.DeleteAsync, LoadExpensesAsync); await LoadTreasuryIfUnlockedAsync(); });
 
     private async void RefreshOilChangesButton_Click(object sender, RoutedEventArgs e) => await RunSafeAsync(LoadOilChangesAsync);
     private void AddOilChangeButton_Click(object sender, RoutedEventArgs e)
@@ -4639,6 +4795,8 @@ public partial class MainWindow : Window
 
     private async void OpenOilChangeEntry(OilChangeDto source)
     {
+        if (!TryEnsureCanEdit("OilChanges")) return;
+
         SelectTabByTag("OilChanges");
         var window = new OilChangeEntryWindow(_vehicles, source, _oilChanges)
         {
@@ -4688,6 +4846,7 @@ public partial class MainWindow : Window
 
     private async void DeleteOilChangeButton_Click(object sender, RoutedEventArgs e) => await RunSafeAsync(() =>
     {
+        EnsureCanEdit("OilChanges");
         SelectOilChangeFromSender(sender);
         return DeleteSelectedAsync(OilChangesGrid, _oilChanges, x => x.Id, _oilChangeService.DeleteAsync, async () =>
         {
@@ -4700,7 +4859,7 @@ public partial class MainWindow : Window
     private async void RefreshTreasuryButton_Click(object sender, RoutedEventArgs e) => await RunSafeAsync(LoadTreasuryIfUnlockedAsync);
     private async void AddTreasuryButton_Click(object sender, RoutedEventArgs e)
     {
-        if (IsModuleTemporarilyLocked("Treasury"))
+        if (IsModuleTemporarilyLocked("Treasury") || !TryEnsureCanEdit("Treasury"))
         {
             return;
         }
@@ -4731,7 +4890,7 @@ public partial class MainWindow : Window
 
     private async void SaveTreasuryButton_Click(object sender, RoutedEventArgs e)
     {
-        if (IsModuleTemporarilyLocked("Treasury"))
+        if (IsModuleTemporarilyLocked("Treasury") || !TryEnsureCanEdit("Treasury"))
         {
             return;
         }
@@ -4769,6 +4928,7 @@ public partial class MainWindow : Window
             return Task.CompletedTask;
         }
 
+        EnsureCanEdit("Treasury");
         SelectTreasuryFromSender(sender);
         return DeleteSelectedAsync(TreasuryGrid, _treasuryTransactions, x => x.Id, _treasuryService.DeleteAsync, LoadTreasuryIfUnlockedAsync);
     });
@@ -4781,6 +4941,8 @@ public partial class MainWindow : Window
 
     private async void AddVehicleFromLicenseButton_Click(object sender, RoutedEventArgs e)
     {
+        if (!TryEnsureCanEdit("VehicleLicense")) return;
+
         var draft = new VehicleLicenseRow
         {
             Year = DateTime.Today.Year,
@@ -4805,6 +4967,8 @@ public partial class MainWindow : Window
 
     private async void SaveVehicleLicenseButton_Click(object sender, RoutedEventArgs e)
     {
+        if (!TryEnsureCanEdit("VehicleLicense")) return;
+
         var item = SelectVehicleLicenseFromSender(sender);
         if (item is null)
         {
@@ -4827,6 +4991,8 @@ public partial class MainWindow : Window
 
     private async Task SaveVehicleLicenseRowAsync(VehicleLicenseRow item)
     {
+        EnsureCanEdit("VehicleLicense");
+
         if (string.IsNullOrWhiteSpace(item.PlateNumber))
         {
             throw new InvalidOperationException("رقم العربية مطلوب قبل حفظ الترخيص.");
@@ -4863,6 +5029,8 @@ public partial class MainWindow : Window
 
     private async void DeleteVehicleFromLicenseButton_Click(object sender, RoutedEventArgs e) => await RunSafeAsync(async () =>
     {
+        EnsureCanEdit("VehicleLicense");
+
         var item = SelectVehicleLicenseFromSender(sender)
             ?? throw new InvalidOperationException("اختر عربية أولًا.");
 
@@ -4886,6 +5054,8 @@ public partial class MainWindow : Window
 
     private async void ClearVehicleLicenseButton_Click(object sender, RoutedEventArgs e) => await RunSafeAsync(async () =>
     {
+        EnsureCanEdit("VehicleLicense");
+
         var item = SelectVehicleLicenseFromSender(sender)
             ?? throw new InvalidOperationException("اختر ترخيص عربية أولًا.");
 
@@ -4906,6 +5076,8 @@ public partial class MainWindow : Window
 
     private async void AddInsuranceForSelectedLicenseButton_Click(object sender, RoutedEventArgs e)
     {
+        if (!TryEnsureCanEdit("Insurance")) return;
+
         var item = Selected<VehicleLicenseRow>(LicensesGrid);
         if (item is null)
         {
@@ -4943,6 +5115,8 @@ public partial class MainWindow : Window
     private async void RefreshInsuranceButton_Click(object sender, RoutedEventArgs e) => await RunSafeAsync(LoadInsuranceAsync);
     private async void AddInsuranceButton_Click(object sender, RoutedEventArgs e)
     {
+        if (!TryEnsureCanEdit("Insurance")) return;
+
         var vehicle = _vehicles.FirstOrDefault();
         var window = new InsuranceEntryWindow(_vehicles, BuildInsuranceDraft(vehicle))
         {
@@ -4979,6 +5153,8 @@ public partial class MainWindow : Window
 
     private async void SaveInsuranceButton_Click(object sender, RoutedEventArgs e)
     {
+        if (!TryEnsureCanEdit("Insurance")) return;
+
         var item = SelectInsuranceFromSender(sender);
         if (item is null)
         {
@@ -5007,11 +5183,13 @@ public partial class MainWindow : Window
     }
     private async void DeleteInsuranceButton_Click(object sender, RoutedEventArgs e) => await RunSafeAsync(() =>
     {
+        EnsureCanEdit("Insurance");
         SelectInsuranceFromSender(sender);
         return DeleteSelectedAsync(InsuranceGrid, _insurance, x => x.Id, _insuranceService.DeleteAsync, LoadInsuranceAsync);
     });
     private async void AttachInsuranceDocumentButton_Click(object sender, RoutedEventArgs e) => await RunSafeAsync(async () =>
     {
+        EnsureCanEdit("Insurance");
         var item = SelectInsuranceFromSender(sender) ?? throw new InvalidOperationException("اختر وثيقة تأمين أولًا.");
         var filePath = PickDocumentPath();
         if (string.IsNullOrWhiteSpace(filePath))
@@ -5027,13 +5205,13 @@ public partial class MainWindow : Window
     private async void RefreshCustodyButton_Click(object sender, RoutedEventArgs e) => await RunSafeAsync(LoadCustodyIfUnlockedAsync);
     private async void AddCustodyButton_Click(object sender, RoutedEventArgs e)
     {
-        if (IsModuleTemporarilyLocked("Custody"))
+        if (IsModuleTemporarilyLocked("Custody") || !TryEnsureCanEdit("Custody"))
         {
             return;
         }
 
-        var selectedVehicleId = Selected<CustodyDto>(CustodyGrid)?.VehicleId;
-        var window = new CustodyEntryWindow(_vehicles, selectedVehicleId)
+        var selectedUserId = Selected<CustodyDto>(CustodyGrid)?.UserId;
+        var window = new CustodyEntryWindow(_users, selectedUserId)
         {
             Owner = this
         };
@@ -5046,21 +5224,8 @@ public partial class MainWindow : Window
         await RunSafeAsync(async () =>
         {
             await _custodyService.SaveAsync(window.CustodyForm);
-            if (window.CustodyForm.Amount > 0)
-            {
-                var plate = _vehicles.FirstOrDefault(v => v.Id == window.CustodyForm.VehicleId)?.PlateNumber ?? string.Empty;
-                await _treasuryService.SaveAsync(new TreasuryTransactionFormDto
-                {
-                    TransactionDate = window.CustodyForm.HandoverDate,
-                    TransactionType = "صرف",
-                    Amount = window.CustodyForm.Amount,
-                    Description = $"عهدة {window.CustodyForm.CustodyNumber} - {window.CustodyForm.CustodianName} ({plate})",
-                    RelatedEntityType = "عهدة",
-                    PaymentMethod = "نقدي"
-                });
-                await LoadTreasuryIfUnlockedAsync();
-            }
             await LoadCustodyIfUnlockedAsync();
+            await LoadTreasuryIfUnlockedAsync();
             await LoadDashboardAsync();
             await LoadNotificationsAsync();
         });
@@ -5068,7 +5233,7 @@ public partial class MainWindow : Window
 
     private async void SaveCustodyButton_Click(object sender, RoutedEventArgs e)
     {
-        if (IsModuleTemporarilyLocked("Custody"))
+        if (IsModuleTemporarilyLocked("Custody") || !TryEnsureCanEdit("Custody"))
         {
             return;
         }
@@ -5080,7 +5245,7 @@ public partial class MainWindow : Window
             return;
         }
 
-        var window = new CustodyEntryWindow(_vehicles, item.VehicleId, item)
+        var window = new CustodyEntryWindow(_users, item.UserId, item)
         {
             Owner = this
         };
@@ -5092,27 +5257,50 @@ public partial class MainWindow : Window
 
         await RunSafeAsync(async () =>
         {
-            EnsureVehicleExists(window.CustodyForm.VehicleId, "سجل العهدة");
             await _custodyService.SaveAsync(window.CustodyForm);
-            if (window.CustodyForm.Amount > 0)
-            {
-                var plate = _vehicles.FirstOrDefault(v => v.Id == window.CustodyForm.VehicleId)?.PlateNumber ?? string.Empty;
-                await _treasuryService.SaveAsync(new TreasuryTransactionFormDto
-                {
-                    TransactionDate = window.CustodyForm.HandoverDate,
-                    TransactionType = "صرف",
-                    Amount = window.CustodyForm.Amount,
-                    Description = $"عهدة {window.CustodyForm.CustodyNumber} - {window.CustodyForm.CustodianName} ({plate})",
-                    RelatedEntityType = "عهدة",
-                    PaymentMethod = "نقدي"
-                });
-                await LoadTreasuryIfUnlockedAsync();
-            }
             await LoadCustodyIfUnlockedAsync();
+            await LoadTreasuryIfUnlockedAsync();
             await LoadDashboardAsync();
             await LoadNotificationsAsync();
         });
     }
+
+    private async void ReturnCustodyButton_Click(object sender, RoutedEventArgs e) => await RunSafeAsync(async () =>
+    {
+        if (IsModuleTemporarilyLocked("Custody") || !TryEnsureCanEdit("Custody"))
+        {
+            return;
+        }
+
+        var item = SelectCustodyFromSender(sender) ?? throw new InvalidOperationException("اختر سجل عهدة أولًا.");
+        if (item.RemainingAmount <= 0)
+        {
+            throw new InvalidOperationException("لا يوجد مبلغ متبقٍ في هذه العهدة لإرجاعه.");
+        }
+
+        var window = new QuickNameEntryWindow(
+            "إرجاع مبلغ من العهدة",
+            $"المتبقي في العهدة {item.CustodyNumber}: {item.RemainingAmount:0.##}\nأدخل المبلغ المطلوب إرجاعه للخزينة:")
+        {
+            Owner = this
+        };
+
+        if (window.ShowDialog() != true)
+        {
+            return;
+        }
+
+        if (!decimal.TryParse(window.EnteredName, NumberStyles.Number, CultureInfo.InvariantCulture, out var amount) || amount <= 0)
+        {
+            throw new InvalidOperationException("مبلغ غير صحيح.");
+        }
+
+        await _custodyService.ReturnFundsAsync(new CustodyReturnDto { CustodyId = item.Id, Amount = amount });
+        await LoadCustodyIfUnlockedAsync();
+        await LoadTreasuryIfUnlockedAsync();
+        await LoadDashboardAsync();
+        await LoadNotificationsAsync();
+    });
 
     private async void DeleteCustodyButton_Click(object sender, RoutedEventArgs e) => await RunSafeAsync(() =>
     {
@@ -5121,13 +5309,14 @@ public partial class MainWindow : Window
             return Task.CompletedTask;
         }
 
+        EnsureCanEdit("Custody");
         SelectCustodyFromSender(sender);
         return DeleteSelectedAsync(CustodyGrid, _custodies, x => x.Id, _custodyService.DeleteAsync, LoadCustodyIfUnlockedAsync);
     });
 
     private async void AttachCustodyDocumentButton_Click(object sender, RoutedEventArgs e) => await RunSafeAsync(async () =>
     {
-        if (IsModuleTemporarilyLocked("Custody"))
+        if (IsModuleTemporarilyLocked("Custody") || !TryEnsureCanEdit("Custody"))
         {
             return;
         }
@@ -5161,19 +5350,59 @@ public partial class MainWindow : Window
     private async void DeleteServiceProviderButton_Click(object sender, RoutedEventArgs e) => await RunSafeAsync(() => DeleteSelectedAsync(ServiceProvidersGrid, _serviceProviders, x => x.Id, _masterDataService.DeleteServiceProviderAsync, LoadMasterDataAsync));
 
     private async void RefreshUsersButton_Click(object sender, RoutedEventArgs e) => await RunSafeAsync(LoadUsersAsync);
-    private void AddUserButton_Click(object sender, RoutedEventArgs e) => AddNewItem(_users, UsersGrid, new UserFormDto { IsActive = true, Role = "OperationsDataEntry" });
-    private async void SaveUserButton_Click(object sender, RoutedEventArgs e) => await RunSafeAsync(async () =>
+
+    private async void AddUserButton_Click(object sender, RoutedEventArgs e)
     {
         if (!string.Equals(_currentUser?.Role, "Admin", StringComparison.OrdinalIgnoreCase))
         {
-            throw new InvalidOperationException("إدارة المستخدمين متاحة لمدير النظام فقط.");
+            MessageBox.Show("إدارة المستخدمين متاحة لمدير النظام فقط.", "تنبيه واضح", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
         }
 
-        var item = Selected<UserFormDto>(UsersGrid) ?? throw new InvalidOperationException("اختر مستخدمًا أولًا.");
-        item.ConfirmPassword = item.Password;
-        await _authenticationService.SaveUserAsync(item);
-        await LoadUsersAsync();
-    });
+        var window = new UserEntryWindow { Owner = this };
+        if (window.ShowDialog() != true || window.UserForm is null)
+        {
+            return;
+        }
+
+        await RunSafeAsync(async () =>
+        {
+            await _authenticationService.SaveUserAsync(window.UserForm);
+            await LoadUsersAsync();
+        });
+    }
+
+    private async void EditUserButton_Click(object sender, RoutedEventArgs e) => await OpenEditUserDialogAsync();
+
+    private async void UsersGrid_MouseDoubleClick(object sender, MouseButtonEventArgs e) => await OpenEditUserDialogAsync();
+
+    private async Task OpenEditUserDialogAsync()
+    {
+        if (!string.Equals(_currentUser?.Role, "Admin", StringComparison.OrdinalIgnoreCase))
+        {
+            MessageBox.Show("إدارة المستخدمين متاحة لمدير النظام فقط.", "تنبيه واضح", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+
+        var item = Selected<UserFormDto>(UsersGrid);
+        if (item is null || item.Id == 0)
+        {
+            MessageBox.Show("اختر مستخدمًا أولًا.", "تنبيه", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        var window = new UserEntryWindow(item) { Owner = this };
+        if (window.ShowDialog() != true || window.UserForm is null)
+        {
+            return;
+        }
+
+        await RunSafeAsync(async () =>
+        {
+            await _authenticationService.SaveUserAsync(window.UserForm);
+            await LoadUsersAsync();
+        });
+    }
     private async void ToggleUserStatusButton_Click(object sender, RoutedEventArgs e) => await RunSafeAsync(async () =>
     {
         if (!string.Equals(_currentUser?.Role, "Admin", StringComparison.OrdinalIgnoreCase))
@@ -5190,6 +5419,27 @@ public partial class MainWindow : Window
         await _authenticationService.ToggleUserStatusAsync(item.Id, !item.IsActive);
         await LoadUsersAsync();
     });
+
+    private async void UsersGrid_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        var selected = Selected<UserFormDto>(UsersGrid);
+        if (selected is null || selected.Id == 0)
+        {
+            UserCustodySummaryBorder.Visibility = Visibility.Collapsed;
+            return;
+        }
+
+        await RunSafeAsync(async () =>
+        {
+            var summary = await _custodyService.GetUserSummaryAsync(selected.Id);
+            UserCustodySummaryTitleTextBlock.Text = $"عهدة المستخدم: {selected.FullName}";
+            UserCustodyTakenTextBlock.Text = summary.TotalTaken.ToString("0.##");
+            UserCustodySpentTextBlock.Text = summary.TotalSpent.ToString("0.##");
+            UserCustodyReturnedTextBlock.Text = summary.TotalReturned.ToString("0.##");
+            UserCustodyRemainingTextBlock.Text = summary.TotalRemaining.ToString("0.##");
+            UserCustodySummaryBorder.Visibility = summary.Custodies.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
+        });
+    }
 
     private async void GenerateReportButton_Click(object sender, RoutedEventArgs e) => await RunSafeAsync(async () =>
     {
@@ -5533,6 +5783,4 @@ public partial class MainWindow : Window
     });
 
     private async void RefreshNotificationsButton_Click(object sender, RoutedEventArgs e) => await RunSafeAsync(LoadNotificationsAsync);
-
-    private sealed record UserRoleOption(string Value, string DisplayName);
 }

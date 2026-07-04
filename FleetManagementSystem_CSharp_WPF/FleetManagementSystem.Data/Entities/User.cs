@@ -20,5 +20,6 @@ namespace FleetManagementSystem.Data.Entities
 
         public ICollection<Notification> Notifications { get; set; } = new List<Notification>();
         public ICollection<AuditLog> AuditLogs { get; set; } = new List<AuditLog>();
+        public ICollection<Custody> CustodyRecords { get; set; } = new List<Custody>();
     }
 }

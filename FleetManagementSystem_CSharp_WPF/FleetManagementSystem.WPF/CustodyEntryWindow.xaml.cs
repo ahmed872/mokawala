@@ -7,90 +7,67 @@ namespace FleetManagementSystem.WPF;
 
 public partial class CustodyEntryWindow : Window
 {
-    private readonly IReadOnlyList<VehicleDto> _vehicles;
+    private readonly IReadOnlyList<UserFormDto> _users;
     private readonly CustodyDto? _source;
 
     public CustodyFormDto? CustodyForm { get; private set; }
 
-    public CustodyEntryWindow(IEnumerable<VehicleDto> vehicles, int? preselectedVehicleId = null, CustodyDto? source = null)
+    public CustodyEntryWindow(IEnumerable<UserFormDto> users, int? preselectedUserId = null, CustodyDto? source = null)
     {
         InitializeComponent();
 
         _source = source;
-        _vehicles = vehicles
-            .OrderBy(vehicle => vehicle.PlateNumber)
+        _users = users
+            .Where(user => user.IsActive)
+            .OrderBy(user => user.FullName)
             .ToList();
 
-        VehicleComboBox.ItemsSource = _vehicles;
+        UserComboBox.ItemsSource = _users;
 
         if (source is not null)
         {
             Title = "تعديل عهدة";
             CustodyNumberTextBox.Text = source.CustodyNumber;
-            CustodianNameTextBox.Text = source.CustodianName;
-            CustodianPositionTextBox.Text = source.CustodianPosition;
             HandoverDatePicker.SelectedDate = source.HandoverDate == default ? DateTime.Today : source.HandoverDate;
             ReturnDatePicker.SelectedDate = source.ReturnDate;
-            ConditionRatingTextBox.Text = source.VehicleConditionRating <= 0
-                ? "5"
-                : source.VehicleConditionRating.ToString("0.##", CultureInfo.InvariantCulture);
             AmountTextBox.Text = source.Amount <= 0 ? "0" : source.Amount.ToString("0.##", CultureInfo.InvariantCulture);
             NotesTextBox.Text = source.Notes;
             SelectStatus(source.Status);
-            VehicleComboBox.SelectedValue = source.VehicleId;
+            UserComboBox.SelectedValue = source.UserId;
         }
         else
         {
             CustodyNumberTextBox.Text = $"CU-{DateTime.Now:yyyyMMdd-HHmm}";
             HandoverDatePicker.SelectedDate = DateTime.Today;
-            ConditionRatingTextBox.Text = "5";
             AmountTextBox.Text = "0";
         }
 
-        if (source is null && preselectedVehicleId.HasValue)
+        if (source is null && preselectedUserId.HasValue)
         {
-            VehicleComboBox.SelectedValue = preselectedVehicleId.Value;
+            UserComboBox.SelectedValue = preselectedUserId.Value;
         }
-        else if (source is null && _vehicles.Count > 0)
+        else if (source is null && _users.Count > 0)
         {
-            VehicleComboBox.SelectedItem = _vehicles[0];
+            UserComboBox.SelectedItem = _users[0];
         }
 
-        UpdateVehicleSummary();
+        UpdateUserSummary();
     }
 
-    private void VehicleComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e) => UpdateVehicleSummary();
+    private void UserComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e) => UpdateUserSummary();
 
     private void SaveButton_Click(object sender, RoutedEventArgs e)
     {
-        var vehicle = VehicleComboBox.SelectedItem as VehicleDto;
-        if (vehicle is null)
+        var user = UserComboBox.SelectedItem as UserFormDto;
+        if (user is null)
         {
-            ShowValidation("اختر رقم السيارة أولًا.");
+            ShowValidation("اختر المستخدم صاحب العهدة أولًا.");
             return;
         }
 
         if (string.IsNullOrWhiteSpace(CustodyNumberTextBox.Text))
         {
             ShowValidation("اكتب رقم العهدة أولًا.");
-            return;
-        }
-
-        if (string.IsNullOrWhiteSpace(CustodianNameTextBox.Text))
-        {
-            ShowValidation("اكتب اسم المستلم أولًا.");
-            return;
-        }
-
-        if (!decimal.TryParse(ConditionRatingTextBox.Text.Trim(), NumberStyles.Number, CultureInfo.InvariantCulture, out var rating))
-        {
-            ShowValidation("تقييم الحالة يجب أن يكون رقمًا صحيحًا مثل 5.");
-            return;
-        }
-
-        if (rating is < 1 or > 10)
-        {
-            ShowValidation("تقييم الحالة يجب أن يكون من 1 إلى 10.");
             return;
         }
 
@@ -102,21 +79,20 @@ public partial class CustodyEntryWindow : Window
             return;
         }
 
-        decimal amount = 0;
-        if (!string.IsNullOrWhiteSpace(AmountTextBox.Text))
-            decimal.TryParse(AmountTextBox.Text.Trim(), NumberStyles.Number, CultureInfo.InvariantCulture, out amount);
+        if (!decimal.TryParse(AmountTextBox.Text.Trim(), NumberStyles.Number, CultureInfo.InvariantCulture, out var amount) || amount < 0)
+        {
+            ShowValidation("مبلغ العهدة يجب أن يكون رقمًا صحيحًا وغير سالب.");
+            return;
+        }
 
         CustodyForm = new CustodyFormDto
         {
             Id = _source?.Id ?? 0,
-            VehicleId = vehicle.Id,
+            UserId = user.Id,
             CustodyNumber = CustodyNumberTextBox.Text.Trim(),
-            CustodianName = CustodianNameTextBox.Text.Trim(),
-            CustodianPosition = CustodianPositionTextBox.Text.Trim(),
             HandoverDate = handoverDate,
             ReturnDate = returnDate,
             Status = (StatusComboBox.SelectedItem as ComboBoxItem)?.Tag?.ToString() ?? "Active",
-            VehicleConditionRating = rating,
             Amount = amount,
             Notes = NotesTextBox.Text.Trim()
         };
@@ -141,16 +117,13 @@ public partial class CustodyEntryWindow : Window
 
     private void CancelButton_Click(object sender, RoutedEventArgs e) => DialogResult = false;
 
-    private void UpdateVehicleSummary()
+    private void UpdateUserSummary()
     {
-        var vehicle = VehicleComboBox.SelectedItem as VehicleDto;
-        VehiclePlateTextBlock.Text = vehicle?.PlateNumber ?? "اختر سيارة";
-        VehicleTypeTextBlock.Text = string.IsNullOrWhiteSpace(vehicle?.VehicleType) ? "-" : vehicle.VehicleType;
-        VehicleModelTextBlock.Text = string.IsNullOrWhiteSpace(vehicle?.Model) ? "-" : vehicle.Model;
-        VehicleYearTextBlock.Text = vehicle is null || vehicle.Year <= 0 ? "-" : vehicle.Year.ToString(CultureInfo.InvariantCulture);
-        VehicleChassisTextBlock.Text = string.IsNullOrWhiteSpace(vehicle?.ChassisNumber) ? "-" : vehicle.ChassisNumber;
-        VehicleEngineTextBlock.Text = string.IsNullOrWhiteSpace(vehicle?.EngineNumber) ? "-" : vehicle.EngineNumber;
-        VehicleStatusTextBlock.Text = string.IsNullOrWhiteSpace(vehicle?.Status) ? "-" : vehicle.Status;
+        var user = UserComboBox.SelectedItem as UserFormDto;
+        UserFullNameTextBlock.Text = user is null ? "اختر مستخدمًا" : user.FullName;
+        UsernameTextBlock.Text = string.IsNullOrWhiteSpace(user?.Username) ? "-" : user.Username;
+        UserRoleTextBlock.Text = string.IsNullOrWhiteSpace(user?.Role) ? "-" : user.Role;
+        UserStatusTextBlock.Text = user is null ? "-" : (user.IsActive ? "مفعل" : "غير مفعل");
     }
 
     private void ShowValidation(string message)

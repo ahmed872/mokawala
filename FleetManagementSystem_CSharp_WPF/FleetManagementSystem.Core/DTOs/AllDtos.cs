@@ -850,6 +850,7 @@ namespace FleetManagementSystem.Core.DTOs
     {
         public int Id { get; set; }
         public string VehiclePlateNumber { get; set; } = string.Empty;
+        public string CustodyNumber { get; set; } = string.Empty;
         public DateTime ExpenseDate { get; set; }
         public string Category { get; set; } = string.Empty;
         public decimal Amount { get; set; }
@@ -863,8 +864,11 @@ namespace FleetManagementSystem.Core.DTOs
     public class ExpenseDto
     {
         public int Id { get; set; }
-        public int VehicleId { get; set; }
+        public int? VehicleId { get; set; }
         public string VehiclePlateNumber { get; set; } = string.Empty;
+        public int? CustodyId { get; set; }
+        public string CustodyNumber { get; set; } = string.Empty;
+        public string CustodyUserFullName { get; set; } = string.Empty;
         public DateTime ExpenseDate { get; set; }
         public string Category { get; set; } = string.Empty;
         public decimal Amount { get; set; }
@@ -883,7 +887,8 @@ namespace FleetManagementSystem.Core.DTOs
     public class ExpenseFormDto
     {
         public int Id { get; set; }
-        public int VehicleId { get; set; }
+        public int? VehicleId { get; set; }
+        public int? CustodyId { get; set; }
         public DateTime ExpenseDate { get; set; }
         public string Category { get; set; } = string.Empty;
         public decimal Amount { get; set; }
@@ -1114,8 +1119,11 @@ namespace FleetManagementSystem.Core.DTOs
     {
         public int Id { get; set; }
         public string CustodyNumber { get; set; } = string.Empty;
-        public string VehiclePlateNumber { get; set; } = string.Empty;
-        public string CustodianName { get; set; } = string.Empty;
+        public string UserFullName { get; set; } = string.Empty;
+        public decimal Amount { get; set; }
+        public decimal SpentAmount { get; set; }
+        public decimal ReturnedAmount { get; set; }
+        public decimal RemainingAmount { get; set; }
         public DateTime HandoverDate { get; set; }
         public DateTime? ReturnDate { get; set; }
         public string Status { get; set; } = string.Empty;
@@ -1127,19 +1135,18 @@ namespace FleetManagementSystem.Core.DTOs
     public class CustodyDto
     {
         public int Id { get; set; }
-        public int VehicleId { get; set; }
-        public string VehiclePlateNumber { get; set; } = string.Empty;
+        public int UserId { get; set; }
+        public string UserFullName { get; set; } = string.Empty;
         public string CustodyNumber { get; set; } = string.Empty;
-        public string CustodianName { get; set; } = string.Empty;
-        public string CustodianPosition { get; set; } = string.Empty;
         public DateTime HandoverDate { get; set; }
         public DateTime? ReturnDate { get; set; }
         public string Status { get; set; } = string.Empty;
-        public decimal VehicleConditionRating { get; set; }
         public decimal Amount { get; set; }
+        public decimal SpentAmount { get; set; }
+        public decimal ReturnedAmount { get; set; }
+        public decimal RemainingAmount { get; set; }
         public string Notes { get; set; } = string.Empty;
         public string DocumentUrl { get; set; } = string.Empty;
-        public List<CustodyItemDto> Items { get; set; } = new List<CustodyItemDto>();
     }
 
     /// <summary>
@@ -1148,33 +1155,37 @@ namespace FleetManagementSystem.Core.DTOs
     public class CustodyFormDto
     {
         public int Id { get; set; }
-        public int VehicleId { get; set; }
+        public int UserId { get; set; }
         public string CustodyNumber { get; set; } = string.Empty;
-        public string CustodianName { get; set; } = string.Empty;
-        public string CustodianPosition { get; set; } = string.Empty;
         public DateTime HandoverDate { get; set; }
         public DateTime? ReturnDate { get; set; }
         public string Status { get; set; } = "Active";
-        public decimal VehicleConditionRating { get; set; } = 5;
         public decimal Amount { get; set; } = 0;
         public string Notes { get; set; } = string.Empty;
         public string DocumentUrl { get; set; } = string.Empty;
     }
 
     /// <summary>
-    /// Custody item DTO.
+    /// Request to return part or all of an outstanding custody balance back to the treasury.
     /// </summary>
-    public class CustodyItemDto
+    public class CustodyReturnDto
     {
-        public int Id { get; set; }
         public int CustodyId { get; set; }
-        public string ItemName { get; set; } = string.Empty;
-        public string ItemDescription { get; set; } = string.Empty;
-        public int Quantity { get; set; }
-        public string SerialNumber { get; set; } = string.Empty;
-        public bool IsReturned { get; set; }
-        public DateTime? ReturnDate { get; set; }
-        public string Condition { get; set; } = "Good";
+        public decimal Amount { get; set; }
+        public string Notes { get; set; } = string.Empty;
+    }
+
+    /// <summary>
+    /// Summary of a single user's custody activity (taken / spent / returned / remaining).
+    /// </summary>
+    public class UserCustodySummaryDto
+    {
+        public int UserId { get; set; }
+        public decimal TotalTaken { get; set; }
+        public decimal TotalSpent { get; set; }
+        public decimal TotalReturned { get; set; }
+        public decimal TotalRemaining { get; set; }
+        public List<CustodyDto> Custodies { get; set; } = new List<CustodyDto>();
     }
 
     // ========================================================================

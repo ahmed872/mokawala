@@ -676,13 +676,18 @@ public class OperationalScenarioTests
                 var custody = await CreateCustodyAsync(h, n);
                 Assert.True(custody.Id > 0);
             }),
-            new("Custody links employee by custodian name", async (h, n) =>
+            new("Custody links to the assigned user", async (h, n) =>
             {
-                var employee = await CreateEmployeeAsync(h, n);
-                var vehicle = await CreateVehicleAsync(h, n);
-                var custody = await h.CustodyService.SaveAsync(NewCustodyForm(n, vehicle.Id, employee.FullName));
+                var user = await CreateCustodyUserAsync(h, n);
+                var custody = await h.CustodyService.SaveAsync(NewCustodyForm(n, user.Id));
                 var entity = await h.Context.Custodies.FirstAsync(x => x.Id == custody.Id);
-                Assert.Equal(employee.Id, entity.EmployeeId);
+                Assert.Equal(user.Id, entity.UserId);
+            }),
+            new("Custody grant posts a treasury outflow", async (h, n) =>
+            {
+                var before = await h.TreasuryService.GetCurrentBalanceAsync();
+                await CreateCustodyAsync(h, n, amount: 500);
+                Assert.Equal(before - 500, await h.TreasuryService.GetCurrentBalanceAsync());
             }),
             new("Custody delete removes record", async (h, n) =>
             {
@@ -690,12 +695,44 @@ public class OperationalScenarioTests
                 await h.CustodyService.DeleteAsync(custody.Id);
                 Assert.Null(await h.CustodyService.GetByIdAsync(custody.Id));
             }),
-            new("Custody blocks linked employee delete", async (h, n) =>
+            new("Custody blocks delete when linked expenses exist", async (h, n) =>
             {
-                var employee = await CreateEmployeeAsync(h, n);
-                var vehicle = await CreateVehicleAsync(h, n);
-                await h.CustodyService.SaveAsync(NewCustodyForm(n, vehicle.Id, employee.FullName));
-                await AssertInvalidOperationAsync(() => h.EmployeeService.DeleteAsync(employee.Id), "ارتباطه");
+                var custody = await CreateCustodyAsync(h, n);
+                await h.ExpenseService.SaveAsync(new ExpenseFormDto { CustodyId = custody.Id, Amount = 100, ExpenseDate = DateTime.Today, Category = "أخرى" });
+                await AssertInvalidOperationAsync(() => h.CustodyService.DeleteAsync(custody.Id), "لا يمكن حذف عهدة");
+            }),
+            new("Expense from custody reduces remaining balance", async (h, n) =>
+            {
+                var custody = await CreateCustodyAsync(h, n, amount: 1000);
+                await h.ExpenseService.SaveAsync(new ExpenseFormDto { CustodyId = custody.Id, Amount = 300, ExpenseDate = DateTime.Today, Category = "أخرى" });
+                var updated = await h.CustodyService.GetByIdAsync(custody.Id);
+                Assert.Equal(300, updated!.SpentAmount);
+                Assert.Equal(700, updated.RemainingAmount);
+            }),
+            new("Expense cannot exceed custody remaining balance", async (h, n) =>
+            {
+                var custody = await CreateCustodyAsync(h, n, amount: 200);
+                await AssertInvalidOperationAsync(
+                    () => h.ExpenseService.SaveAsync(new ExpenseFormDto { CustodyId = custody.Id, Amount = 300, ExpenseDate = DateTime.Today, Category = "أخرى" }),
+                    "أكبر من المتبقي");
+            }),
+            new("Custody closes automatically once fully spent", async (h, n) =>
+            {
+                var custody = await CreateCustodyAsync(h, n, amount: 400);
+                await h.ExpenseService.SaveAsync(new ExpenseFormDto { CustodyId = custody.Id, Amount = 400, ExpenseDate = DateTime.Today, Category = "أخرى" });
+                var updated = await h.CustodyService.GetByIdAsync(custody.Id);
+                Assert.Equal(0, updated!.RemainingAmount);
+                Assert.Equal("مغلق", updated.Status);
+            }),
+            new("Returning custody funds posts a treasury inflow and updates balance", async (h, n) =>
+            {
+                var custody = await CreateCustodyAsync(h, n, amount: 1000);
+                var beforeReturn = await h.TreasuryService.GetCurrentBalanceAsync();
+                await h.CustodyService.ReturnFundsAsync(new CustodyReturnDto { CustodyId = custody.Id, Amount = 600 });
+                var updated = await h.CustodyService.GetByIdAsync(custody.Id);
+                Assert.Equal(600, updated!.ReturnedAmount);
+                Assert.Equal(400, updated.RemainingAmount);
+                Assert.Equal(beforeReturn + 600, await h.TreasuryService.GetCurrentBalanceAsync());
             }),
             new("Treasury income increases balance", async (h, n) =>
             {
@@ -975,23 +1012,27 @@ public class OperationalScenarioTests
         return await h.LicenseService.SaveAsync(NewLicenseForm(scenario, driver.Id, expiry: expiry));
     }
 
-    private static CustodyFormDto NewCustodyForm(int scenario, int vehicleId, string custodianName = "مستلم عهدة") =>
+    private static CustodyFormDto NewCustodyForm(int scenario, int userId, decimal amount = 1000) =>
         new()
         {
-            VehicleId = vehicleId,
+            UserId = userId,
             CustodyNumber = $"CUS-{scenario:000}",
-            CustodianName = custodianName,
-            CustodianPosition = "مشرف",
             HandoverDate = DateTime.Today,
             Status = "Active",
-            VehicleConditionRating = 5,
+            Amount = amount,
             Notes = "عهدة اختبار"
         };
 
-    private static async Task<CustodyDto> CreateCustodyAsync(ScenarioHarness h, int scenario)
+    private static async Task<UserDto> CreateCustodyUserAsync(ScenarioHarness h, int scenario)
     {
-        var vehicle = await CreateVehicleAsync(h, scenario);
-        return await h.CustodyService.SaveAsync(NewCustodyForm(scenario, vehicle.Id));
+        var saved = await h.AuthenticationService.SaveUserAsync(NewUser($"custodian{scenario}", "Strong@123"));
+        return saved;
+    }
+
+    private static async Task<CustodyDto> CreateCustodyAsync(ScenarioHarness h, int scenario, decimal amount = 1000)
+    {
+        var user = await CreateCustodyUserAsync(h, scenario);
+        return await h.CustodyService.SaveAsync(NewCustodyForm(scenario, user.Id, amount));
     }
 
     private static UserFormDto NewUser(string username, string password) =>

@@ -444,6 +444,9 @@ internal static class ServiceHelpers
             Id = entity.Id,
             VehicleId = entity.VehicleId,
             VehiclePlateNumber = entity.Vehicle?.PlateNumber ?? string.Empty,
+            CustodyId = entity.CustodyId,
+            CustodyNumber = entity.Custody?.CustodyNumber ?? string.Empty,
+            CustodyUserFullName = entity.Custody?.User?.FullName ?? string.Empty,
             ExpenseDate = entity.ExpenseDate,
             Category = entity.Category,
             Amount = entity.Amount,
@@ -560,23 +563,26 @@ internal static class ServiceHelpers
             Notes = entity.Notes
         };
 
-    public static CustodyDto ToDto(this Custody entity) =>
-        new()
+    public static CustodyDto ToDto(this Custody entity)
+    {
+        var spent = entity.Expenses?.Sum(e => e.Amount) ?? 0m;
+        return new CustodyDto
         {
             Id = entity.Id,
-            VehicleId = entity.VehicleId,
-            VehiclePlateNumber = entity.Vehicle?.PlateNumber ?? string.Empty,
+            UserId = entity.UserId,
+            UserFullName = entity.User?.FullName ?? string.Empty,
             CustodyNumber = entity.CustodyNumber,
-            CustodianName = entity.CustodianName,
-            CustodianPosition = entity.CustodianPosition,
             HandoverDate = entity.HandoverDate,
             ReturnDate = entity.ReturnDate,
             Status = StatusDisplay(entity.Status),
-            VehicleConditionRating = entity.VehicleConditionRating,
+            Amount = entity.Amount,
+            SpentAmount = spent,
+            ReturnedAmount = entity.ReturnedAmount,
+            RemainingAmount = entity.Amount - spent - entity.ReturnedAmount,
             Notes = entity.Notes,
-            DocumentUrl = entity.DocumentUrl,
-            Items = new List<CustodyItemDto>()
+            DocumentUrl = entity.DocumentUrl
         };
+    }
 
     public static VehicleTypeDto ToDto(this VehicleType entity) =>
         new()
