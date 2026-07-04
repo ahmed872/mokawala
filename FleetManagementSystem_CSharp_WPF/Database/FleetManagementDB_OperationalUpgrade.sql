@@ -62,3 +62,16 @@ ALTER TABLE `FuelTransactions`
 ALTER TABLE `Expenses`
     ADD CONSTRAINT `fk_expense_treasury`
         FOREIGN KEY (`TreasuryTransactionId`) REFERENCES `TreasuryTransactions` (`Id`) ON DELETE SET NULL;
+
+-- Custody is now held by a User (not a Vehicle): who took the money, how much,
+-- how much they've spent from it, and how much has been returned to the treasury.
+ALTER TABLE `Custody`
+    ADD COLUMN IF NOT EXISTS `UserId` INT NOT NULL DEFAULT 0,
+    ADD COLUMN IF NOT EXISTS `Amount` DECIMAL(18,2) NOT NULL DEFAULT 0,
+    ADD COLUMN IF NOT EXISTS `ReturnedAmount` DECIMAL(18,2) NOT NULL DEFAULT 0;
+
+-- Expenses can now be drawn from a custody instead of (or in addition to being
+-- unrelated to) a specific vehicle.
+ALTER TABLE `Expenses`
+    MODIFY COLUMN `VehicleId` INT NULL,
+    ADD COLUMN IF NOT EXISTS `CustodyId` INT NULL;

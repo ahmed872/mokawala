@@ -486,5 +486,7 @@ $RECYCLE.BIN/
 # Vim temporary swap files
 *.swp
 
-# Ignore local database file
-FleetManagementSystem_CSharp_WPF/FleetManagementSystem.WPF/fleet-management.dev.db
+# Local SQLite/dev database files (never commit real or sample data)
+*.db
+*.db-shm
+*.db-wal

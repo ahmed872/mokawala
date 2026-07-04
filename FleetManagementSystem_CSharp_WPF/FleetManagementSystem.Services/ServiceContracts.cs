@@ -127,7 +127,10 @@ public interface ICustodyService
 {
     Task<List<CustodyDto>> GetAllAsync();
     Task<CustodyDto?> GetByIdAsync(int id);
+    Task<List<CustodyDto>> GetByUserIdAsync(int userId);
+    Task<UserCustodySummaryDto> GetUserSummaryAsync(int userId);
     Task<CustodyDto> SaveAsync(CustodyFormDto dto);
+    Task<CustodyDto> ReturnFundsAsync(CustodyReturnDto dto);
     Task DeleteAsync(int id);
 }
 

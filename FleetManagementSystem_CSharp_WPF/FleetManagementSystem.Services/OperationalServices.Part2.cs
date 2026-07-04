@@ -183,6 +183,7 @@ public sealed class ExpenseService(FleetDbContext context, IAuditService auditSe
     {
         var items = await _context.Expenses
             .Include(e => e.Vehicle)
+            .Include(e => e.Custody).ThenInclude(c => c!.User)
             .OrderByDescending(e => e.ExpenseDate)
             .ToListAsync();
 
@@ -193,6 +194,7 @@ public sealed class ExpenseService(FleetDbContext context, IAuditService auditSe
     {
         var entity = await _context.Expenses
             .Include(e => e.Vehicle)
+            .Include(e => e.Custody).ThenInclude(c => c!.User)
             .FirstOrDefaultAsync(e => e.Id == id);
 
         return entity?.ToDto();
@@ -200,7 +202,7 @@ public sealed class ExpenseService(FleetDbContext context, IAuditService auditSe
 
     public async Task<ExpenseDto> SaveAsync(ExpenseFormDto dto)
     {
-        if (!await _context.Vehicles.AnyAsync(v => v.Id == dto.VehicleId))
+        if (dto.VehicleId.HasValue && !await _context.Vehicles.AnyAsync(v => v.Id == dto.VehicleId.Value))
         {
             throw new InvalidOperationException("المركبة غير موجودة.");
         }
@@ -210,8 +212,30 @@ public sealed class ExpenseService(FleetDbContext context, IAuditService auditSe
             throw new InvalidOperationException("قيمة المصروف لا يمكن أن تكون سالبة.");
         }
 
+        Custody? custody = null;
+        if (dto.CustodyId.HasValue)
+        {
+            custody = await _context.Custodies
+                .Include(c => c.Expenses)
+                .FirstOrDefaultAsync(c => c.Id == dto.CustodyId.Value)
+                ?? throw new InvalidOperationException("العهدة غير موجودة.");
+
+            if (custody.Status != "Active")
+            {
+                throw new InvalidOperationException("لا يمكن الصرف من عهدة مغلقة.");
+            }
+
+            var spentExcludingThis = custody.Expenses.Where(e => e.Id != dto.Id).Sum(e => e.Amount);
+            var remaining = custody.Amount - spentExcludingThis - custody.ReturnedAmount;
+            if (dto.Amount > remaining)
+            {
+                throw new InvalidOperationException($"المبلغ أكبر من المتبقي في العهدة ({remaining:0.##}).");
+            }
+        }
+
         Expense entity;
         var action = dto.Id == 0 ? "Create" : "Update";
+        int? previousCustodyId = null;
         if (dto.Id == 0)
         {
             entity = new Expense { CreatedAt = DateTime.UtcNow };
@@ -221,16 +245,20 @@ public sealed class ExpenseService(FleetDbContext context, IAuditService auditSe
         {
             entity = await _context.Expenses.FirstOrDefaultAsync(e => e.Id == dto.Id)
                 ?? throw new InvalidOperationException("المصروف غير موجود.");
+            previousCustodyId = entity.CustodyId;
         }
 
         entity.VehicleId = dto.VehicleId;
+        entity.CustodyId = dto.CustodyId;
         entity.ExpenseDate = ServiceHelpers.OrToday(dto.ExpenseDate);
         entity.Category = ServiceHelpers.Clean(dto.Category);
         entity.Amount = dto.Amount;
         entity.Description = ServiceHelpers.Clean(dto.Description);
         entity.Vendor = ServiceHelpers.Clean(dto.Vendor);
         entity.ReceiptUrl = ServiceHelpers.Clean(dto.ReceiptUrl);
-        entity.PaidFromTreasury = dto.PaidFromTreasury;
+        // Money spent from a custody already left the treasury when the custody was granted,
+        // so it must never also post a separate treasury transaction (would double-count).
+        entity.PaidFromTreasury = !dto.CustodyId.HasValue && dto.PaidFromTreasury;
         entity.Status = string.IsNullOrWhiteSpace(dto.Status) ? "Pending" : dto.Status;
         entity.Notes = ServiceHelpers.Clean(dto.Notes);
         entity.UpdatedAt = DateTime.UtcNow;
@@ -256,7 +284,9 @@ public sealed class ExpenseService(FleetDbContext context, IAuditService auditSe
             treasury.TransactionDate = entity.ExpenseDate;
             treasury.TransactionType = "صرف";
             treasury.Amount = entity.Amount;
-            treasury.Description = $"مصروف {entity.Category} للمركبة #{entity.VehicleId}";
+            treasury.Description = entity.VehicleId.HasValue
+                ? $"مصروف {entity.Category} للمركبة #{entity.VehicleId}"
+                : $"مصروف {entity.Category}";
             treasury.RelatedEntityType = "Expense";
             treasury.RelatedEntityId = entity.Id;
             treasury.PaymentMethod = "نقدي";
@@ -279,6 +309,12 @@ public sealed class ExpenseService(FleetDbContext context, IAuditService auditSe
             await _context.SaveChangesAsync();
         }
 
+        await ReconcileCustodyStatusAsync(entity.CustodyId);
+        if (previousCustodyId.HasValue && previousCustodyId != entity.CustodyId)
+        {
+            await ReconcileCustodyStatusAsync(previousCustodyId);
+        }
+
         await _auditService.LogActionAsync(action, "Expense", entity.Id, null, entity.Amount.ToString("0.##"));
         return (await GetByIdAsync(entity.Id))!;
     }
@@ -297,9 +333,44 @@ public sealed class ExpenseService(FleetDbContext context, IAuditService auditSe
             }
         }
 
+        var custodyId = entity.CustodyId;
         _context.Expenses.Remove(entity);
         await _context.SaveChangesAsync();
+
+        await ReconcileCustodyStatusAsync(custodyId);
+
         await _auditService.LogActionAsync("Delete", "Expense", entity.Id, entity.Amount.ToString("0.##"), null);
+    }
+
+    // Closes a custody once its remaining balance reaches zero, and reopens it if a later edit/delete brings the balance back above zero.
+    private async Task ReconcileCustodyStatusAsync(int? custodyId)
+    {
+        if (!custodyId.HasValue)
+        {
+            return;
+        }
+
+        var custody = await _context.Custodies.Include(c => c.Expenses).FirstOrDefaultAsync(c => c.Id == custodyId.Value);
+        if (custody is null)
+        {
+            return;
+        }
+
+        var remaining = custody.Amount - custody.Expenses.Sum(e => e.Amount) - custody.ReturnedAmount;
+        if (remaining <= 0 && custody.Status == "Active")
+        {
+            custody.Status = "Closed";
+            custody.ReturnDate = DateTime.UtcNow;
+            custody.UpdatedAt = DateTime.UtcNow;
+            await _context.SaveChangesAsync();
+        }
+        else if (remaining > 0 && custody.Status != "Active")
+        {
+            custody.Status = "Active";
+            custody.ReturnDate = null;
+            custody.UpdatedAt = DateTime.UtcNow;
+            await _context.SaveChangesAsync();
+        }
     }
 }
 
@@ -763,8 +834,8 @@ public sealed class CustodyService(FleetDbContext context, IAuditService auditSe
     public async Task<List<CustodyDto>> GetAllAsync()
     {
         var items = await _context.Custodies
-            .Include(c => c.Vehicle)
-            .Include(c => c.Employee)
+            .Include(c => c.User)
+            .Include(c => c.Expenses)
             .OrderByDescending(c => c.HandoverDate)
             .ToListAsync();
 
@@ -774,18 +845,52 @@ public sealed class CustodyService(FleetDbContext context, IAuditService auditSe
     public async Task<CustodyDto?> GetByIdAsync(int id)
     {
         var entity = await _context.Custodies
-            .Include(c => c.Vehicle)
-            .Include(c => c.Employee)
+            .Include(c => c.User)
+            .Include(c => c.Expenses)
             .FirstOrDefaultAsync(c => c.Id == id);
 
         return entity?.ToDto();
     }
 
+    public async Task<List<CustodyDto>> GetByUserIdAsync(int userId)
+    {
+        var items = await _context.Custodies
+            .Include(c => c.User)
+            .Include(c => c.Expenses)
+            .Where(c => c.UserId == userId)
+            .OrderByDescending(c => c.HandoverDate)
+            .ToListAsync();
+
+        return items.Select(c => c.ToDto()).ToList();
+    }
+
+    public async Task<UserCustodySummaryDto> GetUserSummaryAsync(int userId)
+    {
+        var custodies = await GetByUserIdAsync(userId);
+        return new UserCustodySummaryDto
+        {
+            UserId = userId,
+            TotalTaken = custodies.Sum(c => c.Amount),
+            TotalSpent = custodies.Sum(c => c.SpentAmount),
+            TotalReturned = custodies.Sum(c => c.ReturnedAmount),
+            TotalRemaining = custodies.Sum(c => c.RemainingAmount),
+            Custodies = custodies
+        };
+    }
+
     public async Task<CustodyDto> SaveAsync(CustodyFormDto dto)
     {
-        if (!await _context.Vehicles.AnyAsync(v => v.Id == dto.VehicleId))
+        var user = await _context.Users.FirstOrDefaultAsync(u => u.Id == dto.UserId)
+            ?? throw new InvalidOperationException("المستخدم غير موجود.");
+
+        if (!user.IsActive)
         {
-            throw new InvalidOperationException("المركبة غير موجودة.");
+            throw new InvalidOperationException("لا يمكن إسناد عهدة لمستخدم غير مفعل.");
+        }
+
+        if (dto.Amount < 0)
+        {
+            throw new InvalidOperationException("قيمة العهدة لا يمكن أن تكون سالبة.");
         }
 
         Custody entity;
@@ -801,31 +906,103 @@ public sealed class CustodyService(FleetDbContext context, IAuditService auditSe
                 ?? throw new InvalidOperationException("العهدة غير موجودة.");
         }
 
-        entity.VehicleId = dto.VehicleId;
+        entity.UserId = dto.UserId;
         entity.CustodyNumber = ServiceHelpers.Clean(dto.CustodyNumber);
-        entity.CustodianName = ServiceHelpers.Clean(dto.CustodianName);
-        entity.CustodianPosition = ServiceHelpers.Clean(dto.CustodianPosition);
         entity.HandoverDate = ServiceHelpers.OrToday(dto.HandoverDate);
         entity.ReturnDate = ServiceHelpers.OrNull(dto.ReturnDate);
         entity.Status = string.IsNullOrWhiteSpace(dto.Status) ? "Active" : dto.Status;
-        entity.VehicleConditionRating = dto.VehicleConditionRating <= 0 ? 5 : dto.VehicleConditionRating;
+        entity.Amount = dto.Amount;
         entity.Notes = ServiceHelpers.Clean(dto.Notes);
         entity.DocumentUrl = ServiceHelpers.Clean(dto.DocumentUrl);
         entity.UpdatedAt = DateTime.UtcNow;
 
-        var employee = await _context.Employees
-            .FirstOrDefaultAsync(e => e.FullName == entity.CustodianName || e.EmployeeId == entity.CustodianName);
-        entity.EmployeeId = employee?.Id;
+        await _context.SaveChangesAsync();
+
+        if (action == "Create" && entity.Amount > 0)
+        {
+            _context.TreasuryTransactions.Add(new TreasuryTransaction
+            {
+                TransactionDate = entity.HandoverDate,
+                TransactionType = "صرف",
+                Amount = entity.Amount,
+                Description = $"صرف عهدة {entity.CustodyNumber} إلى {user.FullName}",
+                RelatedEntityType = "Custody",
+                RelatedEntityId = entity.Id,
+                PaymentMethod = "نقدي",
+                CreatedAt = DateTime.UtcNow,
+                UpdatedAt = DateTime.UtcNow
+            });
+
+            await _context.SaveChangesAsync();
+        }
+
+        await _auditService.LogActionAsync(action, "Custody", entity.Id, null, entity.CustodyNumber);
+        return (await GetByIdAsync(entity.Id))!;
+    }
+
+    public async Task<CustodyDto> ReturnFundsAsync(CustodyReturnDto dto)
+    {
+        if (dto.Amount <= 0)
+        {
+            throw new InvalidOperationException("مبلغ الإرجاع يجب أن يكون أكبر من صفر.");
+        }
+
+        var entity = await _context.Custodies
+            .Include(c => c.User)
+            .Include(c => c.Expenses)
+            .FirstOrDefaultAsync(c => c.Id == dto.CustodyId)
+            ?? throw new InvalidOperationException("العهدة غير موجودة.");
+
+        var spent = entity.Expenses.Sum(e => e.Amount);
+        var remaining = entity.Amount - spent - entity.ReturnedAmount;
+        if (dto.Amount > remaining)
+        {
+            throw new InvalidOperationException("مبلغ الإرجاع أكبر من المتبقي في العهدة.");
+        }
+
+        entity.ReturnedAmount += dto.Amount;
+        entity.UpdatedAt = DateTime.UtcNow;
+
+        if (entity.Amount - spent - entity.ReturnedAmount <= 0)
+        {
+            entity.Status = "Closed";
+            entity.ReturnDate = DateTime.UtcNow;
+        }
+
+        _context.TreasuryTransactions.Add(new TreasuryTransaction
+        {
+            TransactionDate = DateTime.Today,
+            TransactionType = "إيراد",
+            Amount = dto.Amount,
+            Description = $"إرجاع من عهدة {entity.CustodyNumber} ({entity.User?.FullName})",
+            RelatedEntityType = "Custody",
+            RelatedEntityId = entity.Id,
+            PaymentMethod = "نقدي",
+            Notes = ServiceHelpers.Clean(dto.Notes),
+            CreatedAt = DateTime.UtcNow,
+            UpdatedAt = DateTime.UtcNow
+        });
 
         await _context.SaveChangesAsync();
-        await _auditService.LogActionAsync(action, "Custody", entity.Id, null, entity.CustodyNumber);
+        await _auditService.LogActionAsync("Return", "Custody", entity.Id, null, dto.Amount.ToString("0.##"));
         return (await GetByIdAsync(entity.Id))!;
     }
 
     public async Task DeleteAsync(int id)
     {
+        var hasExpenses = await _context.Expenses.AnyAsync(e => e.CustodyId == id);
+        if (hasExpenses)
+        {
+            throw new InvalidOperationException("لا يمكن حذف عهدة مرتبطة بمصروفات مسجلة عليها.");
+        }
+
         var entity = await _context.Custodies.FirstOrDefaultAsync(c => c.Id == id)
             ?? throw new InvalidOperationException("العهدة غير موجودة.");
+
+        var linkedTreasury = await _context.TreasuryTransactions
+            .Where(t => t.RelatedEntityType == "Custody" && t.RelatedEntityId == id)
+            .ToListAsync();
+        _context.TreasuryTransactions.RemoveRange(linkedTreasury);
 
         _context.Custodies.Remove(entity);
         await _context.SaveChangesAsync();

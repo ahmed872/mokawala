@@ -20,7 +20,6 @@ namespace FleetManagementSystem.Data.Entities
         public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
 
         // Navigation properties
-        public ICollection<Custody> CustodyRecords { get; set; } = new List<Custody>();
         public ICollection<Trip> RequesterTrips { get; set; } = new List<Trip>();
         public ICollection<Trip> SupervisorTrips { get; set; } = new List<Trip>();
     }

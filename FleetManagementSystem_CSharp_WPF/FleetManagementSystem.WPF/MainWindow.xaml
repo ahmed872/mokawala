@@ -1160,6 +1160,35 @@
                                                 Visibility="Collapsed">
                                             إضافة مشرف
                                         </Button>
+                                        <Border x:Name="MyCustodyBorder"
+                                                Background="#F0FFF4"
+                                                BorderBrush="#C5DBC8"
+                                                BorderThickness="1"
+                                                CornerRadius="12"
+                                                Padding="14"
+                                                Margin="0,18,0,0"
+                                                Visibility="Collapsed">
+                                            <StackPanel>
+                                                <TextBlock Text="عهدتي"
+                                                           FontSize="13"
+                                                           FontWeight="Bold"
+                                                           Foreground="{StaticResource MutedBrush}"
+                                                           HorizontalAlignment="Center"/>
+                                                <TextBlock x:Name="MyCustodyRemainingTextBlock"
+                                                           FontSize="22"
+                                                           FontWeight="Bold"
+                                                           Foreground="#E65100"
+                                                           HorizontalAlignment="Center"
+                                                           Margin="0,6,0,0"/>
+                                                <TextBlock x:Name="MyCustodyDetailsTextBlock"
+                                                           FontSize="12"
+                                                           Foreground="{StaticResource MutedBrush}"
+                                                           HorizontalAlignment="Center"
+                                                           TextAlignment="Center"
+                                                           TextWrapping="Wrap"
+                                                           Margin="0,4,0,0"/>
+                                            </StackPanel>
+                                        </Border>
                                     </StackPanel>
                                 </Border>
 
@@ -5085,7 +5114,7 @@
                                   VerticalAlignment="Stretch">
                             <DataGrid.Columns>
                                 <DataGridTemplateColumn Header="إجراءات"
-                                                        Width="92"
+                                                        Width="170"
                                                         IsReadOnly="True">
                                     <DataGridTemplateColumn.CellTemplate>
                                         <DataTemplate>
@@ -5098,6 +5127,22 @@
                                                         ToolTip="تعديل العهدة"
                                                         AutomationProperties.Name="تعديل العهدة"
                                                         Click="SaveCustodyButton_Click"/>
+                                                <Button Content="إرجاع"
+                                                        Width="60"
+                                                        Height="30"
+                                                        MinWidth="0"
+                                                        Margin="2,0"
+                                                        Padding="0"
+                                                        FontSize="12"
+                                                        FontWeight="SemiBold"
+                                                        Foreground="{StaticResource AccentBrush}"
+                                                        Background="#F7FBFD"
+                                                        BorderBrush="#D3E2EA"
+                                                        BorderThickness="1"
+                                                        Cursor="Hand"
+                                                        ToolTip="إرجاع مبلغ من العهدة للخزينة"
+                                                        AutomationProperties.Name="إرجاع مبلغ من العهدة"
+                                                        Click="ReturnCustodyButton_Click"/>
                                                 <Button Style="{StaticResource GridRowDangerActionButtonStyle}"
                                                         Content="{Binding}"
                                                         ContentTemplate="{StaticResource GridDeleteActionIconTemplate}"
@@ -5110,7 +5155,7 @@
                                 </DataGridTemplateColumn>
                                 <DataGridTextColumn Binding="{Binding Id}"
                                                     IsReadOnly="True"
-                                                    Width="110">
+                                                    Width="90">
                                     <DataGridTextColumn.Header>
                                         <StackPanel Orientation="Vertical"
                                                     HorizontalAlignment="Stretch">
@@ -5120,23 +5165,6 @@
                                                        Margin="0,0,0,8"/>
                                             <TextBox x:Name="CustodyFilterId"
                                                      AutomationProperties.AutomationId="CustodyFilterId"
-                                                     HorizontalAlignment="Stretch"
-                                                     Style="{StaticResource FilterTextBoxStyle}"
-                                                     TextChanged="CustodyFilter_Changed"/>
-                                        </StackPanel>
-                                    </DataGridTextColumn.Header>
-                                </DataGridTextColumn>
-                                <DataGridTextColumn Binding="{Binding VehiclePlateNumber}"
-                                                    Width="175">
-                                    <DataGridTextColumn.Header>
-                                        <StackPanel Orientation="Vertical"
-                                                    HorizontalAlignment="Stretch">
-                                            <TextBlock Text="العربية"
-                                                       HorizontalAlignment="Center"
-                                                       FontWeight="Bold"
-                                                       Margin="0,0,0,8"/>
-                                            <TextBox x:Name="CustodyFilterPlate"
-                                                     AutomationProperties.AutomationId="CustodyFilterPlate"
                                                      HorizontalAlignment="Stretch"
                                                      Style="{StaticResource FilterTextBoxStyle}"
                                                      TextChanged="CustodyFilter_Changed"/>
@@ -5160,12 +5188,12 @@
                                         </StackPanel>
                                     </DataGridTextColumn.Header>
                                 </DataGridTextColumn>
-                                <DataGridTextColumn Binding="{Binding CustodianName}"
+                                <DataGridTextColumn Binding="{Binding UserFullName}"
                                                     Width="190">
                                     <DataGridTextColumn.Header>
                                         <StackPanel Orientation="Vertical"
                                                     HorizontalAlignment="Stretch">
-                                            <TextBlock Text="المستلم"
+                                            <TextBlock Text="المستلم (المستخدم)"
                                                        HorizontalAlignment="Center"
                                                        FontWeight="Bold"
                                                        Margin="0,0,0,8"/>
@@ -5177,21 +5205,36 @@
                                         </StackPanel>
                                     </DataGridTextColumn.Header>
                                 </DataGridTextColumn>
-                                <DataGridTextColumn Binding="{Binding CustodianPosition}"
-                                                    Width="175">
+                                <DataGridTextColumn Binding="{Binding Amount, StringFormat=0.##}"
+                                                    Width="130">
                                     <DataGridTextColumn.Header>
-                                        <StackPanel Orientation="Vertical"
-                                                    HorizontalAlignment="Stretch">
-                                            <TextBlock Text="الوظيفة"
-                                                       HorizontalAlignment="Center"
-                                                       FontWeight="Bold"
-                                                       Margin="0,0,0,8"/>
-                                            <TextBox x:Name="CustodyFilterPosition"
-                                                     AutomationProperties.AutomationId="CustodyFilterPosition"
-                                                     HorizontalAlignment="Stretch"
-                                                     Style="{StaticResource FilterTextBoxStyle}"
-                                                     TextChanged="CustodyFilter_Changed"/>
-                                        </StackPanel>
+                                        <TextBlock Text="قيمة العهدة"
+                                                   HorizontalAlignment="Center"
+                                                   FontWeight="Bold"/>
+                                    </DataGridTextColumn.Header>
+                                </DataGridTextColumn>
+                                <DataGridTextColumn Binding="{Binding SpentAmount, StringFormat=0.##}"
+                                                    Width="130">
+                                    <DataGridTextColumn.Header>
+                                        <TextBlock Text="تم صرفه"
+                                                   HorizontalAlignment="Center"
+                                                   FontWeight="Bold"/>
+                                    </DataGridTextColumn.Header>
+                                </DataGridTextColumn>
+                                <DataGridTextColumn Binding="{Binding ReturnedAmount, StringFormat=0.##}"
+                                                    Width="130">
+                                    <DataGridTextColumn.Header>
+                                        <TextBlock Text="تم إرجاعه"
+                                                   HorizontalAlignment="Center"
+                                                   FontWeight="Bold"/>
+                                    </DataGridTextColumn.Header>
+                                </DataGridTextColumn>
+                                <DataGridTextColumn Binding="{Binding RemainingAmount, StringFormat=0.##}"
+                                                    Width="130">
+                                    <DataGridTextColumn.Header>
+                                        <TextBlock Text="المتبقي"
+                                                   HorizontalAlignment="Center"
+                                                   FontWeight="Bold"/>
                                     </DataGridTextColumn.Header>
                                 </DataGridTextColumn>
                                 <DataGridTextColumn Binding="{Binding HandoverDate, StringFormat=yyyy-MM-dd}"
@@ -5239,23 +5282,6 @@
                                                        Margin="0,0,0,8"/>
                                             <TextBox x:Name="CustodyFilterStatus"
                                                      AutomationProperties.AutomationId="CustodyFilterStatus"
-                                                     HorizontalAlignment="Stretch"
-                                                     Style="{StaticResource FilterTextBoxStyle}"
-                                                     TextChanged="CustodyFilter_Changed"/>
-                                        </StackPanel>
-                                    </DataGridTextColumn.Header>
-                                </DataGridTextColumn>
-                                <DataGridTextColumn Binding="{Binding VehicleConditionRating, StringFormat=0.##}"
-                                                    Width="145">
-                                    <DataGridTextColumn.Header>
-                                        <StackPanel Orientation="Vertical"
-                                                    HorizontalAlignment="Stretch">
-                                            <TextBlock Text="تقييم الحالة"
-                                                       HorizontalAlignment="Center"
-                                                       FontWeight="Bold"
-                                                       Margin="0,0,0,8"/>
-                                            <TextBox x:Name="CustodyFilterRating"
-                                                     AutomationProperties.AutomationId="CustodyFilterRating"
                                                      HorizontalAlignment="Stretch"
                                                      Style="{StaticResource FilterTextBoxStyle}"
                                                      TextChanged="CustodyFilter_Changed"/>
@@ -5535,9 +5561,85 @@
                             <Button Style="{StaticResource DangerButtonStyle}"
                                     Click="ToggleUserStatusButton_Click">تفعيل/إيقاف</Button>
                         </WrapPanel>
+                        <Border x:Name="UserCustodySummaryBorder"
+                                DockPanel.Dock="Bottom"
+                                Background="#F0FFF4"
+                                BorderBrush="#C5DBC8"
+                                BorderThickness="1"
+                                CornerRadius="12"
+                                Padding="18,12"
+                                Margin="0,10,0,0"
+                                Visibility="Collapsed">
+                            <StackPanel>
+                                <TextBlock x:Name="UserCustodySummaryTitleTextBlock"
+                                           FontWeight="Bold"
+                                           FontSize="14"
+                                           Margin="0,0,0,8"/>
+                                <Grid FlowDirection="RightToLeft">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Grid.Column="0"
+                                                HorizontalAlignment="Center">
+                                        <TextBlock Text="إجمالي ما تم صرفه له"
+                                                   FontSize="12"
+                                                   Foreground="#607D8B"
+                                                   HorizontalAlignment="Center"/>
+                                        <TextBlock x:Name="UserCustodyTakenTextBlock"
+                                                   Text="0"
+                                                   FontSize="18"
+                                                   FontWeight="Bold"
+                                                   HorizontalAlignment="Center"/>
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="1"
+                                                HorizontalAlignment="Center">
+                                        <TextBlock Text="صرفه هو من العهدة"
+                                                   FontSize="12"
+                                                   Foreground="#607D8B"
+                                                   HorizontalAlignment="Center"/>
+                                        <TextBlock x:Name="UserCustodySpentTextBlock"
+                                                   Text="0"
+                                                   FontSize="18"
+                                                   FontWeight="Bold"
+                                                   Foreground="#E65100"
+                                                   HorizontalAlignment="Center"/>
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="2"
+                                                HorizontalAlignment="Center">
+                                        <TextBlock Text="تم إرجاعه للخزينة"
+                                                   FontSize="12"
+                                                   Foreground="#607D8B"
+                                                   HorizontalAlignment="Center"/>
+                                        <TextBlock x:Name="UserCustodyReturnedTextBlock"
+                                                   Text="0"
+                                                   FontSize="18"
+                                                   FontWeight="Bold"
+                                                   Foreground="#2E7D32"
+                                                   HorizontalAlignment="Center"/>
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="3"
+                                                HorizontalAlignment="Center">
+                                        <TextBlock Text="المتبقي معه الآن"
+                                                   FontSize="12"
+                                                   Foreground="#607D8B"
+                                                   HorizontalAlignment="Center"/>
+                                        <TextBlock x:Name="UserCustodyRemainingTextBlock"
+                                                   Text="0"
+                                                   FontSize="18"
+                                                   FontWeight="Bold"
+                                                   Foreground="{StaticResource AccentBrush}"
+                                                   HorizontalAlignment="Center"/>
+                                    </StackPanel>
+                                </Grid>
+                            </StackPanel>
+                        </Border>
                         <DataGrid x:Name="UsersGrid"
                                   AutomationProperties.AutomationId="UsersGrid"
-                                  AutoGeneratingColumn="Grid_AutoGeneratingColumn"/>
+                                  AutoGeneratingColumn="Grid_AutoGeneratingColumn"
+                                  SelectionChanged="UsersGrid_SelectionChanged"/>
                     </DockPanel>
                 </TabItem>
 

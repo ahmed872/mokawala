@@ -188,6 +188,13 @@ public sealed class DataBootstrapService(FleetDbContext context) : IDataBootstra
         await EnsureColumnAsync("Drivers", "WorkLocation", GetShortTextColumnDefinition(defaultValue: string.Empty));
         await EnsureDriverAttendanceTableAsync();
 
+        // Custody used to be tied to a Vehicle; it is now tied to the User who holds the money.
+        await EnsureColumnAsync("Custody", "UserId", GetNotNullIntColumnDefinition(defaultValue: 0));
+        await EnsureColumnAsync("Custody", "Amount", GetNotNullDecimalColumnDefinition(defaultValue: 0));
+        await EnsureColumnAsync("Custody", "ReturnedAmount", GetNotNullDecimalColumnDefinition(defaultValue: 0));
+        await EnsureColumnAsync("Expenses", "CustodyId", GetNullableIntColumnDefinition());
+        await EnsureExpenseVehicleIdIsNullableAsync();
+
         if (await HasColumnAsync("Vehicles", "RegistrationType"))
         {
             await _context.Database.ExecuteSqlRawAsync(
@@ -422,6 +429,26 @@ public sealed class DataBootstrapService(FleetDbContext context) : IDataBootstra
     private string GetRegistrationTypeColumnDefinition() =>
         _context.Database.IsSqlite() ? "TEXT NOT NULL DEFAULT 'ترخيص'" : "VARCHAR(30) NOT NULL DEFAULT 'ترخيص'";
 
+    private string GetNotNullIntColumnDefinition(int defaultValue) =>
+        _context.Database.IsSqlite() ? $"INTEGER NOT NULL DEFAULT {defaultValue}" : $"INT NOT NULL DEFAULT {defaultValue}";
+
+    private string GetNotNullDecimalColumnDefinition(decimal defaultValue) =>
+        _context.Database.IsSqlite() ? $"TEXT NOT NULL DEFAULT '{defaultValue}'" : $"DECIMAL(18,2) NOT NULL DEFAULT {defaultValue}";
+
+    private async Task EnsureExpenseVehicleIdIsNullableAsync()
+    {
+        // Only MySQL needs an explicit column-nullability migration; SQLite databases here are
+        // dev/local files that get created fresh (via EnsureCreated) with the correct schema already.
+        if (!_context.Database.IsMySql())
+        {
+            return;
+        }
+
+#pragma warning disable EF1002
+        await _context.Database.ExecuteSqlRawAsync("ALTER TABLE Expenses MODIFY COLUMN VehicleId INT NULL");
+#pragma warning restore EF1002
+    }
+
     private async Task SeedDemoOperationsAsync()
     {
         if (!await _context.Vehicles.AnyAsync())
@@ -610,6 +637,10 @@ public sealed class DataBootstrapService(FleetDbContext context) : IDataBootstra
             .OrderBy(e => e.Id)
             .Take(4)
             .ToListAsync();
+        var seededUsers = await _context.Users
+            .OrderBy(u => u.Id)
+            .Take(4)
+            .ToListAsync();
 
         if (!await _context.Insurances.AnyAsync() && seededVehicles.Count > 0)
         {
@@ -651,32 +682,27 @@ public sealed class DataBootstrapService(FleetDbContext context) : IDataBootstra
             _context.Insurances.AddRange(policies);
         }
 
-        if (!await _context.Custodies.AnyAsync() && seededVehicles.Count > 0 && seededEmployees.Count > 0)
+        if (!await _context.Custodies.AnyAsync() && seededUsers.Count > 0)
         {
             _context.Custodies.AddRange(
                 new Custody
                 {
-                    VehicleId = seededVehicles[0].Id,
-                    EmployeeId = seededEmployees[0].Id,
+                    UserId = seededUsers[0].Id,
                     CustodyNumber = "CU-DEMO-001",
-                    CustodianName = seededEmployees[0].FullName,
-                    CustodianPosition = seededEmployees[0].Position,
+                    Amount = 2000,
                     HandoverDate = DateTime.Today.AddDays(-14),
                     Status = "Active",
-                    VehicleConditionRating = 8,
                     Notes = "عهدة تشغيل يومية"
                 },
                 new Custody
                 {
-                    VehicleId = seededVehicles[Math.Min(1, seededVehicles.Count - 1)].Id,
-                    EmployeeId = seededEmployees[Math.Min(1, seededEmployees.Count - 1)].Id,
+                    UserId = seededUsers[Math.Min(1, seededUsers.Count - 1)].Id,
                     CustodyNumber = "CU-DEMO-002",
-                    CustodianName = seededEmployees[Math.Min(1, seededEmployees.Count - 1)].FullName,
-                    CustodianPosition = seededEmployees[Math.Min(1, seededEmployees.Count - 1)].Position,
+                    Amount = 1500,
+                    ReturnedAmount = 1500,
                     HandoverDate = DateTime.Today.AddDays(-30),
                     ReturnDate = DateTime.Today.AddDays(-3),
-                    Status = "Returned",
-                    VehicleConditionRating = 7,
+                    Status = "Closed",
                     Notes = "عهدة مرتجعة بعد مأمورية"
                 });
         }
