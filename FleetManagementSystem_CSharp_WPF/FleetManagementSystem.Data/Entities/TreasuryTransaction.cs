@@ -19,5 +19,6 @@ namespace FleetManagementSystem.Data.Entities
 
         public ICollection<FuelTransaction> FuelTransactions { get; set; } = new List<FuelTransaction>();
         public ICollection<Expense> Expenses { get; set; } = new List<Expense>();
+        public ICollection<Custody> Custodies { get; set; } = new List<Custody>();
     }
 }
