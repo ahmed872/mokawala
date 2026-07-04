@@ -134,6 +134,7 @@ internal static class ServiceHelpers
             "inprogress" or "intrip" or "in trip" => "جاري",
             "maintenance" => "صيانة",
             "returned" => "مرتجع",
+            "settled" => "تمت التسوية",
             _ => Clean(status)
         };
     }
@@ -560,23 +561,49 @@ internal static class ServiceHelpers
             Notes = entity.Notes
         };
 
-    public static CustodyDto ToDto(this Custody entity) =>
+    public static string CustodianTypeDisplay(int? driverId) => driverId.HasValue ? "سائق" : "موظف";
+
+    public static CustodySettlementDto ToDto(this CustodySettlement entity) =>
         new()
         {
             Id = entity.Id,
-            VehicleId = entity.VehicleId,
-            VehiclePlateNumber = entity.Vehicle?.PlateNumber ?? string.Empty,
+            CustodyId = entity.CustodyId,
+            CustodyNumber = entity.Custody?.CustodyNumber ?? string.Empty,
+            Amount = entity.Amount,
+            SettlementDate = entity.SettlementDate,
+            Description = entity.Description,
+            ReceiptFilePath = entity.ReceiptFilePath,
+            Notes = entity.Notes
+        };
+
+    public static CustodyDto ToDto(this Custody entity)
+    {
+        var settledAmount = entity.Settlements.Sum(s => s.Amount);
+        return new()
+        {
+            Id = entity.Id,
+            DriverId = entity.DriverId,
+            EmployeeId = entity.EmployeeId,
+            CustodianName = entity.Driver?.FullName ?? entity.Employee?.FullName ?? string.Empty,
+            CustodianType = CustodianTypeDisplay(entity.DriverId),
             CustodyNumber = entity.CustodyNumber,
-            CustodianName = entity.CustodianName,
-            CustodianPosition = entity.CustodianPosition,
+            Amount = entity.Amount,
             HandoverDate = entity.HandoverDate,
             ReturnDate = entity.ReturnDate,
             Status = StatusDisplay(entity.Status),
-            VehicleConditionRating = entity.VehicleConditionRating,
+            PaidFromTreasury = entity.PaidFromTreasury,
+            TreasuryTransactionId = entity.TreasuryTransactionId,
+            SettledAmount = settledAmount,
+            RemainingBalance = entity.Amount - settledAmount,
             Notes = entity.Notes,
             DocumentUrl = entity.DocumentUrl,
-            Items = new List<CustodyItemDto>()
+            Settlements = entity.Settlements
+                .OrderByDescending(s => s.SettlementDate)
+                .ThenByDescending(s => s.Id)
+                .Select(s => s.ToDto())
+                .ToList()
         };
+    }
 
     public static VehicleTypeDto ToDto(this VehicleType entity) =>
         new()

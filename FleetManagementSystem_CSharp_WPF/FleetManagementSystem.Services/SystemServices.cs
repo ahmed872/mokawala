@@ -187,6 +187,8 @@ public sealed class DataBootstrapService(FleetDbContext context) : IDataBootstra
         await EnsureColumnAsync("Drivers", "TrafficUnit", GetShortTextColumnDefinition(defaultValue: string.Empty));
         await EnsureColumnAsync("Drivers", "WorkLocation", GetShortTextColumnDefinition(defaultValue: string.Empty));
         await EnsureDriverAttendanceTableAsync();
+        await EnsureCustodySchemaAsync();
+        await EnsureCustodySettlementsTableAsync();
 
         if (await HasColumnAsync("Vehicles", "RegistrationType"))
         {
@@ -264,6 +266,173 @@ public sealed class DataBootstrapService(FleetDbContext context) : IDataBootstra
         }
 #pragma warning restore EF1002
     }
+
+    private async Task EnsureCustodySchemaAsync()
+    {
+        if (!await HasTableAsync("Custody"))
+        {
+            // EnsureCreated built the table in its current (human-custodian) shape.
+            return;
+        }
+
+        if (!await HasColumnAsync("Custody", "VehicleId"))
+        {
+            // Already migrated; only top up columns that may be missing on older migrated databases.
+            await EnsureColumnAsync("Custody", "DriverId", GetNullableIntColumnDefinition());
+            await EnsureColumnAsync("Custody", "Amount", GetRequiredDecimalColumnDefinition());
+            await EnsureColumnAsync("Custody", "PaidFromTreasury", GetBooleanColumnDefinition(defaultValue: false));
+            await EnsureColumnAsync("Custody", "TreasuryTransactionId", GetNullableIntColumnDefinition());
+            return;
+        }
+
+#pragma warning disable EF1002
+        // Legacy vehicle-bound custody table: rebuild it around human custodians. SQLite cannot
+        // drop the NOT NULL VehicleId column in place, so this is the documented table-rebuild
+        // pattern (create → copy → drop → rename) executed atomically. The previous custodian's
+        // free-text name is preserved into Notes because it cannot be mapped to a Driver/Employee
+        // row reliably; rows keep their EmployeeId when one was already linked.
+        if (_context.Database.IsSqlite())
+        {
+            await using var transaction = await _context.Database.BeginTransactionAsync();
+            await _context.Database.ExecuteSqlRawAsync("""
+                CREATE TABLE Custody_migration_new (
+                    Id INTEGER NOT NULL CONSTRAINT PK_Custody PRIMARY KEY AUTOINCREMENT,
+                    DriverId INTEGER NULL,
+                    EmployeeId INTEGER NULL,
+                    CustodyNumber TEXT NOT NULL DEFAULT '',
+                    Amount TEXT NOT NULL DEFAULT '0',
+                    HandoverDate TEXT NOT NULL,
+                    ReturnDate TEXT NULL,
+                    Status TEXT NOT NULL DEFAULT 'Active',
+                    PaidFromTreasury INTEGER NOT NULL DEFAULT 0,
+                    TreasuryTransactionId INTEGER NULL,
+                    Notes TEXT NOT NULL DEFAULT '',
+                    DocumentUrl TEXT NOT NULL DEFAULT '',
+                    CreatedAt TEXT NOT NULL,
+                    UpdatedAt TEXT NOT NULL,
+                    CONSTRAINT FK_Custody_Drivers_DriverId FOREIGN KEY (DriverId) REFERENCES Drivers (Id) ON DELETE RESTRICT,
+                    CONSTRAINT FK_Custody_Employees_EmployeeId FOREIGN KEY (EmployeeId) REFERENCES Employees (Id) ON DELETE RESTRICT,
+                    CONSTRAINT FK_Custody_TreasuryTransactions_TreasuryTransactionId FOREIGN KEY (TreasuryTransactionId) REFERENCES TreasuryTransactions (Id) ON DELETE SET NULL
+                );
+                """);
+            await _context.Database.ExecuteSqlRawAsync("""
+                INSERT INTO Custody_migration_new
+                    (Id, DriverId, EmployeeId, CustodyNumber, Amount, HandoverDate, ReturnDate, Status, PaidFromTreasury, TreasuryTransactionId, Notes, DocumentUrl, CreatedAt, UpdatedAt)
+                SELECT
+                    Id,
+                    NULL,
+                    EmployeeId,
+                    COALESCE(CustodyNumber, ''),
+                    '0',
+                    HandoverDate,
+                    ReturnDate,
+                    COALESCE(Status, 'Active'),
+                    0,
+                    NULL,
+                    CASE
+                        WHEN TRIM(COALESCE(CustodianName, '')) <> ''
+                        THEN COALESCE(Notes, '')
+                             || CASE WHEN TRIM(COALESCE(Notes, '')) <> '' THEN ' | ' ELSE '' END
+                             || 'أمين العهدة قبل الترحيل: ' || CustodianName
+                        ELSE COALESCE(Notes, '')
+                    END,
+                    COALESCE(DocumentUrl, ''),
+                    CreatedAt,
+                    UpdatedAt
+                FROM Custody;
+                """);
+            await _context.Database.ExecuteSqlRawAsync("DROP TABLE Custody");
+            await _context.Database.ExecuteSqlRawAsync("ALTER TABLE Custody_migration_new RENAME TO Custody");
+            await _context.Database.ExecuteSqlRawAsync("CREATE INDEX IF NOT EXISTS IX_Custody_DriverId ON Custody (DriverId)");
+            await _context.Database.ExecuteSqlRawAsync("CREATE INDEX IF NOT EXISTS IX_Custody_EmployeeId ON Custody (EmployeeId)");
+            await transaction.CommitAsync();
+            return;
+        }
+
+        if (_context.Database.IsMySql())
+        {
+            await using var transaction = await _context.Database.BeginTransactionAsync();
+            await _context.Database.ExecuteSqlRawAsync("""
+                UPDATE Custody
+                SET Notes = CASE
+                    WHEN TRIM(COALESCE(CustodianName, '')) <> ''
+                    THEN CONCAT(
+                        COALESCE(Notes, ''),
+                        CASE WHEN TRIM(COALESCE(Notes, '')) <> '' THEN ' | ' ELSE '' END,
+                        'أمين العهدة قبل الترحيل: ', CustodianName)
+                    ELSE COALESCE(Notes, '')
+                END
+                """);
+            await _context.Database.ExecuteSqlRawAsync("""
+                ALTER TABLE Custody
+                    DROP COLUMN VehicleId,
+                    DROP COLUMN CustodianName,
+                    DROP COLUMN CustodianPosition,
+                    DROP COLUMN VehicleConditionRating,
+                    ADD COLUMN DriverId INT NULL,
+                    ADD COLUMN Amount DECIMAL(18,2) NOT NULL DEFAULT 0,
+                    ADD COLUMN PaidFromTreasury TINYINT(1) NOT NULL DEFAULT 0,
+                    ADD COLUMN TreasuryTransactionId INT NULL
+                """);
+            await transaction.CommitAsync();
+        }
+#pragma warning restore EF1002
+    }
+
+    private async Task EnsureCustodySettlementsTableAsync()
+    {
+        if (await HasTableAsync("CustodySettlements"))
+        {
+            return;
+        }
+
+#pragma warning disable EF1002
+        if (_context.Database.IsSqlite())
+        {
+            await _context.Database.ExecuteSqlRawAsync("""
+                CREATE TABLE IF NOT EXISTS CustodySettlements (
+                    Id INTEGER NOT NULL CONSTRAINT PK_CustodySettlements PRIMARY KEY AUTOINCREMENT,
+                    CustodyId INTEGER NOT NULL,
+                    Amount TEXT NOT NULL,
+                    SettlementDate TEXT NOT NULL,
+                    Description TEXT NOT NULL DEFAULT '',
+                    ReceiptFilePath TEXT NOT NULL,
+                    Notes TEXT NOT NULL DEFAULT '',
+                    CreatedAt TEXT NOT NULL,
+                    UpdatedAt TEXT NOT NULL,
+                    CONSTRAINT CK_CustodySettlements_PositiveAmount CHECK (CAST(Amount AS NUMERIC) > 0),
+                    CONSTRAINT FK_CustodySettlements_Custody_CustodyId FOREIGN KEY (CustodyId) REFERENCES Custody (Id) ON DELETE RESTRICT
+                );
+                """);
+            await _context.Database.ExecuteSqlRawAsync(
+                "CREATE INDEX IF NOT EXISTS IX_CustodySettlements_CustodyId ON CustodySettlements (CustodyId)");
+            return;
+        }
+
+        if (_context.Database.IsMySql())
+        {
+            await _context.Database.ExecuteSqlRawAsync("""
+                CREATE TABLE IF NOT EXISTS CustodySettlements (
+                    Id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+                    CustodyId INT NOT NULL,
+                    Amount DECIMAL(18,2) NOT NULL,
+                    SettlementDate DATETIME NOT NULL,
+                    Description VARCHAR(500) NOT NULL DEFAULT '',
+                    ReceiptFilePath VARCHAR(500) NOT NULL,
+                    Notes VARCHAR(2000) NOT NULL DEFAULT '',
+                    CreatedAt DATETIME NOT NULL,
+                    UpdatedAt DATETIME NOT NULL,
+                    KEY IX_CustodySettlements_CustodyId (CustodyId),
+                    CONSTRAINT CK_CustodySettlements_PositiveAmount CHECK (Amount > 0),
+                    CONSTRAINT FK_CustodySettlements_Custody_CustodyId FOREIGN KEY (CustodyId) REFERENCES Custody (Id) ON DELETE RESTRICT
+                );
+                """);
+        }
+#pragma warning restore EF1002
+    }
+
+    private string GetRequiredDecimalColumnDefinition() =>
+        _context.Database.IsSqlite() ? "TEXT NOT NULL DEFAULT '0'" : "DECIMAL(18,2) NOT NULL DEFAULT 0";
 
     private async Task EnsureColumnAsync(string tableName, string columnName, string columnDefinition)
     {
@@ -651,32 +820,26 @@ public sealed class DataBootstrapService(FleetDbContext context) : IDataBootstra
             _context.Insurances.AddRange(policies);
         }
 
-        if (!await _context.Custodies.AnyAsync() && seededVehicles.Count > 0 && seededEmployees.Count > 0)
+        if (!await _context.Custodies.AnyAsync() && seededEmployees.Count > 0)
         {
             _context.Custodies.AddRange(
                 new Custody
                 {
-                    VehicleId = seededVehicles[0].Id,
                     EmployeeId = seededEmployees[0].Id,
                     CustodyNumber = "CU-DEMO-001",
-                    CustodianName = seededEmployees[0].FullName,
-                    CustodianPosition = seededEmployees[0].Position,
+                    Amount = 5000,
                     HandoverDate = DateTime.Today.AddDays(-14),
                     Status = "Active",
-                    VehicleConditionRating = 8,
                     Notes = "عهدة تشغيل يومية"
                 },
                 new Custody
                 {
-                    VehicleId = seededVehicles[Math.Min(1, seededVehicles.Count - 1)].Id,
                     EmployeeId = seededEmployees[Math.Min(1, seededEmployees.Count - 1)].Id,
                     CustodyNumber = "CU-DEMO-002",
-                    CustodianName = seededEmployees[Math.Min(1, seededEmployees.Count - 1)].FullName,
-                    CustodianPosition = seededEmployees[Math.Min(1, seededEmployees.Count - 1)].Position,
+                    Amount = 3000,
                     HandoverDate = DateTime.Today.AddDays(-30),
                     ReturnDate = DateTime.Today.AddDays(-3),
                     Status = "Returned",
-                    VehicleConditionRating = 7,
                     Notes = "عهدة مرتجعة بعد مأمورية"
                 });
         }

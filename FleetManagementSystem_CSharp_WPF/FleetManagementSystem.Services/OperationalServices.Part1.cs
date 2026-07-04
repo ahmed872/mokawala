@@ -157,8 +157,7 @@ public sealed class VehicleService(FleetDbContext context, IAuditService auditSe
             await _context.Trips.AnyAsync(x => x.VehicleId == id) ||
             await _context.FuelTransactions.AnyAsync(x => x.VehicleId == id) ||
             await _context.Expenses.AnyAsync(x => x.VehicleId == id) ||
-            await _context.Insurances.AnyAsync(x => x.VehicleId == id) ||
-            await _context.Custodies.AnyAsync(x => x.VehicleId == id);
+            await _context.Insurances.AnyAsync(x => x.VehicleId == id);
 
         if (hasDependents)
         {

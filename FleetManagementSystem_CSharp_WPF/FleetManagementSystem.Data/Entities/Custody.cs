@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 
 namespace FleetManagementSystem.Data.Entities
 {
@@ -43,5 +44,6 @@ namespace FleetManagementSystem.Data.Entities
         public Driver? Driver { get; set; }
         public Employee? Employee { get; set; }
         public TreasuryTransaction? TreasuryTransaction { get; set; }
+        public ICollection<CustodySettlement> Settlements { get; set; } = new List<CustodySettlement>();
     }
 }

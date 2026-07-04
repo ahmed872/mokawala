@@ -1117,6 +1117,8 @@ namespace FleetManagementSystem.Core.DTOs
         public string CustodianName { get; set; } = string.Empty;
         public string CustodianType { get; set; } = string.Empty;
         public decimal Amount { get; set; }
+        public decimal SettledAmount { get; set; }
+        public decimal RemainingBalance { get; set; }
         public DateTime HandoverDate { get; set; }
         public DateTime? ReturnDate { get; set; }
         public string Status { get; set; } = string.Empty;
@@ -1140,8 +1142,11 @@ namespace FleetManagementSystem.Core.DTOs
         public string Status { get; set; } = string.Empty;
         public bool PaidFromTreasury { get; set; }
         public int? TreasuryTransactionId { get; set; }
+        public decimal SettledAmount { get; set; }
+        public decimal RemainingBalance { get; set; }
         public string Notes { get; set; } = string.Empty;
         public string DocumentUrl { get; set; } = string.Empty;
+        public List<CustodySettlementDto> Settlements { get; set; } = new List<CustodySettlementDto>();
     }
 
     /// <summary>
@@ -1163,6 +1168,37 @@ namespace FleetManagementSystem.Core.DTOs
         public bool PaidFromTreasury { get; set; } = true;
         public string Notes { get; set; } = string.Empty;
         public string DocumentUrl { get; set; } = string.Empty;
+    }
+
+    /// <summary>
+    /// Custody settlement DTO for detail/list views.
+    /// </summary>
+    public class CustodySettlementDto
+    {
+        public int Id { get; set; }
+        public int CustodyId { get; set; }
+        public string CustodyNumber { get; set; } = string.Empty;
+        public decimal Amount { get; set; }
+        public DateTime SettlementDate { get; set; }
+        public string Description { get; set; } = string.Empty;
+        public string ReceiptFilePath { get; set; } = string.Empty;
+        public string Notes { get; set; } = string.Empty;
+    }
+
+    /// <summary>
+    /// Custody settlement DTO for the self-service settlement form. ReceiptSourceFilePath is the
+    /// scanned receipt picked by the custodian (PNG, JPEG, or PDF); the service layer verifies,
+    /// stores it under Uploads/Receipts, and persists the stored path. A settlement without a
+    /// valid receipt payload is rejected before anything is written.
+    /// </summary>
+    public class CustodySettlementFormDto
+    {
+        public int CustodyId { get; set; }
+        public decimal Amount { get; set; }
+        public DateTime SettlementDate { get; set; }
+        public string Description { get; set; } = string.Empty;
+        public string ReceiptSourceFilePath { get; set; } = string.Empty;
+        public string Notes { get; set; } = string.Empty;
     }
 
     // ========================================================================

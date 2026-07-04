@@ -33,6 +33,7 @@ namespace FleetManagementSystem.Data
         public DbSet<Insurance> Insurances => Set<Insurance>();
         public DbSet<Custody> Custody { get; set; }
         public DbSet<Custody> Custodies => Set<Custody>();
+        public DbSet<CustodySettlement> CustodySettlements { get; set; }
         public DbSet<Notification> Notifications { get; set; }
         public DbSet<AuditLog> AuditLogs { get; set; }
 
@@ -61,6 +62,7 @@ namespace FleetManagementSystem.Data
             modelBuilder.ApplyConfiguration(new LicenseConfiguration());
             modelBuilder.ApplyConfiguration(new InsuranceConfiguration());
             modelBuilder.ApplyConfiguration(new CustodyConfiguration());
+            modelBuilder.ApplyConfiguration(new CustodySettlementConfiguration());
             modelBuilder.ApplyConfiguration(new NotificationConfiguration());
             modelBuilder.ApplyConfiguration(new AuditLogConfiguration());
         }

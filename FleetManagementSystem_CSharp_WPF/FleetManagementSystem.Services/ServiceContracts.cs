@@ -129,6 +129,34 @@ public interface ICustodyService
     Task<CustodyDto?> GetByIdAsync(int id);
     Task<CustodyDto> SaveAsync(CustodyFormDto dto);
     Task DeleteAsync(int id);
+
+    /// <summary>
+    /// "عهدتي" self-service query: active custodies held by the given custodian.
+    /// Exactly one of <paramref name="driverId"/>/<paramref name="employeeId"/> must be provided.
+    /// </summary>
+    Task<List<CustodyDto>> GetActiveForCustodianAsync(int? driverId, int? employeeId);
+
+    /// <summary>
+    /// Posts an expense settlement (تسوية عهدة) against a custody's remaining balance.
+    /// Requires a verified scanned receipt; rejects amounts exceeding the remaining balance.
+    /// </summary>
+    Task<CustodyDto> SettleAsync(CustodySettlementFormDto dto);
+
+    /// <summary>Removes an erroneous settlement and restores the settled amount to the custody balance.</summary>
+    Task DeleteSettlementAsync(int settlementId);
+}
+
+/// <summary>
+/// Stores scanned financial documents (invoices/receipts) under the local Uploads/Receipts
+/// directory and returns the stored relative path. Validates type (PNG/JPEG/PDF by extension
+/// and file signature), non-empty content, and size before accepting the payload.
+/// </summary>
+public interface IReceiptFileService
+{
+    Task<string> SaveReceiptAsync(string sourceFilePath, CancellationToken cancellationToken = default);
+
+    /// <summary>Resolves a stored relative receipt path to an absolute path on disk.</summary>
+    string ResolveAbsolutePath(string storedReceiptPath);
 }
 
 public interface IMasterDataService
