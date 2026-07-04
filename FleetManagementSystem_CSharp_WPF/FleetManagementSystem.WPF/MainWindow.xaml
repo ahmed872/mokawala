@@ -1615,6 +1615,11 @@
                                         <StackPanel>
                                             <TextBlock Style="{StaticResource PageTitleStyle}"
                                                        Text="السائقين"/>
+                                            <TextBlock x:Name="DriversCountTextBlock"
+                                                       Margin="0,4,0,0"
+                                                       FontSize="13"
+                                                       Foreground="{StaticResource MutedBrush}"
+                                                       Text="عدد السائقين المعروضين: 0"/>
                                         </StackPanel>
                                         <WrapPanel Grid.Column="1"
                                                    VerticalAlignment="Center">
@@ -1627,6 +1632,8 @@
                                         </WrapPanel>
                                     </Grid>
                                 </Border>
+                                <Border Style="{StaticResource TripPageCardStyle}"
+                                        Padding="10">
                                 <DataGrid x:Name="DriversGrid"
                                           AutomationProperties.AutomationId="DriversGrid"
                                           IsReadOnly="True"
@@ -1636,7 +1643,7 @@
                                           AutoGenerateColumns="False"
                                           FrozenColumnCount="1"
                                           HeadersVisibility="Column"
-                                          MinRowHeight="38"
+                                          MinRowHeight="40"
                                           ColumnHeaderHeight="75">
                                     <DataGrid.Columns>
                                         <DataGridTemplateColumn Width="58"
@@ -1889,6 +1896,7 @@
                                         </DataGridCheckBoxColumn>
                                     </DataGrid.Columns>
                                 </DataGrid>
+                                </Border>
                             </DockPanel>
                         </TabItem>
 

@@ -3768,6 +3768,9 @@ public partial class MainWindow : Window
 
         view.Filter = DriverRowMatchesFilters;
         view.Refresh();
+
+        var visibleCount = _drivers.Count(DriverRowMatchesFilters);
+        DriversCountTextBlock.Text = $"عدد السائقين المعروضين: {visibleCount}";
     }
 
     private bool DriverRowMatchesFilters(object item)
