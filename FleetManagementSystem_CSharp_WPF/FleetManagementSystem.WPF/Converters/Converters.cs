@@ -396,6 +396,76 @@ namespace FleetManagementSystem.WPF.Converters
     }
 
     // ========================================================================
+    // USER ROLE DISPLAY CONVERTER
+    // ========================================================================
+
+    public class UserRoleDisplayConverter : IValueConverter
+    {
+        private static readonly System.Collections.Generic.Dictionary<string, string> RoleDisplayNames = new(StringComparer.OrdinalIgnoreCase)
+        {
+            ["Admin"] = "مدير النظام",
+            ["OperationsManager"] = "مدير التشغيل",
+            ["OperationsDataEntry"] = "إدخال بيانات التشغيل",
+            ["MaintenanceOfficer"] = "مسؤول الصيانة",
+            ["TreasuryOfficer"] = "مسؤول الخزينة",
+            ["TripsLicensesOfficer"] = "مسؤول التشغيلات والتراخيص",
+            ["InsuranceOfficer"] = "مسؤول التأمينات",
+            ["Viewer"] = "عرض فقط",
+            ["Staff"] = "موظف"
+        };
+
+        public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+        {
+            var role = value?.ToString();
+            if (string.IsNullOrWhiteSpace(role))
+            {
+                return string.Empty;
+            }
+
+            return RoleDisplayNames.TryGetValue(role, out var display) ? display : role;
+        }
+
+        public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
+        {
+            throw new NotImplementedException();
+        }
+    }
+
+    // ========================================================================
+    // ACTIVE STATUS BADGE CONVERTERS
+    // ========================================================================
+
+    public class ActiveStatusBrushConverter : IValueConverter
+    {
+        public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+        {
+            var isActive = value is bool b && b;
+            return new System.Windows.Media.SolidColorBrush(isActive
+                ? System.Windows.Media.Color.FromRgb(0x38, 0x8E, 0x3C)
+                : System.Windows.Media.Color.FromRgb(0x75, 0x75, 0x75));
+        }
+
+        public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
+        {
+            throw new NotImplementedException();
+        }
+    }
+
+    public class ActiveStatusTextConverter : IValueConverter
+    {
+        public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+        {
+            var isActive = value is bool b && b;
+            return isActive ? "مفعل" : "موقوف";
+        }
+
+        public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
+        {
+            throw new NotImplementedException();
+        }
+    }
+
+    // ========================================================================
     // STATUS COLOR CONVERTER
     // ========================================================================
 

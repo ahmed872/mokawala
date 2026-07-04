@@ -16,6 +16,9 @@
         Background="{StaticResource PageBackgroundBrush}">
     <Window.Resources>
         <converters:VisibleRowNumberConverter x:Key="VisibleRowNumberConverter"/>
+        <converters:UserRoleDisplayConverter x:Key="UserRoleDisplayConverter"/>
+        <converters:ActiveStatusBrushConverter x:Key="ActiveStatusBrushConverter"/>
+        <converters:ActiveStatusTextConverter x:Key="ActiveStatusTextConverter"/>
         <x:Array x:Key="DriverAttendanceStatuses"
                  Type="{x:Type sys:String}">
             <sys:String>حاضر</sys:String>
@@ -1890,14 +1893,16 @@
                         </TabItem>
 
                         <TabItem Header="حضور وغياب">
+                            <ScrollViewer VerticalScrollBarVisibility="Auto"
+                                          HorizontalScrollBarVisibility="Disabled">
                             <Grid>
                                 <Grid.RowDefinitions>
                                     <RowDefinition Height="Auto"/>
-                                    <RowDefinition Height="*"
+                                    <RowDefinition Height="Auto"
                                                    MinHeight="220"/>
                                     <RowDefinition Height="10"/>
                                     <RowDefinition Height="Auto"/>
-                                    <RowDefinition Height="*"
+                                    <RowDefinition Height="Auto"
                                                    MinHeight="140"/>
                                     <RowDefinition Height="0"/>
                                 </Grid.RowDefinitions>
@@ -2714,6 +2719,7 @@
                                     <TextBlock x:Name="DriverAttendanceWeekRangeTextBlock"/>
                                 </StackPanel>
                             </Grid>
+                            </ScrollViewer>
                         </TabItem>
 
                         <TabItem Header="تقرير السائقين">
@@ -5555,7 +5561,7 @@
                             <Button Style="{StaticResource PrimaryButtonStyle}"
                                     Click="AddUserButton_Click">إضافة مستخدم</Button>
                             <Button Style="{StaticResource PrimaryButtonStyle}"
-                                    Click="SaveUserButton_Click">حفظ المحدد</Button>
+                                    Click="EditUserButton_Click">تعديل بيانات المحدد</Button>
                             <Button Style="{StaticResource PrimaryButtonStyle}"
                                     Click="RefreshUsersButton_Click">تحديث</Button>
                             <Button Style="{StaticResource DangerButtonStyle}"
@@ -5638,8 +5644,43 @@
                         </Border>
                         <DataGrid x:Name="UsersGrid"
                                   AutomationProperties.AutomationId="UsersGrid"
-                                  AutoGeneratingColumn="Grid_AutoGeneratingColumn"
-                                  SelectionChanged="UsersGrid_SelectionChanged"/>
+                                  AutoGenerateColumns="False"
+                                  IsReadOnly="True"
+                                  SelectionChanged="UsersGrid_SelectionChanged"
+                                  MouseDoubleClick="UsersGrid_MouseDoubleClick">
+                            <DataGrid.Columns>
+                                <DataGridTextColumn Header="الاسم الكامل"
+                                                     Binding="{Binding FullName}"
+                                                     Width="2*"/>
+                                <DataGridTextColumn Header="اسم الدخول"
+                                                     Binding="{Binding Username}"
+                                                     Width="*"/>
+                                <DataGridTextColumn Header="البريد الإلكتروني"
+                                                     Binding="{Binding Email}"
+                                                     Width="1.4*"/>
+                                <DataGridTextColumn Header="رقم الهاتف"
+                                                     Binding="{Binding PhoneNumber}"
+                                                     Width="*"/>
+                                <DataGridTextColumn Header="الدور"
+                                                     Binding="{Binding Role, Converter={StaticResource UserRoleDisplayConverter}}"
+                                                     Width="1.3*"/>
+                                <DataGridTemplateColumn Header="الحالة"
+                                                        Width="Auto">
+                                    <DataGridTemplateColumn.CellTemplate>
+                                        <DataTemplate>
+                                            <Border CornerRadius="10"
+                                                    Padding="10,4"
+                                                    HorizontalAlignment="Center"
+                                                    Background="{Binding IsActive, Converter={StaticResource ActiveStatusBrushConverter}}">
+                                                <TextBlock Text="{Binding IsActive, Converter={StaticResource ActiveStatusTextConverter}}"
+                                                           Foreground="White"
+                                                           FontWeight="SemiBold"/>
+                                            </Border>
+                                        </DataTemplate>
+                                    </DataGridTemplateColumn.CellTemplate>
+                                </DataGridTemplateColumn>
+                            </DataGrid.Columns>
+                        </DataGrid>
                     </DockPanel>
                 </TabItem>
 

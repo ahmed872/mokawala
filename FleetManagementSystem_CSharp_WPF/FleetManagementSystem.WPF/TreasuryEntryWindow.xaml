@@ -228,8 +228,12 @@
                     <TextBox x:Name="DescriptionTextBox"
                              AutomationProperties.AutomationId="TreasuryDescriptionTextBox"
                              Style="{StaticResource AppTextBoxStyle}"
-                             Height="72"
+                             ToolTip="اكتب وصف مختصر لحركة الخزينة، مثال: تحصيل إيجار عربية، أو صرف مصاريف صيانة"
+                             MinHeight="72"
+                             Height="Auto"
+                             AcceptsReturn="True"
                              TextWrapping="Wrap"
+                             VerticalScrollBarVisibility="Auto"
                              VerticalContentAlignment="Top"
                              Padding="12,8"/>
                 </StackPanel>

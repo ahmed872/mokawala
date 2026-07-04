@@ -78,6 +78,10 @@
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>
     </Page>
+    <Page Include="UserEntryWindow.xaml">
+      <Generator>MSBuild:Compile</Generator>
+      <SubType>Designer</SubType>
+    </Page>
     <Page Include="TreasuryEntryWindow.xaml">
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>
@@ -137,6 +141,9 @@
     </Compile>
     <Compile Include="CustodyEntryWindow.xaml.cs">
       <DependentUpon>CustodyEntryWindow.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="UserEntryWindow.xaml.cs">
+      <DependentUpon>UserEntryWindow.xaml</DependentUpon>
     </Compile>
     <Compile Include="TreasuryEntryWindow.xaml.cs">
       <DependentUpon>TreasuryEntryWindow.xaml</DependentUpon>
