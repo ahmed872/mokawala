@@ -1741,7 +1741,20 @@ public partial class MainWindow : Window
         return builder.ToString();
     }
 
-    private static FlowDocument BuildReportDocument(ReportDataDto report)
+    private static readonly System.Windows.Media.Brush ReportAccentBrush = CreateFrozenBrush(0x12, 0x3B, 0x53);
+    private static readonly System.Windows.Media.Brush ReportBorderBrush = CreateFrozenBrush(0xC9, 0xD4, 0xDD);
+    private static readonly System.Windows.Media.Brush ReportAltRowBrush = CreateFrozenBrush(0xF4, 0xF8, 0xFB);
+    private static readonly System.Windows.Media.Brush ReportMutedBrush = CreateFrozenBrush(0x6B, 0x7A, 0x88);
+    private static readonly System.Windows.Media.Brush ReportInkBrush = CreateFrozenBrush(0x1F, 0x2D, 0x3A);
+
+    private static System.Windows.Media.Brush CreateFrozenBrush(byte r, byte g, byte b)
+    {
+        var brush = new SolidColorBrush(System.Windows.Media.Color.FromRgb(r, g, b));
+        brush.Freeze();
+        return brush;
+    }
+
+    private FlowDocument BuildReportDocument(ReportDataDto report)
     {
         var pageWidth = Math.Max(980, report.Columns.Sum(GetReportColumnPrintWidth) + 72);
         var document = new FlowDocument
@@ -1753,26 +1766,69 @@ public partial class MainWindow : Window
             PageWidth = pageWidth,
             MinPageWidth = pageWidth,
             MaxPageWidth = pageWidth,
-            ColumnWidth = pageWidth
+            ColumnWidth = pageWidth,
+            Foreground = ReportInkBrush
         };
+
+        var companyName = string.IsNullOrWhiteSpace(_settings?.CompanyName)
+            ? "شركة جوميكس للحركة والمعدات"
+            : _settings!.CompanyName.Trim();
+
+        document.Blocks.Add(new Paragraph(new Run(companyName))
+        {
+            FontSize = 13,
+            FontWeight = FontWeights.SemiBold,
+            Foreground = ReportMutedBrush,
+            TextAlignment = TextAlignment.Right,
+            Margin = new Thickness(0, 0, 0, 2)
+        });
 
         document.Blocks.Add(new Paragraph(new Run(report.ReportTitle))
         {
-            FontSize = 18,
+            FontSize = 21,
             FontWeight = FontWeights.Bold,
+            Foreground = ReportAccentBrush,
             TextAlignment = TextAlignment.Right,
-            Margin = new Thickness(0, 0, 0, 8)
+            Margin = new Thickness(0, 0, 0, 6),
+            BorderBrush = ReportAccentBrush,
+            BorderThickness = new Thickness(0, 0, 0, 2),
+            Padding = new Thickness(0, 0, 0, 6)
         });
 
-        document.Blocks.Add(new Paragraph(new Run($"تاريخ التوليد: {report.GeneratedDate.ToLocalTime():yyyy-MM-dd HH:mm} - عدد السجلات: {report.Data.Count}"))
+        var recordsLabel = report.Data.Count switch
+        {
+            0 => "لا توجد سجلات مطابقة",
+            1 => "سجل واحد",
+            2 => "سجلان",
+            <= 10 => $"{report.Data.Count} سجلات",
+            _ => $"{report.Data.Count} سجلًا"
+        };
+
+        document.Blocks.Add(new Paragraph(new Run($"تاريخ التوليد: {report.GeneratedDate.ToLocalTime():yyyy-MM-dd HH:mm}    |    عدد السجلات: {recordsLabel}"))
         {
             FontSize = 11,
-            Foreground = System.Windows.Media.Brushes.DimGray,
+            Foreground = ReportMutedBrush,
             TextAlignment = TextAlignment.Right,
-            Margin = new Thickness(0, 0, 0, 14)
+            Margin = new Thickness(0, 4, 0, 14)
         });
 
-        var table = new Table { CellSpacing = 0 };
+        if (report.Data.Count == 0)
+        {
+            document.Blocks.Add(new Paragraph(new Run("لا توجد بيانات مطابقة لعرضها في هذا التقرير. جرّب تعديل الفلاتر أو الفترة الزمنية ثم أعد توليد التقرير."))
+            {
+                FontSize = 13,
+                Foreground = ReportMutedBrush,
+                TextAlignment = TextAlignment.Center,
+                Padding = new Thickness(24),
+                Margin = new Thickness(0, 24, 0, 0),
+                BorderBrush = ReportBorderBrush,
+                BorderThickness = new Thickness(1)
+            });
+
+            return document;
+        }
+
+        var table = new Table { CellSpacing = 0, BorderBrush = ReportBorderBrush, BorderThickness = new Thickness(0.75) };
         foreach (var column in report.Columns)
         {
             table.Columns.Add(new TableColumn { Width = new GridLength(GetReportColumnPrintWidth(column)) });
@@ -1787,32 +1843,18 @@ public partial class MainWindow : Window
 
         rowGroup.Rows.Add(headerRow);
 
+        var rowIndex = 0;
         foreach (var row in report.Data)
         {
             var tableRow = new TableRow();
+            var isAlternate = rowIndex % 2 == 1;
             foreach (var column in report.Columns)
             {
-                tableRow.Cells.Add(CreateReportCell(GetReportValue(row, column), isHeader: false));
+                tableRow.Cells.Add(CreateReportCell(GetReportValue(row, column), isHeader: false, isAlternate));
             }
 
             rowGroup.Rows.Add(tableRow);
-        }
-
-        if (report.Data.Count == 0)
-        {
-            rowGroup.Rows.Add(new TableRow
-            {
-                Cells =
-                {
-                    new TableCell(new Paragraph(new Run("لا توجد بيانات.")))
-                    {
-                        ColumnSpan = Math.Max(report.Columns.Count, 1),
-                        Padding = new Thickness(8),
-                        BorderBrush = System.Windows.Media.Brushes.LightGray,
-                        BorderThickness = new Thickness(0.5)
-                    }
-                }
-            });
+            rowIndex++;
         }
 
         table.RowGroups.Add(rowGroup);
@@ -1881,7 +1923,7 @@ public partial class MainWindow : Window
         return 135;
     }
 
-    private static TableCell CreateReportCell(string value, bool isHeader)
+    private static TableCell CreateReportCell(string value, bool isHeader, bool isAlternate = false)
     {
         var paragraph = new Paragraph
         {
@@ -1902,11 +1944,14 @@ public partial class MainWindow : Window
 
         return new TableCell(paragraph)
         {
-            Padding = new Thickness(6),
-            BorderBrush = System.Windows.Media.Brushes.LightGray,
+            Padding = new Thickness(7, 6, 7, 6),
+            BorderBrush = ReportBorderBrush,
             BorderThickness = new Thickness(0.5),
-            Background = isHeader ? System.Windows.Media.Brushes.Gainsboro : System.Windows.Media.Brushes.Transparent,
-            FontWeight = isHeader ? FontWeights.SemiBold : FontWeights.Normal
+            Background = isHeader
+                ? ReportAccentBrush
+                : isAlternate ? ReportAltRowBrush : System.Windows.Media.Brushes.White,
+            Foreground = isHeader ? System.Windows.Media.Brushes.White : ReportInkBrush,
+            FontWeight = isHeader ? FontWeights.Bold : FontWeights.Normal
         };
     }
 
