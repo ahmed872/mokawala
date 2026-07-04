@@ -49,11 +49,7 @@ public partial class MainWindow : Window
         "DriverId"
     };
 
-    private static readonly HashSet<string> TemporarilyLockedModules = new(StringComparer.OrdinalIgnoreCase)
-    {
-        "Treasury",
-        "Custody"
-    };
+    private static readonly HashSet<string> TemporarilyLockedModules = new(StringComparer.OrdinalIgnoreCase);
 
     private static readonly Dictionary<string, string> ColumnHeaders = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -201,6 +197,8 @@ public partial class MainWindow : Window
     private readonly ObservableCollection<DriverDto> _drivers = new();
     private readonly ObservableCollection<DriverDto> _driverReportDriverOptions = new();
     private readonly ObservableCollection<DriverWeeklyAttendanceRow> _driverAttendanceWeekRows = new();
+    private readonly ObservableCollection<DailyAttendanceRow> _dailyAttendanceRows = new();
+    private readonly ObservableCollection<DriverAttendanceDto> _absenceHistoryRows = new();
     private readonly ObservableCollection<DriverReportDto> _driverReportRows = new();
     private readonly ObservableCollection<EmployeeDto> _employees = new();
     private readonly ObservableCollection<TripDto> _trips = new();
@@ -479,6 +477,11 @@ public partial class MainWindow : Window
         MaintenanceGrid.ItemsSource = _maintenance;
         DriversGrid.ItemsSource = _drivers;
         DriverAttendanceGrid.ItemsSource = _driverAttendanceWeekRows;
+        DailyAttendanceGrid.ItemsSource = _dailyAttendanceRows;
+        AbsenceHistoryGrid.ItemsSource = _absenceHistoryRows;
+        AbsenceHistoryDriverComboBox.ItemsSource = _drivers;
+        AbsenceHistoryFromPicker.SelectedDate = DateTime.Today.AddMonths(-3);
+        AbsenceHistoryToPicker.SelectedDate = DateTime.Today;
         DriverReportsGrid.ItemsSource = _driverReportRows;
         EmployeesGrid.ItemsSource = _employees;
         TripsGrid.ItemsSource = _trips;
@@ -574,6 +577,7 @@ public partial class MainWindow : Window
         await LoadContractsAsync();
         await LoadMaintenanceAsync();
         await LoadDriversAsync();
+        await LoadDailyAttendanceAsync();
         await LoadDriverAttendanceWeekAsync();
         await LoadEmployeesAsync();
         await LoadTripsAsync();
@@ -1001,7 +1005,11 @@ public partial class MainWindow : Window
     private async Task LoadFuelAsync() => ReplaceCollection(_fuel, await _fuelService.GetAllAsync());
     private async Task LoadExpensesAsync() => ReplaceCollection(_expenses, await _expenseService.GetAllAsync());
     private async Task LoadOilChangesAsync() => ReplaceCollection(_oilChanges, await _oilChangeService.GetAllAsync());
-    private async Task LoadTreasuryAsync() => ReplaceCollection(_treasuryTransactions, await _treasuryService.GetAllAsync());
+    private async Task LoadTreasuryAsync()
+    {
+        ReplaceCollection(_treasuryTransactions, await _treasuryService.GetAllAsync());
+        UpdateTreasurySummary();
+    }
     private Task LoadTreasuryIfUnlockedAsync() =>
         IsModuleTemporarilyLocked("Treasury") ? Task.CompletedTask : LoadTreasuryAsync();
 
@@ -1011,9 +1019,44 @@ public partial class MainWindow : Window
         return Task.CompletedTask;
     }
     private async Task LoadInsuranceAsync() => ReplaceCollection(_insurance, await _insuranceService.GetAllAsync());
-    private async Task LoadCustodyAsync() => ReplaceCollection(_custodies, await _custodyService.GetAllAsync());
+    private async Task LoadCustodyAsync()
+    {
+        ReplaceCollection(_custodies, await _custodyService.GetAllAsync());
+        UpdateCustodySummary();
+    }
     private Task LoadCustodyIfUnlockedAsync() =>
         IsModuleTemporarilyLocked("Custody") ? Task.CompletedTask : LoadCustodyAsync();
+
+    private void UpdateTreasurySummary()
+    {
+        var income = _treasuryTransactions
+            .Where(t => string.Equals(t.TransactionType, "إيراد", StringComparison.OrdinalIgnoreCase))
+            .Sum(t => t.Amount);
+        var expense = _treasuryTransactions
+            .Where(t => string.Equals(t.TransactionType, "صرف", StringComparison.OrdinalIgnoreCase))
+            .Sum(t => t.Amount);
+        var balance = income - expense;
+
+        TreasuryTotalIncomeTextBlock.Text = income.ToString("N2");
+        TreasuryTotalExpenseTextBlock.Text = expense.ToString("N2");
+        TreasuryNetBalanceTextBlock.Text = balance.ToString("N2");
+        TreasuryNetBalanceTextBlock.Foreground = balance >= 0
+            ? new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(0x18, 0x5A, 0x30))
+            : new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(0xC6, 0x28, 0x28));
+    }
+
+    private void UpdateCustodySummary()
+    {
+        var total = _custodies.Count;
+        var active = _custodies.Count(c =>
+            !string.Equals(c.Status, "Returned", StringComparison.OrdinalIgnoreCase) &&
+            !string.Equals(c.Status, "مسترجعة", StringComparison.OrdinalIgnoreCase));
+        var returned = total - active;
+
+        CustodyTotalCountTextBlock.Text = total.ToString();
+        CustodyActiveCountTextBlock.Text = active.ToString();
+        CustodyReturnedCountTextBlock.Text = returned.ToString();
+    }
 
     private async Task LoadUsersAsync()
     {
@@ -1556,6 +1599,38 @@ public partial class MainWindow : Window
         public string WednesdayStatus { get; set; } = string.Empty;
         public string ThursdayStatus { get; set; } = string.Empty;
         public string FridayStatus { get; set; } = string.Empty;
+    }
+
+    public sealed class DailyAttendanceRow : System.ComponentModel.INotifyPropertyChanged
+    {
+        private string _status = "حاضر";
+        private string _absenceReason = string.Empty;
+        public int DriverId { get; set; }
+        public string DriverName { get; set; } = string.Empty;
+        public string WorkLocation { get; set; } = string.Empty;
+        public string Status
+        {
+            get => _status;
+            set
+            {
+                if (_status == value) return;
+                _status = value;
+                PropertyChanged?.Invoke(this, new System.ComponentModel.PropertyChangedEventArgs(nameof(Status)));
+                PropertyChanged?.Invoke(this, new System.ComponentModel.PropertyChangedEventArgs(nameof(IsAbsent)));
+            }
+        }
+        public string AbsenceReason
+        {
+            get => _absenceReason;
+            set
+            {
+                if (_absenceReason == value) return;
+                _absenceReason = value;
+                PropertyChanged?.Invoke(this, new System.ComponentModel.PropertyChangedEventArgs(nameof(AbsenceReason)));
+            }
+        }
+        public bool IsAbsent => string.Equals(_status, "غائب", StringComparison.OrdinalIgnoreCase);
+        public event System.ComponentModel.PropertyChangedEventHandler? PropertyChanged;
     }
 
     private static ReportDataDto BuildSelectedReportRowSnapshot(ReportDataDto source, DataRowView selectedRow)
@@ -3469,17 +3544,10 @@ public partial class MainWindow : Window
         {
             return;
         }
-
         _isSavingDriverAttendanceWeek = true;
         try
         {
-            CommitGridEdit(DriverAttendanceGrid);
-            var weekStart = GetSelectedDriverWeekStart();
-            var forms = _driverAttendanceWeekRows
-                .SelectMany(row => BuildDriverAttendanceForms(row, weekStart))
-                .ToList();
-
-            await _driverAttendanceService.SaveWeekAsync(weekStart, forms);
+            await SaveDailyAttendanceAsync();
         }
         finally
         {
@@ -3487,6 +3555,93 @@ public partial class MainWindow : Window
         }
     }
 
+    private async Task LoadDailyAttendanceAsync()
+    {
+        var weekStart = StartOfDriverWeek(DateTime.Today);
+        var records = await _driverAttendanceService.GetWeekAsync(weekStart);
+        var todayRecords = records.Where(r => r.WorkDate.Date == DateTime.Today.Date).ToList();
+        var isFriday = DateTime.Today.DayOfWeek == DayOfWeek.Friday;
+
+        var rows = _drivers
+            .Where(d => d.IsActive)
+            .OrderBy(d => d.FullName, StringComparer.CurrentCultureIgnoreCase)
+            .Select(driver =>
+            {
+                var record = todayRecords.FirstOrDefault(r => r.DriverId == driver.Id);
+                string status;
+                if (record is not null)
+                {
+                    // Map stored display status; empty = Rest day
+                    status = string.IsNullOrEmpty(record.Status) ? "راحة" : record.Status;
+                }
+                else
+                {
+                    status = isFriday ? "راحة" : "حاضر";
+                }
+
+                return new DailyAttendanceRow
+                {
+                    DriverId = driver.Id,
+                    DriverName = driver.FullName,
+                    WorkLocation = record?.WorkLocation ?? driver.WorkLocation,
+                    Status = status,
+                    AbsenceReason = record?.AbsenceReason ?? string.Empty
+                };
+            })
+            .ToList();
+        ReplaceCollection(_dailyAttendanceRows, rows);
+        DailyAttendanceDateTextBlock.Text = DateTime.Today.ToString(
+            "dddd - yyyy/MM/dd", new System.Globalization.CultureInfo("ar-EG"));
+    }
+
+    private async Task SaveDailyAttendanceAsync()
+    {
+        CommitGridEdit(DailyAttendanceGrid);
+        var weekStart = StartOfDriverWeek(DateTime.Today);
+        var forms = _dailyAttendanceRows
+            .Select(row => new DriverAttendanceFormDto
+            {
+                DriverId = row.DriverId,
+                WorkDate = DateTime.Today,
+                WorkLocation = row.WorkLocation,
+                Status = row.Status,
+                AbsenceReason = row.IsAbsent ? row.AbsenceReason : string.Empty
+            })
+            .ToList();
+        await _driverAttendanceService.SaveWeekAsync(weekStart, forms);
+    }
+
+    private async Task LoadAbsenceHistoryAsync()
+    {
+        if (AbsenceHistoryDriverComboBox.SelectedValue is not int driverId || driverId <= 0)
+        {
+            MessageBox.Show("اختر سائقًا أولًا.", "تنبيه", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+        var from = AbsenceHistoryFromPicker.SelectedDate ?? DateTime.Today.AddMonths(-3);
+        var to = AbsenceHistoryToPicker.SelectedDate ?? DateTime.Today;
+        var absences = await _driverAttendanceService.GetDriverAbsencesAsync(driverId, from, to);
+        ReplaceCollection(_absenceHistoryRows, absences);
+    }
+
+    private void DailyAttendanceInput_Changed(object sender, RoutedEventArgs e)
+    {
+        if (sender is Control control && !control.IsKeyboardFocusWithin && !control.IsMouseOver)
+            return;
+        _driverAttendanceAutoSaveTimer.Stop();
+        _driverAttendanceAutoSaveTimer.Start();
+    }
+
+    private async void SaveDailyAttendanceButton_Click(object sender, RoutedEventArgs e) =>
+        await RunSafeAsync(async () =>
+        {
+            await SaveDailyAttendanceAsync();
+            await LoadDailyAttendanceAsync();
+            MessageBox.Show("تم حفظ حضور اليوم بنجاح.", "تم", MessageBoxButton.OK, MessageBoxImage.Information);
+        });
+
+    private async void LoadAbsenceHistoryButton_Click(object sender, RoutedEventArgs e) =>
+        await RunSafeAsync(LoadAbsenceHistoryAsync);
     private async void GenerateDriverReportButton_Click(object sender, RoutedEventArgs e) => await RunSafeAsync(GenerateDriverReportAsync);
 
     private async Task GenerateDriverReportAsync()
@@ -4498,6 +4653,20 @@ public partial class MainWindow : Window
         await RunSafeAsync(async () =>
         {
             await _oilChangeService.SaveAsync(window.OilChangeForm);
+            if (window.OilChangeForm.IsOilChanged && window.OilChangeForm.Cost > 0)
+            {
+                var vehicle = _vehicles.FirstOrDefault(v => v.Id == window.OilChangeForm.VehicleId);
+                await _treasuryService.SaveAsync(new TreasuryTransactionFormDto
+                {
+                    TransactionDate = window.OilChangeForm.ChangeDate,
+                    TransactionType = "صرف",
+                    Amount = window.OilChangeForm.Cost,
+                    Description = $"تغيير زيت - {vehicle?.PlateNumber ?? string.Empty}",
+                    RelatedEntityType = "زيت",
+                    PaymentMethod = "نقدي"
+                });
+                await LoadTreasuryIfUnlockedAsync();
+            }
             await LoadOilChangesAsync();
             await LoadVehiclesAsync();
             await LoadDashboardAsync();
@@ -4877,6 +5046,20 @@ public partial class MainWindow : Window
         await RunSafeAsync(async () =>
         {
             await _custodyService.SaveAsync(window.CustodyForm);
+            if (window.CustodyForm.Amount > 0)
+            {
+                var plate = _vehicles.FirstOrDefault(v => v.Id == window.CustodyForm.VehicleId)?.PlateNumber ?? string.Empty;
+                await _treasuryService.SaveAsync(new TreasuryTransactionFormDto
+                {
+                    TransactionDate = window.CustodyForm.HandoverDate,
+                    TransactionType = "صرف",
+                    Amount = window.CustodyForm.Amount,
+                    Description = $"عهدة {window.CustodyForm.CustodyNumber} - {window.CustodyForm.CustodianName} ({plate})",
+                    RelatedEntityType = "عهدة",
+                    PaymentMethod = "نقدي"
+                });
+                await LoadTreasuryIfUnlockedAsync();
+            }
             await LoadCustodyIfUnlockedAsync();
             await LoadDashboardAsync();
             await LoadNotificationsAsync();
@@ -4911,6 +5094,20 @@ public partial class MainWindow : Window
         {
             EnsureVehicleExists(window.CustodyForm.VehicleId, "سجل العهدة");
             await _custodyService.SaveAsync(window.CustodyForm);
+            if (window.CustodyForm.Amount > 0)
+            {
+                var plate = _vehicles.FirstOrDefault(v => v.Id == window.CustodyForm.VehicleId)?.PlateNumber ?? string.Empty;
+                await _treasuryService.SaveAsync(new TreasuryTransactionFormDto
+                {
+                    TransactionDate = window.CustodyForm.HandoverDate,
+                    TransactionType = "صرف",
+                    Amount = window.CustodyForm.Amount,
+                    Description = $"عهدة {window.CustodyForm.CustodyNumber} - {window.CustodyForm.CustodianName} ({plate})",
+                    RelatedEntityType = "عهدة",
+                    PaymentMethod = "نقدي"
+                });
+                await LoadTreasuryIfUnlockedAsync();
+            }
             await LoadCustodyIfUnlockedAsync();
             await LoadDashboardAsync();
             await LoadNotificationsAsync();

@@ -579,7 +579,7 @@ public sealed class DriverAttendanceService(FleetDbContext context, IAuditServic
 
             record.WorkLocation = ServiceHelpers.Clean(string.IsNullOrWhiteSpace(dto.WorkLocation) ? driver.WorkLocation : dto.WorkLocation);
             record.Status = status;
-            record.AbsenceReason = string.Empty;
+            record.AbsenceReason = ServiceHelpers.Clean(dto.AbsenceReason ?? string.Empty);
             record.Notes = ServiceHelpers.Clean(dto.Notes);
             record.UpdatedAt = DateTime.UtcNow;
         }
@@ -587,6 +587,20 @@ public sealed class DriverAttendanceService(FleetDbContext context, IAuditServic
         await _context.SaveChangesAsync();
         await _auditService.LogActionAsync("SaveWeek", "DriverAttendance", 0, null, start.ToString("yyyy-MM-dd"));
         return await GetWeekAsync(start);
+    }
+
+    public async Task<List<DriverAttendanceDto>> GetDriverAbsencesAsync(int driverId, DateTime from, DateTime to)
+    {
+        var start = from.Date;
+        var endExclusive = to.Date.AddDays(1);
+        var records = await _context.DriverAttendances
+            .Include(x => x.Driver)
+            .Where(x => x.DriverId == driverId
+                   && x.WorkDate >= start && x.WorkDate < endExclusive
+                   && (x.Status == "Absent" || x.Status == "Leave" || x.Status == "CompensatoryRest"))
+            .OrderByDescending(x => x.WorkDate)
+            .ToListAsync();
+        return records.Select(x => x.ToDto()).ToList();
     }
 
     public async Task<List<DriverReportDto>> GenerateReportAsync(DateTime startDate, DateTime endDate, int? driverId = null)

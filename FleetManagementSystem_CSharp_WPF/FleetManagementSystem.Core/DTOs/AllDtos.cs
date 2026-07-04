@@ -1136,6 +1136,7 @@ namespace FleetManagementSystem.Core.DTOs
         public DateTime? ReturnDate { get; set; }
         public string Status { get; set; } = string.Empty;
         public decimal VehicleConditionRating { get; set; }
+        public decimal Amount { get; set; }
         public string Notes { get; set; } = string.Empty;
         public string DocumentUrl { get; set; } = string.Empty;
         public List<CustodyItemDto> Items { get; set; } = new List<CustodyItemDto>();
@@ -1155,6 +1156,7 @@ namespace FleetManagementSystem.Core.DTOs
         public DateTime? ReturnDate { get; set; }
         public string Status { get; set; } = "Active";
         public decimal VehicleConditionRating { get; set; } = 5;
+        public decimal Amount { get; set; } = 0;
         public string Notes { get; set; } = string.Empty;
         public string DocumentUrl { get; set; } = string.Empty;
     }
