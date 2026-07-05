@@ -803,13 +803,139 @@ public sealed class CustodyService(FleetDbContext context, IAuditService auditSe
             .Include(c => c.Driver)
             .Include(c => c.Employee)
             .Include(c => c.Settlements)
-            .Where(c => c.Status == "Active")
+            .Where(c => c.Status == "Active" || c.Status == "PendingApproval")
             .Where(c => driverId.HasValue ? c.DriverId == driverId.Value : c.EmployeeId == employeeId!.Value)
             .OrderByDescending(c => c.HandoverDate)
             .ThenByDescending(c => c.Id)
             .ToListAsync();
 
         return items.Select(c => c.ToDto()).ToList();
+    }
+
+    public async Task<List<CustodyDto>> GetPendingApprovalAsync()
+    {
+        var items = await _context.Custodies
+            .Include(c => c.Driver)
+            .Include(c => c.Employee)
+            .Include(c => c.Settlements)
+            .Where(c => c.Status == "PendingApproval")
+            .OrderBy(c => c.UpdatedAt)
+            .ToListAsync();
+
+        return items.Select(c => c.ToDto()).ToList();
+    }
+
+    public async Task<CustodyDto> ApproveClosureAsync(int custodyId, string approvedBy)
+    {
+        var custody = await _context.Custodies
+            .Include(c => c.Driver)
+            .Include(c => c.Employee)
+            .Include(c => c.Settlements)
+            .FirstOrDefaultAsync(c => c.Id == custodyId)
+            ?? throw new InvalidOperationException("العهدة غير موجودة.");
+
+        if (!string.Equals(custody.Status, "PendingApproval", StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException("العهدة ليست بانتظار الاعتماد.");
+        }
+
+        var settledAmount = custody.Settlements.Sum(s => s.Amount);
+        if (settledAmount != custody.Amount)
+        {
+            throw new InvalidOperationException("لا يمكن اعتماد التصفية قبل تغطية كامل قيمة العهدة بالتسويات.");
+        }
+
+        var custodianName = custody.Driver?.FullName ?? custody.Employee?.FullName ?? string.Empty;
+        var approver = ServiceHelpers.Clean(approvedBy);
+        var now = DateTime.UtcNow;
+
+        await using var transaction = await _context.Database.BeginTransactionAsync();
+
+        if (custody.PaidFromTreasury)
+        {
+            // The disbursement already left the treasury as one lump sum. On approval that lump
+            // is reversed with a matching liquidation income, and each documented settlement is
+            // posted as an expense attributed to the custodian — net zero on the balance while
+            // itemizing exactly where the custody money went.
+            _context.TreasuryTransactions.Add(new TreasuryTransaction
+            {
+                TransactionDate = DateTime.Today,
+                TransactionType = "إيراد",
+                Amount = custody.Amount,
+                Description = $"تصفية عهدة {custody.CustodyNumber} — {custodianName}",
+                RelatedEntityType = "Custody",
+                RelatedEntityId = custody.Id,
+                PaymentMethod = "نقدي",
+                Notes = string.IsNullOrWhiteSpace(approver) ? string.Empty : $"اعتمدها: {approver}",
+                CreatedAt = now,
+                UpdatedAt = now
+            });
+
+            foreach (var settlement in custody.Settlements.OrderBy(s => s.SettlementDate).ThenBy(s => s.Id))
+            {
+                _context.TreasuryTransactions.Add(new TreasuryTransaction
+                {
+                    TransactionDate = settlement.SettlementDate,
+                    TransactionType = "صرف",
+                    Amount = settlement.Amount,
+                    Description = string.IsNullOrWhiteSpace(settlement.Description)
+                        ? $"مصروف من عهدة {custody.CustodyNumber} — {custodianName}"
+                        : $"من عهدة {custody.CustodyNumber} ({custodianName}): {settlement.Description}",
+                    RelatedEntityType = "CustodySettlement",
+                    RelatedEntityId = settlement.Id,
+                    PaymentMethod = "نقدي",
+                    Notes = settlement.Notes,
+                    CreatedAt = now,
+                    UpdatedAt = now
+                });
+            }
+        }
+
+        custody.Status = "Settled";
+        custody.ReturnDate ??= DateTime.Today;
+        custody.UpdatedAt = now;
+
+        await _context.SaveChangesAsync();
+        await _auditService.LogActionAsync(
+            "Approve", "Custody", custody.Id, "PendingApproval",
+            $"Settled by {approver}: {custody.CustodyNumber}");
+        await transaction.CommitAsync();
+
+        return (await GetByIdAsync(custody.Id))!;
+    }
+
+    public async Task<CustodyDto> RejectClosureAsync(int custodyId, string rejectedBy, string reason)
+    {
+        var custody = await _context.Custodies
+            .FirstOrDefaultAsync(c => c.Id == custodyId)
+            ?? throw new InvalidOperationException("العهدة غير موجودة.");
+
+        if (!string.Equals(custody.Status, "PendingApproval", StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException("العهدة ليست بانتظار الاعتماد.");
+        }
+
+        var cleanReason = ServiceHelpers.Clean(reason);
+        if (string.IsNullOrWhiteSpace(cleanReason))
+        {
+            throw new InvalidOperationException("سبب رفض التصفية مطلوب حتى يعرف أمين العهدة ما يجب تصحيحه.");
+        }
+
+        await using var transaction = await _context.Database.BeginTransactionAsync();
+
+        custody.Status = "Active";
+        var rejectionNote = $"رفض التصفية ({ServiceHelpers.Clean(rejectedBy)}): {cleanReason}";
+        custody.Notes = string.IsNullOrWhiteSpace(custody.Notes)
+            ? rejectionNote
+            : $"{custody.Notes} | {rejectionNote}";
+        custody.UpdatedAt = DateTime.UtcNow;
+
+        await _context.SaveChangesAsync();
+        await _auditService.LogActionAsync(
+            "Reject", "Custody", custody.Id, "PendingApproval", rejectionNote);
+        await transaction.CommitAsync();
+
+        return (await GetByIdAsync(custody.Id))!;
     }
 
     public async Task<CustodyDto> SaveAsync(CustodyFormDto dto)
@@ -862,7 +988,7 @@ public sealed class CustodyService(FleetDbContext context, IAuditService auditSe
         entity.Amount = dto.Amount;
         entity.HandoverDate = ServiceHelpers.OrToday(dto.HandoverDate);
         entity.ReturnDate = ServiceHelpers.OrNull(dto.ReturnDate);
-        entity.Status = string.IsNullOrWhiteSpace(dto.Status) ? "Active" : ServiceHelpers.Clean(dto.Status);
+        entity.Status = ServiceHelpers.NormalizeCustodyStatus(dto.Status);
         entity.PaidFromTreasury = dto.PaidFromTreasury;
         entity.Notes = ServiceHelpers.Clean(dto.Notes);
         entity.DocumentUrl = ServiceHelpers.Clean(dto.DocumentUrl);
@@ -969,8 +1095,9 @@ public sealed class CustodyService(FleetDbContext context, IAuditService auditSe
 
             if (remainingBalance - dto.Amount == 0)
             {
-                custody.Status = "Settled";
-                custody.ReturnDate ??= settlement.SettlementDate;
+                // Fully consumed: hand over to the treasury supervisor for approval.
+                // Only ApproveClosureAsync moves it to Settled and posts to the treasury.
+                custody.Status = "PendingApproval";
             }
 
             custody.UpdatedAt = DateTime.UtcNow;
@@ -996,15 +1123,19 @@ public sealed class CustodyService(FleetDbContext context, IAuditService auditSe
             .FirstOrDefaultAsync(s => s.Id == settlementId)
             ?? throw new InvalidOperationException("التسوية غير موجودة.");
 
-        await using var transaction = await _context.Database.BeginTransactionAsync();
-
         var custody = settlement.Custody!;
-        _context.CustodySettlements.Remove(settlement);
-
         if (string.Equals(custody.Status, "Settled", StringComparison.OrdinalIgnoreCase))
         {
+            throw new InvalidOperationException("العهدة معتمدة ومقفلة؛ لا يمكن حذف تسوياتها بعد ترحيلها إلى الخزينة.");
+        }
+
+        await using var transaction = await _context.Database.BeginTransactionAsync();
+
+        _context.CustodySettlements.Remove(settlement);
+
+        if (string.Equals(custody.Status, "PendingApproval", StringComparison.OrdinalIgnoreCase))
+        {
             custody.Status = "Active";
-            custody.ReturnDate = null;
         }
 
         custody.UpdatedAt = DateTime.UtcNow;

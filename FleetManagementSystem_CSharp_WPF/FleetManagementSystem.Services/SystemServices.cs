@@ -186,6 +186,8 @@ public sealed class DataBootstrapService(FleetDbContext context) : IDataBootstra
         await EnsureColumnAsync("Drivers", "FullAddress", GetInsuranceDetailsColumnDefinition());
         await EnsureColumnAsync("Drivers", "TrafficUnit", GetShortTextColumnDefinition(defaultValue: string.Empty));
         await EnsureColumnAsync("Drivers", "WorkLocation", GetShortTextColumnDefinition(defaultValue: string.Empty));
+        await EnsureColumnAsync("Users", "DriverId", GetNullableIntColumnDefinition());
+        await EnsureColumnAsync("Users", "EmployeeId", GetNullableIntColumnDefinition());
         await EnsureDriverAttendanceTableAsync();
         await EnsureCustodySchemaAsync();
         await EnsureCustodySettlementsTableAsync();
@@ -1007,6 +1009,33 @@ public sealed class AuthenticationService(FleetDbContext context, IAuditService 
         entity.FullName = ServiceHelpers.Clean(dto.FullName);
         entity.PhoneNumber = ServiceHelpers.Clean(dto.PhoneNumber);
         entity.Role = Enum.TryParse<UserRole>(dto.Role, true, out var role) ? role : UserRole.Staff;
+
+        if (entity.Role == UserRole.Custodian)
+        {
+            if (dto.DriverId.HasValue == dto.EmployeeId.HasValue)
+            {
+                throw new InvalidOperationException("حساب أمين العهدة يجب ربطه بسائق أو موظف واحد بالضبط.");
+            }
+
+            if (dto.DriverId.HasValue && !await _context.Drivers.AnyAsync(d => d.Id == dto.DriverId.Value))
+            {
+                throw new InvalidOperationException("السائق المرتبط بالحساب غير موجود.");
+            }
+
+            if (dto.EmployeeId.HasValue && !await _context.Employees.AnyAsync(e => e.Id == dto.EmployeeId.Value))
+            {
+                throw new InvalidOperationException("الموظف المرتبط بالحساب غير موجود.");
+            }
+
+            entity.DriverId = dto.DriverId;
+            entity.EmployeeId = dto.EmployeeId;
+        }
+        else
+        {
+            entity.DriverId = null;
+            entity.EmployeeId = null;
+        }
+
         entity.IsActive = dto.IsActive;
         entity.UpdatedAt = DateTime.UtcNow;
         if (dto.Id == 0)

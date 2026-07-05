@@ -6,6 +6,8 @@
         SizeToContent="Height"
         ResizeMode="NoResize"
         WindowStartupLocation="CenterOwner"
+        MaxHeight="{Binding Source={x:Static SystemParameters.WorkArea}, Path=Height}"
+        MaxWidth="{Binding Source={x:Static SystemParameters.WorkArea}, Path=Width}"
         FlowDirection="RightToLeft"
         Background="{StaticResource PageBackgroundBrush}"
         FontFamily="Cairo, Segoe UI, Tahoma">

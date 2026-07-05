@@ -10,7 +10,13 @@ public enum UserRole
     TripsLicensesOfficer,
     InsuranceOfficer,
     Viewer,
-    Staff
+    Staff,
+
+    /// <summary>
+    /// A driver or employee who holds financial custodies: sees only their own custodies
+    /// ("عهدتي") and records receipt-backed settlements against them.
+    /// </summary>
+    Custodian
 }
 
 public enum VehicleStatus

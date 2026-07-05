@@ -4,7 +4,7 @@
         Title="إضافة سائق"
         Width="720"
         SizeToContent="Height"
-        MaxHeight="760"
+        MaxHeight="{Binding Source={x:Static SystemParameters.WorkArea}, Path=Height}"
         WindowStartupLocation="CenterOwner"
         ResizeMode="NoResize"
         FlowDirection="RightToLeft"

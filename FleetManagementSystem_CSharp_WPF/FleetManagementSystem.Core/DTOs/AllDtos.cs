@@ -73,6 +73,8 @@ namespace FleetManagementSystem.Core.DTOs
         public string FullName { get; set; } = string.Empty;
         public string PhoneNumber { get; set; } = string.Empty;
         public string Role { get; set; } = "Staff";
+        public int? DriverId { get; set; }
+        public int? EmployeeId { get; set; }
         public bool IsActive { get; set; }
         public DateTime? LastLoginAt { get; set; }
         public List<string> AllowedModules { get; set; } = new List<string>();
@@ -105,6 +107,8 @@ namespace FleetManagementSystem.Core.DTOs
         public string Password { get; set; } = string.Empty;
         public string ConfirmPassword { get; set; } = string.Empty;
         public string Role { get; set; } = "Staff";
+        public int? DriverId { get; set; }
+        public int? EmployeeId { get; set; }
         public bool IsActive { get; set; } = true;
     }
 

@@ -1048,14 +1048,17 @@ public partial class MainWindow : Window
     private void UpdateCustodySummary()
     {
         var total = _custodies.Count;
-        var active = _custodies.Count(c =>
-            !string.Equals(c.Status, "Returned", StringComparison.OrdinalIgnoreCase) &&
-            !string.Equals(c.Status, "مسترجعة", StringComparison.OrdinalIgnoreCase));
-        var returned = total - active;
+        var pending = _custodies.Count(c => string.Equals(c.Status, "بانتظار الاعتماد", StringComparison.OrdinalIgnoreCase));
+        var closed = _custodies.Count(c =>
+            string.Equals(c.Status, "مرتجع", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(c.Status, "مسترجعة", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(c.Status, "تمت التسوية", StringComparison.OrdinalIgnoreCase));
+        var active = total - pending - closed;
 
         CustodyTotalCountTextBlock.Text = total.ToString();
         CustodyActiveCountTextBlock.Text = active.ToString();
-        CustodyReturnedCountTextBlock.Text = returned.ToString();
+        CustodyPendingCountTextBlock.Text = pending.ToString();
+        CustodyReturnedCountTextBlock.Text = closed.ToString();
     }
 
     private async Task LoadUsersAsync()
@@ -2842,14 +2845,14 @@ public partial class MainWindow : Window
     private CustodyFormDto ToForm(CustodyDto dto) => new()
     {
         Id = dto.Id,
-        VehicleId = dto.VehicleId,
+        DriverId = dto.DriverId,
+        EmployeeId = dto.EmployeeId,
         CustodyNumber = dto.CustodyNumber,
-        CustodianName = dto.CustodianName,
-        CustodianPosition = dto.CustodianPosition,
+        Amount = dto.Amount,
         HandoverDate = dto.HandoverDate,
         ReturnDate = dto.ReturnDate,
         Status = dto.Status,
-        VehicleConditionRating = dto.VehicleConditionRating,
+        PaidFromTreasury = dto.PaidFromTreasury,
         Notes = dto.Notes,
         DocumentUrl = dto.DocumentUrl
     };
@@ -2960,6 +2963,13 @@ public partial class MainWindow : Window
                 },
                 Width = new DataGridLength(WideGridColumnWidth)
             };
+            return;
+        }
+
+        if (ReferenceEquals(sender, UsersGrid) && e.PropertyName.Equals("EmployeeId", StringComparison.OrdinalIgnoreCase))
+        {
+            e.Column = CreateLookupColumn(e.PropertyName, "الموظف (أمين عهدة)", _employees, "FullName", "Id");
+            ApplyReadableColumnWidth(e.Column, e.PropertyName);
             return;
         }
 
@@ -4079,14 +4089,14 @@ public partial class MainWindow : Window
         }
 
         return TextFilterMatches(CustodyFilterId, custody.Id.ToString(CultureInfo.InvariantCulture))
-            && TextFilterMatches(CustodyFilterPlate, custody.VehiclePlateNumber)
+            && TextFilterMatches(CustodyFilterCustodianType, custody.CustodianType)
             && TextFilterMatches(CustodyFilterNumber, custody.CustodyNumber)
             && TextFilterMatches(CustodyFilterCustodian, custody.CustodianName)
-            && TextFilterMatches(CustodyFilterPosition, custody.CustodianPosition)
+            && TextFilterMatches(CustodyFilterAmount, custody.Amount.ToString("0.##", CultureInfo.InvariantCulture))
             && DateFilterMatches(CustodyFilterHandoverDate, custody.HandoverDate)
             && DateFilterMatches(CustodyFilterReturnDate, custody.ReturnDate)
             && TextFilterMatches(CustodyFilterStatus, custody.Status)
-            && TextFilterMatches(CustodyFilterRating, custody.VehicleConditionRating.ToString("0.##", CultureInfo.InvariantCulture))
+            && TextFilterMatches(CustodyFilterRemaining, custody.RemainingBalance.ToString("0.##", CultureInfo.InvariantCulture))
             && TextFilterMatches(CustodyFilterNotes, custody.Notes);
     }
 
@@ -5032,8 +5042,7 @@ public partial class MainWindow : Window
             return;
         }
 
-        var selectedVehicleId = Selected<CustodyDto>(CustodyGrid)?.VehicleId;
-        var window = new CustodyEntryWindow(_vehicles, selectedVehicleId)
+        var window = new CustodyEntryWindow(_drivers, _employees)
         {
             Owner = this
         };
@@ -5045,21 +5054,9 @@ public partial class MainWindow : Window
 
         await RunSafeAsync(async () =>
         {
+            // The service posts the treasury disbursement inside the same transaction.
             await _custodyService.SaveAsync(window.CustodyForm);
-            if (window.CustodyForm.Amount > 0)
-            {
-                var plate = _vehicles.FirstOrDefault(v => v.Id == window.CustodyForm.VehicleId)?.PlateNumber ?? string.Empty;
-                await _treasuryService.SaveAsync(new TreasuryTransactionFormDto
-                {
-                    TransactionDate = window.CustodyForm.HandoverDate,
-                    TransactionType = "صرف",
-                    Amount = window.CustodyForm.Amount,
-                    Description = $"عهدة {window.CustodyForm.CustodyNumber} - {window.CustodyForm.CustodianName} ({plate})",
-                    RelatedEntityType = "عهدة",
-                    PaymentMethod = "نقدي"
-                });
-                await LoadTreasuryIfUnlockedAsync();
-            }
+            await LoadTreasuryIfUnlockedAsync();
             await LoadCustodyIfUnlockedAsync();
             await LoadDashboardAsync();
             await LoadNotificationsAsync();
@@ -5080,7 +5077,7 @@ public partial class MainWindow : Window
             return;
         }
 
-        var window = new CustodyEntryWindow(_vehicles, item.VehicleId, item)
+        var window = new CustodyEntryWindow(_drivers, _employees, item)
         {
             Owner = this
         };
@@ -5092,27 +5089,76 @@ public partial class MainWindow : Window
 
         await RunSafeAsync(async () =>
         {
-            EnsureVehicleExists(window.CustodyForm.VehicleId, "سجل العهدة");
+            // The service keeps the treasury movement in sync inside the same transaction.
             await _custodyService.SaveAsync(window.CustodyForm);
-            if (window.CustodyForm.Amount > 0)
-            {
-                var plate = _vehicles.FirstOrDefault(v => v.Id == window.CustodyForm.VehicleId)?.PlateNumber ?? string.Empty;
-                await _treasuryService.SaveAsync(new TreasuryTransactionFormDto
-                {
-                    TransactionDate = window.CustodyForm.HandoverDate,
-                    TransactionType = "صرف",
-                    Amount = window.CustodyForm.Amount,
-                    Description = $"عهدة {window.CustodyForm.CustodyNumber} - {window.CustodyForm.CustodianName} ({plate})",
-                    RelatedEntityType = "عهدة",
-                    PaymentMethod = "نقدي"
-                });
-                await LoadTreasuryIfUnlockedAsync();
-            }
+            await LoadTreasuryIfUnlockedAsync();
             await LoadCustodyIfUnlockedAsync();
             await LoadDashboardAsync();
             await LoadNotificationsAsync();
         });
     }
+
+    private async void ApproveCustodyButton_Click(object sender, RoutedEventArgs e) => await RunSafeAsync(async () =>
+    {
+        if (IsModuleTemporarilyLocked("Custody"))
+        {
+            return;
+        }
+
+        var item = SelectCustodyFromSender(sender) ?? throw new InvalidOperationException("اختر سجل عهدة أولًا.");
+        var confirmed = MessageBox.Show(
+            $"اعتماد تصفية العهدة {item.CustodyNumber} الخاصة بـ {item.CustodianName}؟\n" +
+            "سيتم قفل العهدة وتسجيل مصاريفها في الخزينة منسوبة لصاحبها.",
+            "اعتماد تصفية العهدة",
+            MessageBoxButton.YesNo,
+            MessageBoxImage.Question);
+
+        if (confirmed != MessageBoxResult.Yes)
+        {
+            return;
+        }
+
+        var approver = _currentUser?.FullName;
+        if (string.IsNullOrWhiteSpace(approver))
+        {
+            approver = _currentUser?.Username ?? string.Empty;
+        }
+
+        await _custodyService.ApproveClosureAsync(item.Id, approver);
+        await LoadCustodyIfUnlockedAsync();
+        await LoadTreasuryIfUnlockedAsync();
+        await LoadDashboardAsync();
+    });
+
+    private async void RejectCustodyButton_Click(object sender, RoutedEventArgs e) => await RunSafeAsync(async () =>
+    {
+        if (IsModuleTemporarilyLocked("Custody"))
+        {
+            return;
+        }
+
+        var item = SelectCustodyFromSender(sender) ?? throw new InvalidOperationException("اختر سجل عهدة أولًا.");
+        var reasonWindow = new QuickNameEntryWindow(
+            "رفض تصفية العهدة",
+            $"اكتب سبب رفض تصفية العهدة {item.CustodyNumber} حتى يظهر لأمين العهدة:")
+        {
+            Owner = this
+        };
+
+        if (reasonWindow.ShowDialog() != true || string.IsNullOrWhiteSpace(reasonWindow.EnteredName))
+        {
+            return;
+        }
+
+        var supervisor = _currentUser?.FullName;
+        if (string.IsNullOrWhiteSpace(supervisor))
+        {
+            supervisor = _currentUser?.Username ?? string.Empty;
+        }
+
+        await _custodyService.RejectClosureAsync(item.Id, supervisor, reasonWindow.EnteredName.Trim());
+        await LoadCustodyIfUnlockedAsync();
+    });
 
     private async void DeleteCustodyButton_Click(object sender, RoutedEventArgs e) => await RunSafeAsync(() =>
     {

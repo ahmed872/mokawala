@@ -125,6 +125,7 @@ public partial class App : Application
         services.AddScoped<ITreasuryService, TreasuryService>();
         services.AddScoped<ILicenseService, LicenseService>();
         services.AddScoped<IInsuranceService, InsuranceService>();
+        services.AddSingleton<IReceiptFileService, ReceiptFileService>();
         services.AddScoped<ICustodyService, CustodyService>();
         services.AddScoped<IMasterDataService, MasterDataService>();
         services.AddScoped<IAuditService, AuditService>();

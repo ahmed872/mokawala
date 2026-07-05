@@ -144,6 +144,19 @@ public interface ICustodyService
 
     /// <summary>Removes an erroneous settlement and restores the settled amount to the custody balance.</summary>
     Task DeleteSettlementAsync(int settlementId);
+
+    /// <summary>Custodies fully consumed by settlements, awaiting the treasury supervisor's decision.</summary>
+    Task<List<CustodyDto>> GetPendingApprovalAsync();
+
+    /// <summary>
+    /// Treasury supervisor approval: closes the custody as Settled and, for treasury-funded
+    /// custodies, posts the liquidation to the treasury — one reversal income plus one expense
+    /// entry per settlement attributed to the custodian — atomically.
+    /// </summary>
+    Task<CustodyDto> ApproveClosureAsync(int custodyId, string approvedBy);
+
+    /// <summary>Treasury supervisor rejection: reopens the custody with the reason recorded in its notes.</summary>
+    Task<CustodyDto> RejectClosureAsync(int custodyId, string rejectedBy, string reason);
 }
 
 /// <summary>

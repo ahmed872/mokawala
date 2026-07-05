@@ -84,6 +84,19 @@ public partial class LoginWindow : Window
                 return;
             }
 
+            // Custodian accounts (drivers/employees holding custodies) get the self-service
+            // "عهدتي" dashboard only — never the operational main window.
+            if (string.Equals(user.Role, "Custodian", StringComparison.OrdinalIgnoreCase))
+            {
+                var custodyWindow = new MyCustodyWindow(
+                    _serviceProvider.GetRequiredService<ICustodyService>(),
+                    user);
+                Application.Current.MainWindow = custodyWindow;
+                custodyWindow.Show();
+                Close();
+                return;
+            }
+
             var mainWindow = _serviceProvider.GetRequiredService<MainWindow>();
             mainWindow.SetCurrentUser(user);
             Application.Current.MainWindow = mainWindow;

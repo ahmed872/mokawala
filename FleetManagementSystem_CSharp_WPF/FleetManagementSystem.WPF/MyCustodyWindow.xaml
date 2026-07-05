@@ -1,0 +1,279 @@
+<Window x:Class="FleetManagementSystem.WPF.MyCustodyWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="عهدتي"
+        Width="1180"
+        Height="760"
+        MaxWidth="{Binding Source={x:Static SystemParameters.WorkArea}, Path=Width}"
+        MaxHeight="{Binding Source={x:Static SystemParameters.WorkArea}, Path=Height}"
+        MinWidth="900"
+        MinHeight="560"
+        WindowStartupLocation="CenterScreen"
+        ResizeMode="CanResize"
+        AutomationProperties.AutomationId="MyCustodyWindow"
+        AutomationProperties.Name="نافذة عهدتي"
+        FlowDirection="RightToLeft"
+        Background="#F6F8F4">
+    <Window.Resources>
+        <SolidColorBrush x:Key="MyCustodySurfaceBrush" Color="#FFFFFF"/>
+        <SolidColorBrush x:Key="MyCustodyAccentBrush" Color="#53766A"/>
+        <SolidColorBrush x:Key="MyCustodyAccentPaleBrush" Color="#E6F0EB"/>
+        <SolidColorBrush x:Key="MyCustodyTextBrush" Color="#24333A"/>
+        <SolidColorBrush x:Key="MyCustodyMutedBrush" Color="#6A7880"/>
+        <SolidColorBrush x:Key="MyCustodyBorderBrush" Color="#D7E2DB"/>
+
+        <Style x:Key="MyCustodyCardStyle" TargetType="Border">
+            <Setter Property="Background" Value="{StaticResource MyCustodySurfaceBrush}"/>
+            <Setter Property="BorderBrush" Value="{StaticResource MyCustodyBorderBrush}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="CornerRadius" Value="18"/>
+            <Setter Property="Padding" Value="16"/>
+        </Style>
+
+        <Style x:Key="MyCustodyLabelStyle" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="{StaticResource MyCustodyTextBrush}"/>
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+        </Style>
+
+        <Style x:Key="MyCustodyPrimaryButtonStyle" TargetType="Button">
+            <Setter Property="Height" Value="42"/>
+            <Setter Property="MinWidth" Value="130"/>
+            <Setter Property="Padding" Value="18,6"/>
+            <Setter Property="FontSize" Value="14"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="Background" Value="{StaticResource MyCustodyAccentBrush}"/>
+            <Setter Property="BorderBrush" Value="{StaticResource MyCustodyAccentBrush}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="ButtonBorder"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="12">
+                            <ContentPresenter HorizontalAlignment="Center"
+                                              VerticalAlignment="Center"
+                                              Margin="{TemplateBinding Padding}"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="ButtonBorder" Property="Opacity" Value="0.92"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="ButtonBorder" Property="Opacity" Value="0.82"/>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter TargetName="ButtonBorder" Property="Opacity" Value="0.45"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="MyCustodySecondaryButtonStyle" TargetType="Button" BasedOn="{StaticResource MyCustodyPrimaryButtonStyle}">
+            <Setter Property="Foreground" Value="{StaticResource MyCustodyTextBrush}"/>
+            <Setter Property="Background" Value="{StaticResource MyCustodyAccentPaleBrush}"/>
+            <Setter Property="BorderBrush" Value="{StaticResource MyCustodyBorderBrush}"/>
+        </Style>
+    </Window.Resources>
+
+    <Grid Margin="18">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <Border Style="{StaticResource MyCustodyCardStyle}"
+                Background="{StaticResource MyCustodyAccentPaleBrush}"
+                Margin="0,0,0,14">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <StackPanel>
+                    <TextBlock Text="عهدتي"
+                               FontSize="26"
+                               FontWeight="Bold"
+                               Foreground="{StaticResource MyCustodyTextBrush}"/>
+                    <TextBlock x:Name="WelcomeTextBlock"
+                               Margin="0,6,0,0"
+                               FontSize="14"
+                               Foreground="{StaticResource MyCustodyMutedBrush}"
+                               Text="سجل مصاريفك من العهدة بفاتورة ممسوحة، وعند تصفير الرصيد تتحول العهدة تلقائيًا لمشرف الخزينة للاعتماد."
+                               TextWrapping="Wrap"/>
+                </StackPanel>
+                <StackPanel Grid.Column="1"
+                            Orientation="Horizontal"
+                            VerticalAlignment="Center">
+                    <Button Content="تحديث"
+                            Style="{StaticResource MyCustodySecondaryButtonStyle}"
+                            Margin="0,0,10,0"
+                            AutomationProperties.AutomationId="MyCustodyRefreshButton"
+                            Click="RefreshButton_Click"/>
+                    <Button Content="خروج"
+                            Style="{StaticResource MyCustodySecondaryButtonStyle}"
+                            AutomationProperties.AutomationId="MyCustodyLogoutButton"
+                            Click="LogoutButton_Click"/>
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <Grid Grid.Row="1">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="7*"/>
+                <ColumnDefinition Width="18"/>
+                <ColumnDefinition Width="5*"/>
+            </Grid.ColumnDefinitions>
+
+            <Grid Grid.Column="0">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="*"/>
+                    <RowDefinition Height="14"/>
+                    <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>
+
+                <Border Style="{StaticResource MyCustodyCardStyle}">
+                    <DockPanel>
+                        <TextBlock DockPanel.Dock="Top"
+                                   Text="العهد الخاصة بي"
+                                   Style="{StaticResource MyCustodyLabelStyle}"
+                                   FontSize="15"
+                                   Margin="0,0,0,10"/>
+                        <DataGrid x:Name="MyCustodiesGrid"
+                                  AutomationProperties.AutomationId="MyCustodiesGrid"
+                                  AutoGenerateColumns="False"
+                                  IsReadOnly="True"
+                                  HeadersVisibility="Column"
+                                  MinRowHeight="34"
+                                  SelectionMode="Single"
+                                  SelectionChanged="MyCustodiesGrid_SelectionChanged">
+                            <DataGrid.Columns>
+                                <DataGridTextColumn Header="رقم العهدة" Binding="{Binding CustodyNumber}" Width="140"/>
+                                <DataGridTextColumn Header="المبلغ" Binding="{Binding Amount, StringFormat=N2}" Width="120"/>
+                                <DataGridTextColumn Header="المنصرف" Binding="{Binding SettledAmount, StringFormat=N2}" Width="120"/>
+                                <DataGridTextColumn Header="المتبقي" Binding="{Binding RemainingBalance, StringFormat=N2}" Width="120"/>
+                                <DataGridTextColumn Header="الحالة" Binding="{Binding Status}" Width="140"/>
+                                <DataGridTextColumn Header="تاريخ التسليم" Binding="{Binding HandoverDate, StringFormat=yyyy-MM-dd}" Width="130"/>
+                            </DataGrid.Columns>
+                        </DataGrid>
+                    </DockPanel>
+                </Border>
+
+                <Border Grid.Row="2"
+                        Style="{StaticResource MyCustodyCardStyle}">
+                    <DockPanel>
+                        <TextBlock DockPanel.Dock="Top"
+                                   Text="تسويات العهدة المختارة"
+                                   Style="{StaticResource MyCustodyLabelStyle}"
+                                   FontSize="15"
+                                   Margin="0,0,0,10"/>
+                        <DataGrid x:Name="SettlementsGrid"
+                                  AutomationProperties.AutomationId="MyCustodySettlementsGrid"
+                                  AutoGenerateColumns="False"
+                                  IsReadOnly="True"
+                                  HeadersVisibility="Column"
+                                  MinRowHeight="32">
+                            <DataGrid.Columns>
+                                <DataGridTextColumn Header="التاريخ" Binding="{Binding SettlementDate, StringFormat=yyyy-MM-dd}" Width="120"/>
+                                <DataGridTextColumn Header="المبلغ" Binding="{Binding Amount, StringFormat=N2}" Width="120"/>
+                                <DataGridTextColumn Header="البيان" Binding="{Binding Description}" Width="*"/>
+                                <DataGridTextColumn Header="الفاتورة" Binding="{Binding ReceiptFilePath}" Width="220"/>
+                            </DataGrid.Columns>
+                        </DataGrid>
+                    </DockPanel>
+                </Border>
+            </Grid>
+
+            <Border Grid.Column="2"
+                    Style="{StaticResource MyCustodyCardStyle}">
+                <ScrollViewer VerticalScrollBarVisibility="Auto"
+                              HorizontalScrollBarVisibility="Disabled">
+                    <StackPanel>
+                        <TextBlock Text="تسوية مصروف من العهدة"
+                                   Style="{StaticResource MyCustodyLabelStyle}"
+                                   FontSize="16"
+                                   Margin="0,0,0,4"/>
+                        <TextBlock x:Name="SelectedCustodyTextBlock"
+                                   Text="اختر عهدة من القائمة أولًا"
+                                   Foreground="{StaticResource MyCustodyMutedBrush}"
+                                   FontSize="13"
+                                   Margin="0,0,0,14"
+                                   TextWrapping="Wrap"/>
+
+                        <TextBlock Text="قيمة المصروف"
+                                   Style="{StaticResource MyCustodyLabelStyle}"/>
+                        <TextBox x:Name="SettlementAmountTextBox"
+                                 AutomationProperties.AutomationId="SettlementAmountTextBox"
+                                 Margin="0,6,0,12"
+                                 Style="{StaticResource AppTextBoxStyle}"/>
+
+                        <TextBlock Text="تاريخ المصروف"
+                                   Style="{StaticResource MyCustodyLabelStyle}"/>
+                        <DatePicker x:Name="SettlementDatePicker"
+                                    AutomationProperties.AutomationId="SettlementDatePicker"
+                                    Margin="0,6,0,12"
+                                    SelectedDateFormat="Short"/>
+
+                        <TextBlock Text="البيان (اتصرف في إيه؟)"
+                                   Style="{StaticResource MyCustodyLabelStyle}"/>
+                        <TextBox x:Name="SettlementDescriptionTextBox"
+                                 AutomationProperties.AutomationId="SettlementDescriptionTextBox"
+                                 Margin="0,6,0,12"
+                                 Style="{StaticResource AppTextBoxStyle}"/>
+
+                        <TextBlock Text="الفاتورة الممسوحة (PNG / JPEG / PDF) — إلزامية"
+                                   Style="{StaticResource MyCustodyLabelStyle}"/>
+                        <Grid Margin="0,6,0,12">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <Button Content="اختيار ملف"
+                                    Style="{StaticResource MyCustodySecondaryButtonStyle}"
+                                    MinWidth="110"
+                                    AutomationProperties.AutomationId="PickReceiptButton"
+                                    Click="PickReceiptButton_Click"/>
+                            <TextBlock x:Name="ReceiptPathTextBlock"
+                                       Grid.Column="1"
+                                       Margin="10,0,0,0"
+                                       VerticalAlignment="Center"
+                                       Foreground="{StaticResource MyCustodyMutedBrush}"
+                                       TextTrimming="CharacterEllipsis"
+                                       Text="لم يتم اختيار ملف"/>
+                        </Grid>
+
+                        <TextBlock Text="ملاحظات"
+                                   Style="{StaticResource MyCustodyLabelStyle}"/>
+                        <TextBox x:Name="SettlementNotesTextBox"
+                                 AutomationProperties.AutomationId="SettlementNotesTextBox"
+                                 Margin="0,6,0,16"
+                                 MinHeight="64"
+                                 AcceptsReturn="True"
+                                 TextWrapping="Wrap"
+                                 VerticalScrollBarVisibility="Auto"
+                                 Style="{StaticResource AppTextBoxStyle}"/>
+
+                        <Button x:Name="SubmitSettlementButton"
+                                Content="تسجيل التسوية"
+                                Style="{StaticResource MyCustodyPrimaryButtonStyle}"
+                                AutomationProperties.AutomationId="SubmitSettlementButton"
+                                Click="SubmitSettlementButton_Click"/>
+
+                        <TextBlock x:Name="SettlementHintTextBlock"
+                                   Margin="0,12,0,0"
+                                   FontSize="12.5"
+                                   Foreground="{StaticResource MyCustodyMutedBrush}"
+                                   TextWrapping="Wrap"
+                                   Text="لا يمكن حفظ أي تسوية بدون إرفاق فاتورة. عند وصول الرصيد المتبقي إلى صفر تتحول العهدة تلقائيًا إلى مشرف الخزينة للاعتماد."/>
+                    </StackPanel>
+                </ScrollViewer>
+            </Border>
+        </Grid>
+    </Grid>
+</Window>

@@ -3,9 +3,12 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="إضافة عهدة جديدة"
         Width="920"
-        Height="720"
+        MaxWidth="{Binding Source={x:Static SystemParameters.WorkArea}, Path=Width}"
+        Height="700"
+        MaxHeight="{Binding Source={x:Static SystemParameters.WorkArea}, Path=Height}"
+        MinHeight="420"
         WindowStartupLocation="CenterOwner"
-        ResizeMode="NoResize"
+        ResizeMode="CanResize"
         AutomationProperties.AutomationId="CustodyEntryWindow"
         AutomationProperties.Name="نافذة إضافة عهدة جديدة"
         FlowDirection="RightToLeft"
@@ -147,15 +150,51 @@
                                 </Grid.ColumnDefinitions>
 
                                 <StackPanel>
-                                        <TextBlock Text="إضافة عهدة جديدة"
-                                                   FontSize="28"
+                                        <TextBlock Text="عهدة مالية لأمين عهدة"
+                                                   FontSize="26"
                                                    FontWeight="Bold"
                                                    Foreground="{StaticResource CustodyPopupTextBrush}"/>
                                         <TextBlock Margin="0,8,0,0"
                                                    FontSize="14"
                                                    Foreground="{StaticResource CustodyPopupMutedBrush}"
-                                                   Text="سجل العهدة من فورم واحد واضح، وسيتم ربطها بالعربية المختارة مباشرة داخل قاعدة البيانات."
+                                                   Text="العهدة تُسند لسائق أو موظف، ويُخصم مبلغها من الخزينة تلقائيًا في نفس العملية عند اختيار الصرف من الخزينة."
                                                    TextWrapping="Wrap"/>
+                                        <StackPanel Orientation="Horizontal"
+                                                    Margin="0,10,0,0">
+                                                <TextBlock Text="الأمين المختار: "
+                                                           Style="{StaticResource CustodyPopupLabelStyle}"
+                                                           VerticalAlignment="Center"/>
+                                                <TextBlock x:Name="CustodianSummaryTextBlock"
+                                                           Text="-"
+                                                           Margin="6,0,0,0"
+                                                           FontSize="15"
+                                                           FontWeight="Bold"
+                                                           Foreground="{StaticResource CustodyPopupAccentBrush}"
+                                                           VerticalAlignment="Center"/>
+                                        </StackPanel>
+                                        <StackPanel x:Name="EditBalancePanel"
+                                                    Orientation="Horizontal"
+                                                    Margin="0,6,0,0"
+                                                    Visibility="Collapsed">
+                                                <TextBlock Text="المنصرف من العهدة: "
+                                                           Style="{StaticResource CustodyPopupLabelStyle}"
+                                                           VerticalAlignment="Center"/>
+                                                <TextBlock x:Name="SettledSummaryTextBlock"
+                                                           Text="0"
+                                                           Margin="6,0,18,0"
+                                                           FontWeight="Bold"
+                                                           Foreground="#B26A00"
+                                                           VerticalAlignment="Center"/>
+                                                <TextBlock Text="الرصيد المتبقي: "
+                                                           Style="{StaticResource CustodyPopupLabelStyle}"
+                                                           VerticalAlignment="Center"/>
+                                                <TextBlock x:Name="RemainingSummaryTextBlock"
+                                                           Text="0"
+                                                           Margin="6,0,0,0"
+                                                           FontWeight="Bold"
+                                                           Foreground="#2E7D32"
+                                                           VerticalAlignment="Center"/>
+                                        </StackPanel>
                                 </StackPanel>
 
                                 <Border Grid.Column="1"
@@ -179,231 +218,146 @@
                               Margin="0,18,0,18"
                               VerticalScrollBarVisibility="Auto"
                               HorizontalScrollBarVisibility="Disabled">
-                        <StackPanel>
-                                <Border Style="{StaticResource CustodyPopupCardStyle}"
-                                        Margin="0,0,0,18">
-                                        <Grid>
-                                                <Grid.ColumnDefinitions>
-                                                        <ColumnDefinition Width="*"/>
-                                                        <ColumnDefinition Width="*"/>
-                                                        <ColumnDefinition Width="*"/>
-                                                        <ColumnDefinition Width="*"/>
-                                                </Grid.ColumnDefinitions>
-                                                <Grid.RowDefinitions>
-                                                        <RowDefinition Height="Auto"/>
-                                                        <RowDefinition Height="Auto"/>
-                                                </Grid.RowDefinitions>
+                        <Border Style="{StaticResource CustodyPopupCardStyle}">
+                                <Grid Margin="0,4,0,0">
+                                        <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
+                                        <Grid.RowDefinitions>
+                                                <RowDefinition Height="Auto"/>
+                                                <RowDefinition Height="Auto"/>
+                                                <RowDefinition Height="Auto"/>
+                                                <RowDefinition Height="Auto"/>
+                                                <RowDefinition Height="Auto"/>
+                                        </Grid.RowDefinitions>
 
-                                                <StackPanel Margin="0,0,12,12">
-                                                        <TextBlock Text="رقم السيارة"
-                                                                   Style="{StaticResource CustodyPopupLabelStyle}"/>
-                                                        <TextBlock x:Name="VehiclePlateTextBlock"
-                                                                   Style="{StaticResource CustodyPopupValueStyle}"
-                                                                   Text="اختر سيارة"/>
-                                                </StackPanel>
+                                        <StackPanel Margin="0,0,12,14">
+                                                <TextBlock Text="نوع أمين العهدة"
+                                                           Style="{StaticResource CustodyPopupLabelStyle}"/>
+                                                <ComboBox x:Name="CustodianTypeComboBox"
+                                                          AutomationProperties.AutomationId="CustodianTypeComboBox"
+                                                          AutomationProperties.Name="نوع أمين العهدة"
+                                                          Margin="0,8,0,0"
+                                                          Style="{StaticResource AppComboBoxStyle}"
+                                                          SelectedIndex="0"
+                                                          SelectionChanged="CustodianTypeComboBox_SelectionChanged">
+                                                        <ComboBoxItem Content="سائق"
+                                                                      Tag="Driver"/>
+                                                        <ComboBoxItem Content="موظف"
+                                                                      Tag="Employee"/>
+                                                </ComboBox>
+                                        </StackPanel>
 
-                                                <StackPanel Grid.Column="1"
-                                                            Margin="0,0,12,12">
-                                                        <TextBlock Text="نوع السيارة"
-                                                                   Style="{StaticResource CustodyPopupLabelStyle}"/>
-                                                        <TextBlock x:Name="VehicleTypeTextBlock"
-                                                                   Style="{StaticResource CustodyPopupValueStyle}"
-                                                                   Text="-"/>
-                                                </StackPanel>
+                                        <StackPanel Grid.Column="1"
+                                                    Margin="0,0,0,14">
+                                                <TextBlock Text="أمين العهدة"
+                                                           Style="{StaticResource CustodyPopupLabelStyle}"/>
+                                                <ComboBox x:Name="CustodianComboBox"
+                                                          AutomationProperties.AutomationId="CustodianComboBox"
+                                                          AutomationProperties.Name="أمين العهدة"
+                                                          Margin="0,8,0,0"
+                                                          Style="{StaticResource AppComboBoxStyle}"
+                                                          DisplayMemberPath="FullName"
+                                                          SelectedValuePath="Id"
+                                                          SelectionChanged="CustodianComboBox_SelectionChanged"/>
+                                        </StackPanel>
 
-                                                <StackPanel Grid.Column="2"
-                                                            Margin="0,0,12,12">
-                                                        <TextBlock Text="الموديل"
-                                                                   Style="{StaticResource CustodyPopupLabelStyle}"/>
-                                                        <TextBlock x:Name="VehicleModelTextBlock"
-                                                                   Style="{StaticResource CustodyPopupValueStyle}"
-                                                                   Text="-"/>
-                                                </StackPanel>
+                                        <StackPanel Grid.Row="1"
+                                                    Margin="0,0,12,14">
+                                                <TextBlock Text="رقم العهدة"
+                                                           Style="{StaticResource CustodyPopupLabelStyle}"/>
+                                                <TextBox x:Name="CustodyNumberTextBox"
+                                                         AutomationProperties.AutomationId="CustodyNumberTextBox"
+                                                         AutomationProperties.Name="رقم العهدة"
+                                                         Margin="0,8,0,0"
+                                                         Style="{StaticResource AppTextBoxStyle}"/>
+                                        </StackPanel>
 
-                                                <StackPanel Grid.Column="3"
-                                                            Margin="0,0,0,12">
-                                                        <TextBlock Text="سنة الصنع"
-                                                                   Style="{StaticResource CustodyPopupLabelStyle}"/>
-                                                        <TextBlock x:Name="VehicleYearTextBlock"
-                                                                   Style="{StaticResource CustodyPopupValueStyle}"
-                                                                   Text="-"/>
-                                                </StackPanel>
+                                        <StackPanel Grid.Row="1"
+                                                    Grid.Column="1"
+                                                    Margin="0,0,0,14">
+                                                <TextBlock Text="مبلغ العهدة"
+                                                           Style="{StaticResource CustodyPopupLabelStyle}"/>
+                                                <TextBox x:Name="AmountTextBox"
+                                                         AutomationProperties.AutomationId="CustodyAmountTextBox"
+                                                         AutomationProperties.Name="مبلغ العهدة"
+                                                         Margin="0,8,0,0"
+                                                         Style="{StaticResource AppTextBoxStyle}"
+                                                         ToolTip="عند الصرف من الخزينة يُخصم المبلغ تلقائيًا في نفس العملية"/>
+                                        </StackPanel>
 
-                                                <StackPanel Grid.Row="1"
-                                                            Margin="0,0,12,0">
-                                                        <TextBlock Text="رقم الشاسيه"
-                                                                   Style="{StaticResource CustodyPopupLabelStyle}"/>
-                                                        <TextBlock x:Name="VehicleChassisTextBlock"
-                                                                   Style="{StaticResource CustodyPopupValueStyle}"
-                                                                   Text="-"/>
-                                                </StackPanel>
+                                        <StackPanel Grid.Row="2"
+                                                    Margin="0,0,12,14">
+                                                <TextBlock Text="تاريخ التسليم"
+                                                           Style="{StaticResource CustodyPopupLabelStyle}"/>
+                                                <DatePicker x:Name="HandoverDatePicker"
+                                                            AutomationProperties.AutomationId="CustodyHandoverDatePicker"
+                                                            AutomationProperties.Name="تاريخ التسليم"
+                                                            Margin="0,8,0,0"
+                                                            SelectedDateFormat="Short"/>
+                                        </StackPanel>
 
-                                                <StackPanel Grid.Row="1"
-                                                            Grid.Column="1"
-                                                            Margin="0,0,12,0">
-                                                        <TextBlock Text="رقم الموتور"
-                                                                   Style="{StaticResource CustodyPopupLabelStyle}"/>
-                                                        <TextBlock x:Name="VehicleEngineTextBlock"
-                                                                   Style="{StaticResource CustodyPopupValueStyle}"
-                                                                   Text="-"/>
-                                                </StackPanel>
+                                        <StackPanel Grid.Row="2"
+                                                    Grid.Column="1"
+                                                    Margin="0,0,0,14">
+                                                <TextBlock Text="تاريخ الإرجاع"
+                                                           Style="{StaticResource CustodyPopupLabelStyle}"/>
+                                                <DatePicker x:Name="ReturnDatePicker"
+                                                            AutomationProperties.AutomationId="CustodyReturnDatePicker"
+                                                            AutomationProperties.Name="تاريخ الإرجاع"
+                                                            Margin="0,8,0,0"
+                                                            SelectedDateFormat="Short"/>
+                                        </StackPanel>
 
-                                                <StackPanel Grid.Row="1"
-                                                            Grid.Column="2"
-                                                            Margin="0,0,12,0">
-                                                        <TextBlock Text="الحالة"
-                                                                   Style="{StaticResource CustodyPopupLabelStyle}"/>
-                                                        <TextBlock x:Name="VehicleStatusTextBlock"
-                                                                   Style="{StaticResource CustodyPopupValueStyle}"
-                                                                   Text="-"/>
-                                                </StackPanel>
-                                        </Grid>
-                                </Border>
+                                        <StackPanel Grid.Row="3"
+                                                    Margin="0,0,12,14">
+                                                <TextBlock Text="الحالة"
+                                                           Style="{StaticResource CustodyPopupLabelStyle}"/>
+                                                <ComboBox x:Name="StatusComboBox"
+                                                          AutomationProperties.AutomationId="CustodyStatusComboBox"
+                                                          AutomationProperties.Name="حالة العهدة"
+                                                          Margin="0,8,0,0"
+                                                          Style="{StaticResource AppComboBoxStyle}"
+                                                          SelectedIndex="0">
+                                                        <ComboBoxItem Content="نشط"
+                                                                      Tag="Active"/>
+                                                        <ComboBoxItem Content="مرتجع"
+                                                                      Tag="Returned"/>
+                                                </ComboBox>
+                                        </StackPanel>
 
-                                <Border Style="{StaticResource CustodyPopupCardStyle}">
-                                        <Grid Margin="0,4,0,0">
-                                                <Grid.ColumnDefinitions>
-                                                        <ColumnDefinition Width="*"/>
-                                                        <ColumnDefinition Width="*"/>
-                                                </Grid.ColumnDefinitions>
-                                                <Grid.RowDefinitions>
-                                                        <RowDefinition Height="Auto"/>
-                                                        <RowDefinition Height="Auto"/>
-                                                        <RowDefinition Height="Auto"/>
-                                                        <RowDefinition Height="Auto"/>
-                                                        <RowDefinition Height="Auto"/>
-                                                        <RowDefinition Height="Auto"/>
-                                                </Grid.RowDefinitions>
+                                        <StackPanel Grid.Row="3"
+                                                    Grid.Column="1"
+                                                    Margin="0,0,0,14"
+                                                    VerticalAlignment="Bottom">
+                                                <CheckBox x:Name="PaidFromTreasuryCheckBox"
+                                                          AutomationProperties.AutomationId="CustodyPaidFromTreasuryCheckBox"
+                                                          AutomationProperties.Name="الصرف من الخزينة"
+                                                          Content="صرف مبلغ العهدة من الخزينة (خصم فوري متزامن)"
+                                                          IsChecked="True"
+                                                          FontSize="14"
+                                                          FontWeight="SemiBold"
+                                                          Foreground="{StaticResource CustodyPopupTextBrush}"
+                                                          Margin="0,8,0,6"/>
+                                        </StackPanel>
 
-                                                <StackPanel Margin="0,0,12,14">
-                                                        <TextBlock Text="رقم السيارة"
-                                                                   Style="{StaticResource CustodyPopupLabelStyle}"/>
-                                                        <ComboBox x:Name="VehicleComboBox"
-                                                                  AutomationProperties.AutomationId="CustodyVehicleComboBox"
-                                                                  AutomationProperties.Name="رقم السيارة"
-                                                                  Margin="0,8,0,0"
-                                                                  Style="{StaticResource AppComboBoxStyle}"
-                                                                  DisplayMemberPath="PlateNumber"
-                                                                  SelectedValuePath="Id"
-                                                                  SelectionChanged="VehicleComboBox_SelectionChanged"/>
-                                                </StackPanel>
-
-                                                <StackPanel Grid.Column="1"
-                                                            Margin="0,0,0,14">
-                                                        <TextBlock Text="رقم العهدة"
-                                                                   Style="{StaticResource CustodyPopupLabelStyle}"/>
-                                                        <TextBox x:Name="CustodyNumberTextBox"
-                                                                 AutomationProperties.AutomationId="CustodyNumberTextBox"
-                                                                 AutomationProperties.Name="رقم العهدة"
-                                                                 Margin="0,8,0,0"
-                                                                 Style="{StaticResource AppTextBoxStyle}"/>
-                                                </StackPanel>
-
-                                                <StackPanel Grid.Row="1"
-                                                            Margin="0,0,12,14">
-                                                        <TextBlock Text="المستلم"
-                                                                   Style="{StaticResource CustodyPopupLabelStyle}"/>
-                                                        <TextBox x:Name="CustodianNameTextBox"
-                                                                 AutomationProperties.AutomationId="CustodianNameTextBox"
-                                                                 AutomationProperties.Name="المستلم"
-                                                                 Margin="0,8,0,0"
-                                                                 Style="{StaticResource AppTextBoxStyle}"/>
-                                                </StackPanel>
-
-                                                <StackPanel Grid.Row="1"
-                                                            Grid.Column="1"
-                                                            Margin="0,0,0,14">
-                                                        <TextBlock Text="الوظيفة"
-                                                                   Style="{StaticResource CustodyPopupLabelStyle}"/>
-                                                        <TextBox x:Name="CustodianPositionTextBox"
-                                                                 AutomationProperties.AutomationId="CustodianPositionTextBox"
-                                                                 AutomationProperties.Name="الوظيفة"
-                                                                 Margin="0,8,0,0"
-                                                                 Style="{StaticResource AppTextBoxStyle}"/>
-                                                </StackPanel>
-
-                                                <StackPanel Grid.Row="2"
-                                                            Margin="0,0,12,14">
-                                                        <TextBlock Text="تاريخ التسليم"
-                                                                   Style="{StaticResource CustodyPopupLabelStyle}"/>
-                                                        <DatePicker x:Name="HandoverDatePicker"
-                                                                    AutomationProperties.AutomationId="CustodyHandoverDatePicker"
-                                                                    AutomationProperties.Name="تاريخ التسليم"
-                                                                    Margin="0,8,0,0"
-                                                                    SelectedDateFormat="Short"/>
-                                                </StackPanel>
-
-                                                <StackPanel Grid.Row="2"
-                                                            Grid.Column="1"
-                                                            Margin="0,0,0,14">
-                                                        <TextBlock Text="تاريخ الإرجاع"
-                                                                   Style="{StaticResource CustodyPopupLabelStyle}"/>
-                                                        <DatePicker x:Name="ReturnDatePicker"
-                                                                    AutomationProperties.AutomationId="CustodyReturnDatePicker"
-                                                                    AutomationProperties.Name="تاريخ الإرجاع"
-                                                                    Margin="0,8,0,0"
-                                                                    SelectedDateFormat="Short"/>
-                                                </StackPanel>
-
-                                                <StackPanel Grid.Row="3"
-                                                            Margin="0,0,12,14">
-                                                        <TextBlock Text="الحالة"
-                                                                   Style="{StaticResource CustodyPopupLabelStyle}"/>
-                                                        <ComboBox x:Name="StatusComboBox"
-                                                                  AutomationProperties.AutomationId="CustodyStatusComboBox"
-                                                                  AutomationProperties.Name="حالة العهدة"
-                                                                  Margin="0,8,0,0"
-                                                                  Style="{StaticResource AppComboBoxStyle}"
-                                                                  SelectedIndex="0">
-                                                                <ComboBoxItem Content="نشط"
-                                                                              Tag="Active"/>
-                                                                <ComboBoxItem Content="مرتجع"
-                                                                              Tag="Returned"/>
-                                                        </ComboBox>
-                                                </StackPanel>
-
-                                                <StackPanel Grid.Row="3"
-                                                            Grid.Column="1"
-                                                            Margin="0,0,0,14">
-                                                        <TextBlock Text="تقييم الحالة"
-                                                                   Style="{StaticResource CustodyPopupLabelStyle}"/>
-                                                        <TextBox x:Name="ConditionRatingTextBox"
-                                                                 AutomationProperties.AutomationId="CustodyConditionRatingTextBox"
-                                                                 AutomationProperties.Name="تقييم الحالة"
-                                                                 Margin="0,8,0,0"
-                                                                 Style="{StaticResource AppTextBoxStyle}"
-                                                                 ToolTip="رقم من 1 إلى 10"/>
-                                                </StackPanel>
-
-                                                <StackPanel Grid.Row="4"
-                                                            Margin="0,0,12,14">
-                                                        <TextBlock Text="مبلغ العهدة"
-                                                                   Style="{StaticResource CustodyPopupLabelStyle}"/>
-                                                        <TextBox x:Name="AmountTextBox"
-                                                                 AutomationProperties.AutomationId="CustodyAmountTextBox"
-                                                                 AutomationProperties.Name="مبلغ العهدة"
-                                                                 Margin="0,8,0,0"
-                                                                 Style="{StaticResource AppTextBoxStyle}"
-                                                                 ToolTip="المبلغ سيخصم تلقائياً من الخزينة"/>
-                                                </StackPanel>
-
-                                                <StackPanel Grid.Row="5"
-                                                            Grid.ColumnSpan="2">
-                                                        <TextBlock Text="ملاحظات"
-                                                                   Style="{StaticResource CustodyPopupLabelStyle}"/>
-                                                        <TextBox x:Name="NotesTextBox"
-                                                                 AutomationProperties.AutomationId="CustodyNotesTextBox"
-                                                                 AutomationProperties.Name="ملاحظات العهدة"
-                                                                 Margin="0,8,0,0"
-                                                                 MinHeight="82"
-                                                                 AcceptsReturn="True"
-                                                                 TextWrapping="Wrap"
-                                                                 VerticalScrollBarVisibility="Auto"
-                                                                 Style="{StaticResource AppTextBoxStyle}"/>
-                                                </StackPanel>
-                                        </Grid>
-                                </Border>
-                        </StackPanel>
+                                        <StackPanel Grid.Row="4"
+                                                    Grid.ColumnSpan="2">
+                                                <TextBlock Text="ملاحظات"
+                                                           Style="{StaticResource CustodyPopupLabelStyle}"/>
+                                                <TextBox x:Name="NotesTextBox"
+                                                         AutomationProperties.AutomationId="CustodyNotesTextBox"
+                                                         AutomationProperties.Name="ملاحظات العهدة"
+                                                         Margin="0,8,0,0"
+                                                         MinHeight="82"
+                                                         AcceptsReturn="True"
+                                                         TextWrapping="Wrap"
+                                                         VerticalScrollBarVisibility="Auto"
+                                                         Style="{StaticResource AppTextBoxStyle}"/>
+                                        </StackPanel>
+                                </Grid>
+                        </Border>
                 </ScrollViewer>
 
                 <Border Grid.Row="2"

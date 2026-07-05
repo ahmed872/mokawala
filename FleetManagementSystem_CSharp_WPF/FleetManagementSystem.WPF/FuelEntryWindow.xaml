@@ -7,6 +7,8 @@
         MinWidth="720"
         MinHeight="580"
         WindowStartupLocation="CenterOwner"
+        MaxHeight="{Binding Source={x:Static SystemParameters.WorkArea}, Path=Height}"
+        MaxWidth="{Binding Source={x:Static SystemParameters.WorkArea}, Path=Width}"
         ResizeMode="CanResize"
         FlowDirection="RightToLeft"
         Background="{StaticResource PageBackgroundBrush}"

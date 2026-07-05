@@ -13,6 +13,13 @@ namespace FleetManagementSystem.Data.Entities
         public string PasswordHash { get; set; } = string.Empty;
         public string FullName { get; set; } = string.Empty;
         public UserRole Role { get; set; } = UserRole.Staff;
+
+        /// <summary>Set when this account belongs to a driver custodian (Role = Custodian).</summary>
+        public int? DriverId { get; set; }
+
+        /// <summary>Set when this account belongs to an employee custodian (Role = Custodian).</summary>
+        public int? EmployeeId { get; set; }
+
         public bool IsActive { get; set; } = true;
         public DateTime? LastLogin { get; set; }
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;

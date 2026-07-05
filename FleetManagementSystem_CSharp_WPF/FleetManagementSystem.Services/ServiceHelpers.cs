@@ -135,6 +135,7 @@ internal static class ServiceHelpers
             "maintenance" => "صيانة",
             "returned" => "مرتجع",
             "settled" => "تمت التسوية",
+            "pendingapproval" => "بانتظار الاعتماد",
             _ => Clean(status)
         };
     }
@@ -180,7 +181,11 @@ internal static class ServiceHelpers
             },
             UserRole.TreasuryOfficer => new List<string>
             {
-                "Dashboard", "Treasury"
+                "Dashboard", "Treasury", "Custody"
+            },
+            UserRole.Custodian => new List<string>
+            {
+                "MyCustody"
             },
             UserRole.TripsLicensesOfficer => new List<string>
             {
@@ -563,6 +568,23 @@ internal static class ServiceHelpers
 
     public static string CustodianTypeDisplay(int? driverId) => driverId.HasValue ? "سائق" : "موظف";
 
+    /// <summary>
+    /// Maps UI/display custody statuses (Arabic or English, any casing) back to the canonical
+    /// storage values the workflow filters on: Active, PendingApproval, Settled, Returned.
+    /// </summary>
+    public static string NormalizeCustodyStatus(string? status)
+    {
+        var normalized = Clean(status).ToLowerInvariant();
+        return normalized switch
+        {
+            "" or "active" or "نشط" or "نشطة" => "Active",
+            "pendingapproval" or "بانتظار الاعتماد" => "PendingApproval",
+            "settled" or "تمت التسوية" => "Settled",
+            "returned" or "مرتجع" or "مسترجعة" => "Returned",
+            _ => "Active"
+        };
+    }
+
     public static CustodySettlementDto ToDto(this CustodySettlement entity) =>
         new()
         {
@@ -683,6 +705,8 @@ internal static class ServiceHelpers
             FullName = entity.FullName,
             PhoneNumber = entity.PhoneNumber,
             Role = entity.Role.ToString(),
+            DriverId = entity.DriverId,
+            EmployeeId = entity.EmployeeId,
             IsActive = entity.IsActive,
             LastLoginAt = entity.LastLogin,
             AllowedModules = AllowedModulesForRole(entity.Role)

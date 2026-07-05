@@ -98,6 +98,10 @@
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>
     </Page>
+    <Page Include="MyCustodyWindow.xaml">
+      <Generator>MSBuild:Compile</Generator>
+      <SubType>Designer</SubType>
+    </Page>
     <Page Include="MainWindow.xaml">
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>
@@ -152,6 +156,9 @@
     </Compile>
     <Compile Include="ReportPreviewWindow.xaml.cs">
       <DependentUpon>ReportPreviewWindow.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="MyCustodyWindow.xaml.cs">
+      <DependentUpon>MyCustodyWindow.xaml</DependentUpon>
     </Compile>
     <Compile Include="MainWindow.xaml.cs">
       <DependentUpon>MainWindow.xaml</DependentUpon>
