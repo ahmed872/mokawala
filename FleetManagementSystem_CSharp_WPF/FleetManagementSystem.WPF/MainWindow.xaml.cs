@@ -225,7 +225,8 @@ public partial class MainWindow : Window
         new("TripsLicensesOfficer", "مسؤول التشغيلات والتراخيص"),
         new("InsuranceOfficer", "مسؤول التأمينات"),
         new("Viewer", "عرض فقط"),
-        new("Staff", "موظف")
+        new("Staff", "موظف"),
+        new("Custodian", "أمين عهدة (يشوف عهدته فقط)")
     };
     private readonly List<DashboardAlertItem> _dashboardAlertItems = new();
 
@@ -1108,12 +1109,26 @@ public partial class MainWindow : Window
         }
         catch (Exception ex)
         {
-            MessageBox.Show($"لم يتم تنفيذ العملية:\n{ex.Message}", "تنبيه واضح", MessageBoxButton.OK, MessageBoxImage.Warning);
+            MessageBox.Show($"لم يتم تنفيذ العملية:\n{DescribeError(ex)}", "تنبيه واضح", MessageBoxButton.OK, MessageBoxImage.Warning);
         }
         finally
         {
             Mouse.OverrideCursor = null;
         }
+    }
+
+    private static string DescribeError(Exception ex)
+    {
+        var messages = new List<string>();
+        for (var current = ex; current is not null; current = current.InnerException)
+        {
+            if (messages.Count == 0 || !string.Equals(messages[^1], current.Message, StringComparison.Ordinal))
+            {
+                messages.Add(current.Message);
+            }
+        }
+
+        return string.Join("\n↳ ", messages);
     }
 
     private void RestartApplication()

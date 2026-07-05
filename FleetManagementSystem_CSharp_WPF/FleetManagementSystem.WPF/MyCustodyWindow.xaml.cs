@@ -77,7 +77,7 @@ public partial class MyCustodyWindow : Window
         }
         catch (Exception ex)
         {
-            MessageBox.Show(ex.Message, "خطأ", MessageBoxButton.OK, MessageBoxImage.Error);
+            MessageBox.Show(DescribeError(ex), "خطأ", MessageBoxButton.OK, MessageBoxImage.Error);
         }
     }
 
@@ -186,7 +186,7 @@ public partial class MyCustodyWindow : Window
         }
         catch (Exception ex)
         {
-            MessageBox.Show(ex.Message, "تعذر تسجيل التسوية", MessageBoxButton.OK, MessageBoxImage.Error);
+            MessageBox.Show(DescribeError(ex), "تعذر تسجيل التسوية", MessageBoxButton.OK, MessageBoxImage.Error);
         }
         finally
         {
@@ -201,4 +201,18 @@ public partial class MyCustodyWindow : Window
 
     private void ShowValidation(string message) =>
         MessageBox.Show(message, "تنبيه", MessageBoxButton.OK, MessageBoxImage.Information);
+
+    private static string DescribeError(Exception ex)
+    {
+        var messages = new List<string>();
+        for (var current = ex; current is not null; current = current.InnerException)
+        {
+            if (messages.Count == 0 || !string.Equals(messages[^1], current.Message, StringComparison.Ordinal))
+            {
+                messages.Add(current.Message);
+            }
+        }
+
+        return string.Join("\n↳ ", messages);
+    }
 }
