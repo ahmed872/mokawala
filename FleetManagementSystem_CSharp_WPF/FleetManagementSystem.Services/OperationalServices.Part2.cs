@@ -794,9 +794,15 @@ public sealed class CustodyService(FleetDbContext context, IAuditService auditSe
 
     public async Task<CustodyDto> SaveAsync(CustodyFormDto dto)
     {
-        if (!await _context.Vehicles.AnyAsync(v => v.Id == dto.VehicleId))
+        // العهدة أساسها المستلم المسئول؛ ربطها بمركبة اختياري (صفر = بدون مركبة).
+        if (dto.VehicleId > 0 && !await _context.Vehicles.AnyAsync(v => v.Id == dto.VehicleId))
         {
             throw new InvalidOperationException("المركبة غير موجودة.");
+        }
+
+        if (string.IsNullOrWhiteSpace(dto.CustodianName))
+        {
+            throw new InvalidOperationException("اكتب اسم المستلم أولًا.");
         }
 
         Custody entity;
@@ -812,7 +818,7 @@ public sealed class CustodyService(FleetDbContext context, IAuditService auditSe
                 ?? throw new InvalidOperationException("العهدة غير موجودة.");
         }
 
-        entity.VehicleId = dto.VehicleId;
+        entity.VehicleId = dto.VehicleId > 0 ? dto.VehicleId : null;
         entity.CustodyNumber = ServiceHelpers.Clean(dto.CustodyNumber);
         entity.CustodianName = ServiceHelpers.Clean(dto.CustodianName);
         entity.CustodianPosition = ServiceHelpers.Clean(dto.CustodianPosition);
@@ -887,12 +893,13 @@ public sealed class CustodyService(FleetDbContext context, IAuditService auditSe
         entity.UpdatedAt = DateTime.UtcNow;
 
         // ترجع فلوس التصفية للخزينة كإيراد مقابل مصروف تسليم العهدة.
+        var plateSuffix = string.IsNullOrWhiteSpace(entity.Vehicle?.PlateNumber) ? string.Empty : $" ({entity.Vehicle!.PlateNumber})";
         _context.TreasuryTransactions.Add(new TreasuryTransaction
         {
             TransactionDate = settlementDate,
             TransactionType = "إيراد",
             Amount = dto.Amount,
-            Description = $"تصفية عهدة {entity.CustodyNumber} - {entity.CustodianName} ({entity.Vehicle?.PlateNumber})",
+            Description = $"تصفية عهدة {entity.CustodyNumber} - {entity.CustodianName}{plateSuffix}",
             RelatedEntityType = "عهدة",
             RelatedEntityId = entity.Id,
             PaymentMethod = "نقدي",

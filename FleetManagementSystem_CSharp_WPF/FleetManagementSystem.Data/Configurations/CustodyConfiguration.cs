@@ -11,6 +11,12 @@ namespace FleetManagementSystem.Data.Configurations
             builder.HasKey(c => c.Id);
             builder.Property(c => c.Amount).HasPrecision(18, 2);
             builder.Property(c => c.SettledAmount).HasPrecision(18, 2);
+            // العهدة تُسلَّم لمسئول، وربطها بمركبة اختياري.
+            builder.HasOne(c => c.Vehicle)
+                .WithMany()
+                .HasForeignKey(c => c.VehicleId)
+                .IsRequired(false)
+                .OnDelete(DeleteBehavior.SetNull);
             builder.HasOne(c => c.User)
                 .WithMany()
                 .HasForeignKey(c => c.UserId)

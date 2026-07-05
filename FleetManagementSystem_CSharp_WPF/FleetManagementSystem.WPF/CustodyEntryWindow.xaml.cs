@@ -12,7 +12,11 @@ public partial class CustodyEntryWindow : Window
 
     public CustodyFormDto? CustodyForm { get; private set; }
 
-    public CustodyEntryWindow(IEnumerable<VehicleDto> vehicles, int? preselectedVehicleId = null, CustodyDto? source = null)
+    public CustodyEntryWindow(
+        IEnumerable<VehicleDto> vehicles,
+        IEnumerable<EmployeeDto> employees,
+        int? preselectedVehicleId = null,
+        CustodyDto? source = null)
     {
         InitializeComponent();
 
@@ -22,12 +26,16 @@ public partial class CustodyEntryWindow : Window
             .ToList();
 
         VehicleComboBox.ItemsSource = _vehicles;
+        CustodianNameComboBox.ItemsSource = employees
+            .OrderBy(employee => employee.FullName)
+            .ToList();
+        CustodianNameComboBox.SelectionChanged += CustodianNameComboBox_SelectionChanged;
 
         if (source is not null)
         {
             Title = "تعديل عهدة";
             CustodyNumberTextBox.Text = source.CustodyNumber;
-            CustodianNameTextBox.Text = source.CustodianName;
+            CustodianNameComboBox.Text = source.CustodianName;
             CustodianPositionTextBox.Text = source.CustodianPosition;
             HandoverDatePicker.SelectedDate = source.HandoverDate == default ? DateTime.Today : source.HandoverDate;
             ReturnDatePicker.SelectedDate = source.ReturnDate;
@@ -37,7 +45,10 @@ public partial class CustodyEntryWindow : Window
             AmountTextBox.Text = source.Amount <= 0 ? "0" : source.Amount.ToString("0.##", CultureInfo.InvariantCulture);
             NotesTextBox.Text = source.Notes;
             SelectStatus(source.Status);
-            VehicleComboBox.SelectedValue = source.VehicleId;
+            if (source.VehicleId > 0)
+            {
+                VehicleComboBox.SelectedValue = source.VehicleId;
+            }
         }
         else
         {
@@ -45,28 +56,44 @@ public partial class CustodyEntryWindow : Window
             HandoverDatePicker.SelectedDate = DateTime.Today;
             ConditionRatingTextBox.Text = "5";
             AmountTextBox.Text = "0";
-        }
 
-        if (source is null && preselectedVehicleId.HasValue)
-        {
-            VehicleComboBox.SelectedValue = preselectedVehicleId.Value;
-        }
-        else if (source is null && _vehicles.Count > 0)
-        {
-            VehicleComboBox.SelectedItem = _vehicles[0];
+            if (preselectedVehicleId.HasValue)
+            {
+                VehicleComboBox.SelectedValue = preselectedVehicleId.Value;
+            }
         }
 
         UpdateVehicleSummary();
+        Loaded += (_, _) => CustodianNameComboBox.Focus();
+    }
+
+    private void CustodianNameComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        // عند اختيار موظف من القائمة نكمل وظيفته تلقائيًا.
+        if (CustodianNameComboBox.SelectedItem is EmployeeDto employee &&
+            string.IsNullOrWhiteSpace(CustodianPositionTextBox.Text))
+        {
+            CustodianPositionTextBox.Text = employee.Position;
+        }
     }
 
     private void VehicleComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e) => UpdateVehicleSummary();
 
+    private void ClearVehicleButton_Click(object sender, RoutedEventArgs e)
+    {
+        VehicleComboBox.SelectedItem = null;
+        UpdateVehicleSummary();
+    }
+
     private void SaveButton_Click(object sender, RoutedEventArgs e)
     {
-        var vehicle = VehicleComboBox.SelectedItem as VehicleDto;
-        if (vehicle is null)
+        var custodianName = CustodianNameComboBox.SelectedItem is EmployeeDto employee
+            ? employee.FullName
+            : CustodianNameComboBox.Text?.Trim() ?? string.Empty;
+
+        if (string.IsNullOrWhiteSpace(custodianName))
         {
-            ShowValidation("اختر رقم السيارة أولًا.");
+            ShowValidation("اكتب اسم المستلم أولًا.");
             return;
         }
 
@@ -76,16 +103,9 @@ public partial class CustodyEntryWindow : Window
             return;
         }
 
-        if (string.IsNullOrWhiteSpace(CustodianNameTextBox.Text))
-        {
-            ShowValidation("اكتب اسم المستلم أولًا.");
-            return;
-        }
-
         if (!decimal.TryParse(ConditionRatingTextBox.Text.Trim(), NumberStyles.Number, CultureInfo.InvariantCulture, out var rating))
         {
-            ShowValidation("تقييم الحالة يجب أن يكون رقمًا صحيحًا مثل 5.");
-            return;
+            rating = 5;
         }
 
         if (rating is < 1 or > 10)
@@ -103,15 +123,27 @@ public partial class CustodyEntryWindow : Window
         }
 
         decimal amount = 0;
-        if (!string.IsNullOrWhiteSpace(AmountTextBox.Text))
-            decimal.TryParse(AmountTextBox.Text.Trim(), NumberStyles.Number, CultureInfo.InvariantCulture, out amount);
+        if (!string.IsNullOrWhiteSpace(AmountTextBox.Text) &&
+            !decimal.TryParse(AmountTextBox.Text.Trim(), NumberStyles.Number, CultureInfo.InvariantCulture, out amount))
+        {
+            ShowValidation("اكتب مبلغ العهدة كرقم صحيح مثل 5000.");
+            return;
+        }
+
+        if (amount < 0)
+        {
+            ShowValidation("مبلغ العهدة لا يمكن أن يكون سالبًا.");
+            return;
+        }
+
+        var vehicle = VehicleComboBox.SelectedItem as VehicleDto;
 
         CustodyForm = new CustodyFormDto
         {
             Id = _source?.Id ?? 0,
-            VehicleId = vehicle.Id,
+            VehicleId = vehicle?.Id ?? 0,
             CustodyNumber = CustodyNumberTextBox.Text.Trim(),
-            CustodianName = CustodianNameTextBox.Text.Trim(),
+            CustodianName = custodianName,
             CustodianPosition = CustodianPositionTextBox.Text.Trim(),
             HandoverDate = handoverDate,
             ReturnDate = returnDate,
@@ -144,7 +176,8 @@ public partial class CustodyEntryWindow : Window
     private void UpdateVehicleSummary()
     {
         var vehicle = VehicleComboBox.SelectedItem as VehicleDto;
-        VehiclePlateTextBlock.Text = vehicle?.PlateNumber ?? "اختر سيارة";
+        VehicleSummaryBorder.Visibility = vehicle is null ? Visibility.Collapsed : Visibility.Visible;
+        VehiclePlateTextBlock.Text = vehicle?.PlateNumber ?? "بدون عربية";
         VehicleTypeTextBlock.Text = string.IsNullOrWhiteSpace(vehicle?.VehicleType) ? "-" : vehicle.VehicleType;
         VehicleModelTextBlock.Text = string.IsNullOrWhiteSpace(vehicle?.Model) ? "-" : vehicle.Model;
         VehicleYearTextBlock.Text = vehicle is null || vehicle.Year <= 0 ? "-" : vehicle.Year.ToString(CultureInfo.InvariantCulture);

@@ -568,7 +568,7 @@ internal static class ServiceHelpers
         new()
         {
             Id = entity.Id,
-            VehicleId = entity.VehicleId,
+            VehicleId = entity.VehicleId ?? 0,
             VehiclePlateNumber = entity.Vehicle?.PlateNumber ?? string.Empty,
             CustodyNumber = entity.CustodyNumber,
             CustodianName = entity.CustodianName,

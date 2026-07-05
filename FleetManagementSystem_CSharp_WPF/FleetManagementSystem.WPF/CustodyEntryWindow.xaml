@@ -154,7 +154,7 @@
                                         <TextBlock Margin="0,8,0,0"
                                                    FontSize="14"
                                                    Foreground="{StaticResource CustodyPopupMutedBrush}"
-                                                   Text="سجل العهدة من فورم واحد واضح، وسيتم ربطها بالعربية المختارة مباشرة داخل قاعدة البيانات."
+                                                   Text="العهدة تُسجَّل باسم المسئول المستلم، وسيُنشأ له حساب دخول تلقائي ليتابع عهدته ويصفّيها. ربط العهدة بعربية اختياري."
                                                    TextWrapping="Wrap"/>
                                 </StackPanel>
 
@@ -180,8 +180,10 @@
                               VerticalScrollBarVisibility="Auto"
                               HorizontalScrollBarVisibility="Disabled">
                         <StackPanel>
-                                <Border Style="{StaticResource CustodyPopupCardStyle}"
-                                        Margin="0,0,0,18">
+                                <Border x:Name="VehicleSummaryBorder"
+                                        Style="{StaticResource CustodyPopupCardStyle}"
+                                        Margin="0,0,0,18"
+                                        Visibility="Collapsed">
                                         <Grid>
                                                 <Grid.ColumnDefinitions>
                                                         <ColumnDefinition Width="*"/>
@@ -276,48 +278,50 @@
                                                 </Grid.RowDefinitions>
 
                                                 <StackPanel Margin="0,0,12,14">
-                                                        <TextBlock Text="رقم السيارة"
+                                                        <TextBlock Text="المستلم (المسئول عن العهدة)"
                                                                    Style="{StaticResource CustodyPopupLabelStyle}"/>
-                                                        <ComboBox x:Name="VehicleComboBox"
-                                                                  AutomationProperties.AutomationId="CustodyVehicleComboBox"
-                                                                  AutomationProperties.Name="رقم السيارة"
+                                                        <ComboBox x:Name="CustodianNameComboBox"
+                                                                  AutomationProperties.AutomationId="CustodianNameTextBox"
+                                                                  AutomationProperties.Name="المستلم"
                                                                   Margin="0,8,0,0"
                                                                   Style="{StaticResource AppComboBoxStyle}"
-                                                                  DisplayMemberPath="PlateNumber"
-                                                                  SelectedValuePath="Id"
-                                                                  SelectionChanged="VehicleComboBox_SelectionChanged"/>
+                                                                  IsEditable="True"
+                                                                  DisplayMemberPath="FullName"
+                                                                  TextSearch.TextPath="FullName"
+                                                                  ToolTip="اختر موظفًا من القائمة أو اكتب اسم المستلم مباشرة"/>
                                                 </StackPanel>
 
                                                 <StackPanel Grid.Column="1"
-                                                            Margin="0,0,0,14">
-                                                        <TextBlock Text="رقم العهدة"
-                                                                   Style="{StaticResource CustodyPopupLabelStyle}"/>
-                                                        <TextBox x:Name="CustodyNumberTextBox"
-                                                                 AutomationProperties.AutomationId="CustodyNumberTextBox"
-                                                                 AutomationProperties.Name="رقم العهدة"
-                                                                 Margin="0,8,0,0"
-                                                                 Style="{StaticResource AppTextBoxStyle}"/>
-                                                </StackPanel>
-
-                                                <StackPanel Grid.Row="1"
-                                                            Margin="0,0,12,14">
-                                                        <TextBlock Text="المستلم"
-                                                                   Style="{StaticResource CustodyPopupLabelStyle}"/>
-                                                        <TextBox x:Name="CustodianNameTextBox"
-                                                                 AutomationProperties.AutomationId="CustodianNameTextBox"
-                                                                 AutomationProperties.Name="المستلم"
-                                                                 Margin="0,8,0,0"
-                                                                 Style="{StaticResource AppTextBoxStyle}"/>
-                                                </StackPanel>
-
-                                                <StackPanel Grid.Row="1"
-                                                            Grid.Column="1"
                                                             Margin="0,0,0,14">
                                                         <TextBlock Text="الوظيفة"
                                                                    Style="{StaticResource CustodyPopupLabelStyle}"/>
                                                         <TextBox x:Name="CustodianPositionTextBox"
                                                                  AutomationProperties.AutomationId="CustodianPositionTextBox"
                                                                  AutomationProperties.Name="الوظيفة"
+                                                                 Margin="0,8,0,0"
+                                                                 Style="{StaticResource AppTextBoxStyle}"/>
+                                                </StackPanel>
+
+                                                <StackPanel Grid.Row="1"
+                                                            Margin="0,0,12,14">
+                                                        <TextBlock Text="مبلغ العهدة"
+                                                                   Style="{StaticResource CustodyPopupLabelStyle}"/>
+                                                        <TextBox x:Name="AmountTextBox"
+                                                                 AutomationProperties.AutomationId="CustodyAmountTextBox"
+                                                                 AutomationProperties.Name="مبلغ العهدة"
+                                                                 Margin="0,8,0,0"
+                                                                 Style="{StaticResource AppTextBoxStyle}"
+                                                                 ToolTip="المبلغ سيخصم تلقائياً من الخزينة"/>
+                                                </StackPanel>
+
+                                                <StackPanel Grid.Row="1"
+                                                            Grid.Column="1"
+                                                            Margin="0,0,0,14">
+                                                        <TextBlock Text="رقم العهدة"
+                                                                   Style="{StaticResource CustodyPopupLabelStyle}"/>
+                                                        <TextBox x:Name="CustodyNumberTextBox"
+                                                                 AutomationProperties.AutomationId="CustodyNumberTextBox"
+                                                                 AutomationProperties.Name="رقم العهدة"
                                                                  Margin="0,8,0,0"
                                                                  Style="{StaticResource AppTextBoxStyle}"/>
                                                 </StackPanel>
@@ -377,14 +381,29 @@
 
                                                 <StackPanel Grid.Row="4"
                                                             Margin="0,0,12,14">
-                                                        <TextBlock Text="مبلغ العهدة"
+                                                        <TextBlock Text="العربية (اختياري)"
                                                                    Style="{StaticResource CustodyPopupLabelStyle}"/>
-                                                        <TextBox x:Name="AmountTextBox"
-                                                                 AutomationProperties.AutomationId="CustodyAmountTextBox"
-                                                                 AutomationProperties.Name="مبلغ العهدة"
-                                                                 Margin="0,8,0,0"
-                                                                 Style="{StaticResource AppTextBoxStyle}"
-                                                                 ToolTip="المبلغ سيخصم تلقائياً من الخزينة"/>
+                                                        <Grid Margin="0,8,0,0">
+                                                                <Grid.ColumnDefinitions>
+                                                                        <ColumnDefinition Width="*"/>
+                                                                        <ColumnDefinition Width="Auto"/>
+                                                                </Grid.ColumnDefinitions>
+                                                                <ComboBox x:Name="VehicleComboBox"
+                                                                          AutomationProperties.AutomationId="CustodyVehicleComboBox"
+                                                                          AutomationProperties.Name="العربية"
+                                                                          Style="{StaticResource AppComboBoxStyle}"
+                                                                          DisplayMemberPath="PlateNumber"
+                                                                          SelectedValuePath="Id"
+                                                                          SelectionChanged="VehicleComboBox_SelectionChanged"/>
+                                                                <Button Grid.Column="1"
+                                                                        Margin="8,0,0,0"
+                                                                        MinWidth="0"
+                                                                        Style="{StaticResource CustodyPopupSecondaryButtonStyle}"
+                                                                        Content="بدون عربية"
+                                                                        ToolTip="عهدة بدون ربط بعربية"
+                                                                        AutomationProperties.AutomationId="CustodyClearVehicleButton"
+                                                                        Click="ClearVehicleButton_Click"/>
+                                                        </Grid>
                                                 </StackPanel>
 
                                                 <StackPanel Grid.Row="5"

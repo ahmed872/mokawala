@@ -2885,6 +2885,15 @@ public partial class MainWindow : Window
         Notes = dto.Notes
     };
 
+    private string BuildCustodyTreasuryDescription(string prefix, CustodyFormDto form)
+    {
+        var plate = form.VehicleId > 0
+            ? _vehicles.FirstOrDefault(v => v.Id == form.VehicleId)?.PlateNumber
+            : null;
+        var suffix = string.IsNullOrWhiteSpace(plate) ? string.Empty : $" ({plate})";
+        return $"{prefix} {form.CustodyNumber} - {form.CustodianName}{suffix}";
+    }
+
     private CustodyFormDto ToForm(CustodyDto dto) => new()
     {
         Id = dto.Id,
@@ -3222,16 +3231,28 @@ public partial class MainWindow : Window
         };
     }
 
+    private const string DefaultCompanyLogoUri = "pack://application:,,,/Resources/gomix-logo.png";
+
     private void UpdateCompanyLogo()
     {
         CompanyLogoImage.Source = null;
         CompanyLogoImage.Visibility = Visibility.Collapsed;
         CompanyLogoPlaceholderTextBlock.Visibility = Visibility.Visible;
 
-        var logoPath = _settings?.LogoUrl?.Trim();
-        if (string.IsNullOrWhiteSpace(logoPath))
+        // نجرب المسار المحفوظ في الإعدادات أولًا، ولو فشل نرجع دائمًا للوجو المدمج داخل البرنامج.
+        if (TryShowCompanyLogo(_settings?.LogoUrl?.Trim()))
         {
             return;
+        }
+
+        TryShowCompanyLogo(DefaultCompanyLogoUri);
+    }
+
+    private bool TryShowCompanyLogo(string? logoPath)
+    {
+        if (string.IsNullOrWhiteSpace(logoPath))
+        {
+            return false;
         }
 
         try
@@ -3246,7 +3267,7 @@ public partial class MainWindow : Window
                 var fullPath = Path.GetFullPath(logoPath);
                 if (!File.Exists(fullPath))
                 {
-                    return;
+                    return false;
                 }
 
                 logoUri = new Uri(fullPath, UriKind.Absolute);
@@ -3262,10 +3283,11 @@ public partial class MainWindow : Window
             CompanyLogoImage.Source = image;
             CompanyLogoImage.Visibility = Visibility.Visible;
             CompanyLogoPlaceholderTextBlock.Visibility = Visibility.Collapsed;
+            return true;
         }
         catch
         {
-            // Keep the placeholder visible when logo loading fails.
+            return false;
         }
     }
 
@@ -5087,7 +5109,7 @@ public partial class MainWindow : Window
         }
 
         var selectedVehicleId = Selected<CustodyDto>(CustodyGrid)?.VehicleId;
-        var window = new CustodyEntryWindow(_vehicles, selectedVehicleId)
+        var window = new CustodyEntryWindow(_vehicles, _employees, selectedVehicleId > 0 ? selectedVehicleId : null)
         {
             Owner = this
         };
@@ -5102,13 +5124,12 @@ public partial class MainWindow : Window
             var saved = await _custodyService.SaveAsync(window.CustodyForm);
             if (window.CustodyForm.Amount > 0)
             {
-                var plate = _vehicles.FirstOrDefault(v => v.Id == window.CustodyForm.VehicleId)?.PlateNumber ?? string.Empty;
                 await _treasuryService.SaveAsync(new TreasuryTransactionFormDto
                 {
                     TransactionDate = window.CustodyForm.HandoverDate,
                     TransactionType = "صرف",
                     Amount = window.CustodyForm.Amount,
-                    Description = $"عهدة {window.CustodyForm.CustodyNumber} - {window.CustodyForm.CustodianName} ({plate})",
+                    Description = BuildCustodyTreasuryDescription("عهدة", window.CustodyForm),
                     RelatedEntityType = "عهدة",
                     PaymentMethod = "نقدي"
                 });
@@ -5149,7 +5170,7 @@ public partial class MainWindow : Window
             return;
         }
 
-        var window = new CustodyEntryWindow(_vehicles, item.VehicleId, item)
+        var window = new CustodyEntryWindow(_vehicles, _employees, item.VehicleId > 0 ? item.VehicleId : null, item)
         {
             Owner = this
         };
@@ -5161,7 +5182,11 @@ public partial class MainWindow : Window
 
         await RunSafeAsync(async () =>
         {
-            EnsureVehicleExists(window.CustodyForm.VehicleId, "سجل العهدة");
+            if (window.CustodyForm.VehicleId > 0)
+            {
+                EnsureVehicleExists(window.CustodyForm.VehicleId, "سجل العهدة");
+            }
+
             var previousAmount = item.Amount;
             await _custodyService.SaveAsync(window.CustodyForm);
 
@@ -5169,13 +5194,12 @@ public partial class MainWindow : Window
             var amountDelta = window.CustodyForm.Amount - previousAmount;
             if (amountDelta != 0)
             {
-                var plate = _vehicles.FirstOrDefault(v => v.Id == window.CustodyForm.VehicleId)?.PlateNumber ?? string.Empty;
                 await _treasuryService.SaveAsync(new TreasuryTransactionFormDto
                 {
                     TransactionDate = DateTime.Today,
                     TransactionType = amountDelta > 0 ? "صرف" : "إيراد",
                     Amount = Math.Abs(amountDelta),
-                    Description = $"تعديل قيمة عهدة {window.CustodyForm.CustodyNumber} - {window.CustodyForm.CustodianName} ({plate})",
+                    Description = BuildCustodyTreasuryDescription("تعديل قيمة عهدة", window.CustodyForm),
                     RelatedEntityType = "عهدة",
                     PaymentMethod = "نقدي"
                 });

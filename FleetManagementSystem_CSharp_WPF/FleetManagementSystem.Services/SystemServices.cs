@@ -117,6 +117,12 @@ public sealed class DataBootstrapService(FleetDbContext context) : IDataBootstra
             {
                 settings.LogoUrl = DefaultLogoUrl;
             }
+            else if (!settings.LogoUrl.StartsWith("pack://", StringComparison.OrdinalIgnoreCase) &&
+                     !File.Exists(settings.LogoUrl))
+            {
+                // مسار لوجو قديم لم يعد موجودًا على الجهاز؛ نرجع للوجو المدمج.
+                settings.LogoUrl = DefaultLogoUrl;
+            }
 
             settings.UpdatedAt = DateTime.UtcNow;
         }
@@ -192,6 +198,7 @@ public sealed class DataBootstrapService(FleetDbContext context) : IDataBootstra
         await EnsureColumnAsync("Custody", "SettlementNotes", GetShortTextColumnDefinition(defaultValue: string.Empty));
         await EnsureColumnAsync("Custody", "UserId", GetNullableIntColumnDefinition());
         await EnsureColumnAsync("Users", "MustChangePassword", GetBooleanColumnDefinition(defaultValue: false));
+        await EnsureCustodyVehicleOptionalAsync();
         await EnsureDriverAttendanceTableAsync();
 
         if (await HasColumnAsync("Vehicles", "RegistrationType"))
@@ -267,6 +274,113 @@ public sealed class DataBootstrapService(FleetDbContext context) : IDataBootstra
                     CONSTRAINT FK_DriverAttendances_Drivers_DriverId FOREIGN KEY (DriverId) REFERENCES Drivers (Id) ON DELETE CASCADE
                 );
                 """);
+        }
+#pragma warning restore EF1002
+    }
+
+    /// <summary>
+    /// العهدة كانت مربوطة إجباريًا بمركبة؛ الآن الربط اختياري، فنعدّل قواعد البيانات القديمة
+    /// حتى يقبل عمود VehicleId قيمة فارغة.
+    /// </summary>
+    private async Task EnsureCustodyVehicleOptionalAsync()
+    {
+#pragma warning disable EF1002
+        if (_context.Database.IsMySql())
+        {
+            try
+            {
+                await _context.Database.ExecuteSqlRawAsync("ALTER TABLE Custody MODIFY COLUMN VehicleId INT NULL");
+            }
+            catch
+            {
+                // لا نوقف تشغيل التطبيق لو فشل التعديل؛ الإنشاء الجديد للجداول أصلاً يجعل العمود اختياريًا.
+            }
+
+            return;
+        }
+
+        if (!_context.Database.IsSqlite())
+        {
+            return;
+        }
+
+        var connection = _context.Database.GetDbConnection();
+        var closeWhenDone = connection.State != ConnectionState.Open;
+        if (closeWhenDone)
+        {
+            await connection.OpenAsync();
+        }
+
+        try
+        {
+            await using (var check = connection.CreateCommand())
+            {
+                check.CommandText = "PRAGMA table_info('Custody')";
+                await using var reader = await check.ExecuteReaderAsync();
+                var vehicleIdNotNull = false;
+                while (await reader.ReadAsync())
+                {
+                    if (string.Equals(reader["name"]?.ToString(), "VehicleId", StringComparison.OrdinalIgnoreCase))
+                    {
+                        vehicleIdNotNull = Convert.ToInt32(reader["notnull"]) == 1;
+                    }
+                }
+
+                if (!vehicleIdNotNull)
+                {
+                    return;
+                }
+            }
+
+            // SQLite لا يدعم تعديل العمود مباشرة؛ نعيد بناء الجدول بنفس البيانات.
+            var columns = "Id, VehicleId, EmployeeId, UserId, CustodyNumber, CustodianName, CustodianPosition, " +
+                          "HandoverDate, ReturnDate, Status, VehicleConditionRating, Amount, SettledAmount, " +
+                          "SettlementDate, SettlementNotes, Notes, DocumentUrl, CreatedAt, UpdatedAt";
+            var statements = new[]
+            {
+                "PRAGMA foreign_keys = OFF",
+                "ALTER TABLE Custody RENAME TO __Custody_old",
+                """
+                CREATE TABLE Custody (
+                    Id INTEGER NOT NULL CONSTRAINT PK_Custody PRIMARY KEY AUTOINCREMENT,
+                    VehicleId INTEGER NULL,
+                    EmployeeId INTEGER NULL,
+                    UserId INTEGER NULL,
+                    CustodyNumber TEXT NOT NULL DEFAULT '',
+                    CustodianName TEXT NOT NULL DEFAULT '',
+                    CustodianPosition TEXT NOT NULL DEFAULT '',
+                    HandoverDate TEXT NOT NULL,
+                    ReturnDate TEXT NULL,
+                    Status TEXT NOT NULL DEFAULT 'Active',
+                    VehicleConditionRating TEXT NOT NULL DEFAULT '5.0',
+                    Amount TEXT NOT NULL DEFAULT '0',
+                    SettledAmount TEXT NOT NULL DEFAULT '0',
+                    SettlementDate TEXT NULL,
+                    SettlementNotes TEXT NOT NULL DEFAULT '',
+                    Notes TEXT NOT NULL DEFAULT '',
+                    DocumentUrl TEXT NOT NULL DEFAULT '',
+                    CreatedAt TEXT NOT NULL,
+                    UpdatedAt TEXT NOT NULL
+                )
+                """,
+                $"INSERT INTO Custody ({columns}) SELECT {columns} FROM __Custody_old",
+                "DROP TABLE __Custody_old",
+                "PRAGMA foreign_keys = ON"
+            };
+
+            foreach (var sql in statements)
+            {
+                await using var command = connection.CreateCommand();
+                command.CommandText = sql;
+                await command.ExecuteNonQueryAsync();
+            }
+        }
+        finally
+        {
+            if (closeWhenDone)
+            {
+                await connection.CloseAsync();
+            }
         }
 #pragma warning restore EF1002
     }

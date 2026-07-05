@@ -5,7 +5,7 @@ namespace FleetManagementSystem.Data.Entities
     public class Custody
     {
         public int Id { get; set; }
-        public int VehicleId { get; set; }
+        public int? VehicleId { get; set; }
         public int? EmployeeId { get; set; }
         public int? UserId { get; set; }
         public string CustodyNumber { get; set; } = string.Empty;
