@@ -80,6 +80,8 @@ public sealed class FuelService(FleetDbContext context, IAuditService auditServi
             }
         }
 
+        await using var transaction = await _context.Database.BeginTransactionAsync();
+
         FuelTransaction entity;
         var action = dto.Id == 0 ? "Create" : "Update";
         if (dto.Id == 0)
@@ -151,6 +153,7 @@ public sealed class FuelService(FleetDbContext context, IAuditService auditServi
         }
 
         await _auditService.LogActionAsync(action, "Fuel", entity.Id, null, entity.TotalCost.ToString("0.##"));
+        await transaction.CommitAsync();
         return (await GetByIdAsync(entity.Id))!;
     }
 
@@ -209,6 +212,8 @@ public sealed class ExpenseService(FleetDbContext context, IAuditService auditSe
         {
             throw new InvalidOperationException("قيمة المصروف لا يمكن أن تكون سالبة.");
         }
+
+        await using var transaction = await _context.Database.BeginTransactionAsync();
 
         Expense entity;
         var action = dto.Id == 0 ? "Create" : "Update";
@@ -280,6 +285,7 @@ public sealed class ExpenseService(FleetDbContext context, IAuditService auditSe
         }
 
         await _auditService.LogActionAsync(action, "Expense", entity.Id, null, entity.Amount.ToString("0.##"));
+        await transaction.CommitAsync();
         return (await GetByIdAsync(entity.Id))!;
     }
 
@@ -553,9 +559,10 @@ public sealed class TreasuryService(FleetDbContext context, IAuditService auditS
 
         var linkedFuel = await _context.FuelTransactions.AnyAsync(f => f.TreasuryTransactionId == id);
         var linkedExpense = await _context.Expenses.AnyAsync(e => e.TreasuryTransactionId == id);
-        if (linkedFuel || linkedExpense)
+        var linkedCustody = await _context.Custodies.AnyAsync(c => c.TreasuryTransactionId == id);
+        if (linkedFuel || linkedExpense || linkedCustody)
         {
-            throw new InvalidOperationException("لا يمكن حذف حركة خزينة مرتبطة بوقود أو مصروف.");
+            throw new InvalidOperationException("لا يمكن حذف حركة خزينة مرتبطة بوقود أو مصروف أو عهدة.");
         }
 
         _context.TreasuryTransactions.Remove(entity);
@@ -755,17 +762,20 @@ public sealed class InsuranceService(FleetDbContext context, IAuditService audit
     }
 }
 
-public sealed class CustodyService(FleetDbContext context, IAuditService auditService) : ICustodyService
+public sealed class CustodyService(FleetDbContext context, IAuditService auditService, IReceiptFileService receiptFileService) : ICustodyService
 {
     private readonly FleetDbContext _context = context;
     private readonly IAuditService _auditService = auditService;
+    private readonly IReceiptFileService _receiptFileService = receiptFileService;
 
     public async Task<List<CustodyDto>> GetAllAsync()
     {
         var items = await _context.Custodies
-            .Include(c => c.Vehicle)
+            .Include(c => c.Driver)
             .Include(c => c.Employee)
+            .Include(c => c.Settlements)
             .OrderByDescending(c => c.HandoverDate)
+            .ThenByDescending(c => c.Id)
             .ToListAsync();
 
         return items.Select(c => c.ToDto()).ToList();
@@ -774,19 +784,181 @@ public sealed class CustodyService(FleetDbContext context, IAuditService auditSe
     public async Task<CustodyDto?> GetByIdAsync(int id)
     {
         var entity = await _context.Custodies
-            .Include(c => c.Vehicle)
+            .Include(c => c.Driver)
             .Include(c => c.Employee)
+            .Include(c => c.Settlements)
             .FirstOrDefaultAsync(c => c.Id == id);
 
         return entity?.ToDto();
     }
 
+    public async Task<List<CustodyDto>> GetActiveForCustodianAsync(int? driverId, int? employeeId)
+    {
+        if (driverId.HasValue == employeeId.HasValue)
+        {
+            throw new InvalidOperationException("يجب تحديد سائق أو موظف واحد بالضبط لعرض العهد الخاصة به.");
+        }
+
+        var items = await _context.Custodies
+            .Include(c => c.Driver)
+            .Include(c => c.Employee)
+            .Include(c => c.Settlements)
+            .Where(c => c.Status == "Active" || c.Status == "PendingApproval")
+            .Where(c => driverId.HasValue ? c.DriverId == driverId.Value : c.EmployeeId == employeeId!.Value)
+            .OrderByDescending(c => c.HandoverDate)
+            .ThenByDescending(c => c.Id)
+            .ToListAsync();
+
+        return items.Select(c => c.ToDto()).ToList();
+    }
+
+    public async Task<List<CustodyDto>> GetPendingApprovalAsync()
+    {
+        var items = await _context.Custodies
+            .Include(c => c.Driver)
+            .Include(c => c.Employee)
+            .Include(c => c.Settlements)
+            .Where(c => c.Status == "PendingApproval")
+            .OrderBy(c => c.UpdatedAt)
+            .ToListAsync();
+
+        return items.Select(c => c.ToDto()).ToList();
+    }
+
+    public async Task<CustodyDto> ApproveClosureAsync(int custodyId, string approvedBy)
+    {
+        var custody = await _context.Custodies
+            .Include(c => c.Driver)
+            .Include(c => c.Employee)
+            .Include(c => c.Settlements)
+            .FirstOrDefaultAsync(c => c.Id == custodyId)
+            ?? throw new InvalidOperationException("العهدة غير موجودة.");
+
+        if (!string.Equals(custody.Status, "PendingApproval", StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException("العهدة ليست بانتظار الاعتماد.");
+        }
+
+        var settledAmount = custody.Settlements.Sum(s => s.Amount);
+        if (settledAmount != custody.Amount)
+        {
+            throw new InvalidOperationException("لا يمكن اعتماد التصفية قبل تغطية كامل قيمة العهدة بالتسويات.");
+        }
+
+        var custodianName = custody.Driver?.FullName ?? custody.Employee?.FullName ?? string.Empty;
+        var approver = ServiceHelpers.Clean(approvedBy);
+        var now = DateTime.UtcNow;
+
+        await using var transaction = await _context.Database.BeginTransactionAsync();
+
+        if (custody.PaidFromTreasury)
+        {
+            // The disbursement already left the treasury as one lump sum. On approval that lump
+            // is reversed with a matching liquidation income, and each documented settlement is
+            // posted as an expense attributed to the custodian — net zero on the balance while
+            // itemizing exactly where the custody money went.
+            _context.TreasuryTransactions.Add(new TreasuryTransaction
+            {
+                TransactionDate = DateTime.Today,
+                TransactionType = "إيراد",
+                Amount = custody.Amount,
+                Description = $"تصفية عهدة {custody.CustodyNumber} — {custodianName}",
+                RelatedEntityType = "Custody",
+                RelatedEntityId = custody.Id,
+                PaymentMethod = "نقدي",
+                Notes = string.IsNullOrWhiteSpace(approver) ? string.Empty : $"اعتمدها: {approver}",
+                CreatedAt = now,
+                UpdatedAt = now
+            });
+
+            foreach (var settlement in custody.Settlements.OrderBy(s => s.SettlementDate).ThenBy(s => s.Id))
+            {
+                _context.TreasuryTransactions.Add(new TreasuryTransaction
+                {
+                    TransactionDate = settlement.SettlementDate,
+                    TransactionType = "صرف",
+                    Amount = settlement.Amount,
+                    Description = string.IsNullOrWhiteSpace(settlement.Description)
+                        ? $"مصروف من عهدة {custody.CustodyNumber} — {custodianName}"
+                        : $"من عهدة {custody.CustodyNumber} ({custodianName}): {settlement.Description}",
+                    RelatedEntityType = "CustodySettlement",
+                    RelatedEntityId = settlement.Id,
+                    PaymentMethod = "نقدي",
+                    Notes = settlement.Notes,
+                    CreatedAt = now,
+                    UpdatedAt = now
+                });
+            }
+        }
+
+        custody.Status = "Settled";
+        custody.ReturnDate ??= DateTime.Today;
+        custody.UpdatedAt = now;
+
+        await _context.SaveChangesAsync();
+        await _auditService.LogActionAsync(
+            "Approve", "Custody", custody.Id, "PendingApproval",
+            $"Settled by {approver}: {custody.CustodyNumber}");
+        await transaction.CommitAsync();
+
+        return (await GetByIdAsync(custody.Id))!;
+    }
+
+    public async Task<CustodyDto> RejectClosureAsync(int custodyId, string rejectedBy, string reason)
+    {
+        var custody = await _context.Custodies
+            .FirstOrDefaultAsync(c => c.Id == custodyId)
+            ?? throw new InvalidOperationException("العهدة غير موجودة.");
+
+        if (!string.Equals(custody.Status, "PendingApproval", StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException("العهدة ليست بانتظار الاعتماد.");
+        }
+
+        var cleanReason = ServiceHelpers.Clean(reason);
+        if (string.IsNullOrWhiteSpace(cleanReason))
+        {
+            throw new InvalidOperationException("سبب رفض التصفية مطلوب حتى يعرف أمين العهدة ما يجب تصحيحه.");
+        }
+
+        await using var transaction = await _context.Database.BeginTransactionAsync();
+
+        custody.Status = "Active";
+        var rejectionNote = $"رفض التصفية ({ServiceHelpers.Clean(rejectedBy)}): {cleanReason}";
+        custody.Notes = string.IsNullOrWhiteSpace(custody.Notes)
+            ? rejectionNote
+            : $"{custody.Notes} | {rejectionNote}";
+        custody.UpdatedAt = DateTime.UtcNow;
+
+        await _context.SaveChangesAsync();
+        await _auditService.LogActionAsync(
+            "Reject", "Custody", custody.Id, "PendingApproval", rejectionNote);
+        await transaction.CommitAsync();
+
+        return (await GetByIdAsync(custody.Id))!;
+    }
+
     public async Task<CustodyDto> SaveAsync(CustodyFormDto dto)
     {
-        if (!await _context.Vehicles.AnyAsync(v => v.Id == dto.VehicleId))
+        await ValidateCustodianAsync(dto.DriverId, dto.EmployeeId);
+
+        if (dto.Amount <= 0)
         {
-            throw new InvalidOperationException("المركبة غير موجودة.");
+            throw new InvalidOperationException("قيمة العهدة يجب أن تكون أكبر من صفر.");
         }
+
+        var custodyNumber = ServiceHelpers.Clean(dto.CustodyNumber);
+        if (string.IsNullOrWhiteSpace(custodyNumber))
+        {
+            throw new InvalidOperationException("رقم العهدة مطلوب.");
+        }
+
+        if (await _context.Custodies.AnyAsync(c => c.CustodyNumber == custodyNumber && c.Id != dto.Id))
+        {
+            throw new InvalidOperationException("رقم العهدة مستخدم بالفعل لعهدة أخرى.");
+        }
+
+        await using var transaction = await _context.Database.BeginTransactionAsync();
 
         Custody entity;
         var action = dto.Id == 0 ? "Create" : "Update";
@@ -797,39 +969,270 @@ public sealed class CustodyService(FleetDbContext context, IAuditService auditSe
         }
         else
         {
-            entity = await _context.Custodies.FirstOrDefaultAsync(c => c.Id == dto.Id)
+            entity = await _context.Custodies
+                .Include(c => c.Settlements)
+                .FirstOrDefaultAsync(c => c.Id == dto.Id)
                 ?? throw new InvalidOperationException("العهدة غير موجودة.");
+
+            var settledAmount = entity.Settlements.Sum(s => s.Amount);
+            if (dto.Amount < settledAmount)
+            {
+                throw new InvalidOperationException(
+                    $"لا يمكن تخفيض قيمة العهدة إلى {dto.Amount:0.##} لأن التسويات المسجلة عليها بلغت {settledAmount:0.##}.");
+            }
         }
 
-        entity.VehicleId = dto.VehicleId;
-        entity.CustodyNumber = ServiceHelpers.Clean(dto.CustodyNumber);
-        entity.CustodianName = ServiceHelpers.Clean(dto.CustodianName);
-        entity.CustodianPosition = ServiceHelpers.Clean(dto.CustodianPosition);
+        entity.DriverId = dto.DriverId;
+        entity.EmployeeId = dto.EmployeeId;
+        entity.CustodyNumber = custodyNumber;
+        entity.Amount = dto.Amount;
         entity.HandoverDate = ServiceHelpers.OrToday(dto.HandoverDate);
         entity.ReturnDate = ServiceHelpers.OrNull(dto.ReturnDate);
-        entity.Status = string.IsNullOrWhiteSpace(dto.Status) ? "Active" : dto.Status;
-        entity.VehicleConditionRating = dto.VehicleConditionRating <= 0 ? 5 : dto.VehicleConditionRating;
+        entity.Status = ServiceHelpers.NormalizeCustodyStatus(dto.Status);
+        entity.PaidFromTreasury = dto.PaidFromTreasury;
         entity.Notes = ServiceHelpers.Clean(dto.Notes);
         entity.DocumentUrl = ServiceHelpers.Clean(dto.DocumentUrl);
         entity.UpdatedAt = DateTime.UtcNow;
 
-        var employee = await _context.Employees
-            .FirstOrDefaultAsync(e => e.FullName == entity.CustodianName || e.EmployeeId == entity.CustodianName);
-        entity.EmployeeId = employee?.Id;
-
         await _context.SaveChangesAsync();
+
+        if (entity.PaidFromTreasury)
+        {
+            var availableBalance = await GetTreasuryBalanceExcludingAsync(entity.TreasuryTransactionId);
+            if (entity.Amount > availableBalance)
+            {
+                throw new InvalidOperationException(
+                    $"رصيد الخزينة الحالي ({availableBalance:0.##}) لا يكفي لصرف عهدة بقيمة {entity.Amount:0.##}. تم إلغاء العملية بالكامل.");
+            }
+
+            var treasury = entity.TreasuryTransactionId.HasValue
+                ? await _context.TreasuryTransactions.FirstOrDefaultAsync(t => t.Id == entity.TreasuryTransactionId.Value)
+                : null;
+
+            if (treasury is null)
+            {
+                treasury = new TreasuryTransaction { CreatedAt = DateTime.UtcNow };
+                _context.TreasuryTransactions.Add(treasury);
+            }
+
+            var custodianName = await ResolveCustodianNameAsync(entity.DriverId, entity.EmployeeId);
+            treasury.TransactionDate = entity.HandoverDate;
+            treasury.TransactionType = "صرف";
+            treasury.Amount = entity.Amount;
+            treasury.Description = $"صرف عهدة {entity.CustodyNumber} إلى {custodianName}";
+            treasury.RelatedEntityType = "Custody";
+            treasury.RelatedEntityId = entity.Id;
+            treasury.PaymentMethod = "نقدي";
+            treasury.Notes = entity.Notes;
+            treasury.UpdatedAt = DateTime.UtcNow;
+
+            await _context.SaveChangesAsync();
+            entity.TreasuryTransactionId = treasury.Id;
+            await _context.SaveChangesAsync();
+        }
+        else if (entity.TreasuryTransactionId.HasValue)
+        {
+            var treasury = await _context.TreasuryTransactions.FirstOrDefaultAsync(t => t.Id == entity.TreasuryTransactionId.Value);
+            if (treasury is not null)
+            {
+                _context.TreasuryTransactions.Remove(treasury);
+            }
+
+            entity.TreasuryTransactionId = null;
+            await _context.SaveChangesAsync();
+        }
+
         await _auditService.LogActionAsync(action, "Custody", entity.Id, null, entity.CustodyNumber);
+        await transaction.CommitAsync();
         return (await GetByIdAsync(entity.Id))!;
+    }
+
+    public async Task<CustodyDto> SettleAsync(CustodySettlementFormDto dto)
+    {
+        var custody = await _context.Custodies
+            .Include(c => c.Settlements)
+            .FirstOrDefaultAsync(c => c.Id == dto.CustodyId)
+            ?? throw new InvalidOperationException("العهدة غير موجودة.");
+
+        if (!string.Equals(custody.Status, "Active", StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException("لا يمكن تسجيل تسوية على عهدة غير نشطة.");
+        }
+
+        if (dto.Amount <= 0)
+        {
+            throw new InvalidOperationException("قيمة التسوية يجب أن تكون أكبر من صفر.");
+        }
+
+        var settledAmount = custody.Settlements.Sum(s => s.Amount);
+        var remainingBalance = custody.Amount - settledAmount;
+        if (dto.Amount > remainingBalance)
+        {
+            throw new InvalidOperationException(
+                $"قيمة التسوية ({dto.Amount:0.##}) تتجاوز الرصيد المتبقي من العهدة ({remainingBalance:0.##}).");
+        }
+
+        // The receipt is stored before the database transaction (the file system cannot join it);
+        // if the transaction later fails, the orphaned file is removed in the catch below.
+        var storedReceiptPath = await _receiptFileService.SaveReceiptAsync(dto.ReceiptSourceFilePath);
+
+        try
+        {
+            await using var transaction = await _context.Database.BeginTransactionAsync();
+
+            var settlement = new CustodySettlement
+            {
+                CustodyId = custody.Id,
+                Amount = dto.Amount,
+                SettlementDate = ServiceHelpers.OrToday(dto.SettlementDate),
+                Description = ServiceHelpers.Clean(dto.Description),
+                ReceiptFilePath = storedReceiptPath,
+                Notes = ServiceHelpers.Clean(dto.Notes),
+                CreatedAt = DateTime.UtcNow,
+                UpdatedAt = DateTime.UtcNow
+            };
+            _context.CustodySettlements.Add(settlement);
+
+            if (remainingBalance - dto.Amount == 0)
+            {
+                // Fully consumed: hand over to the treasury supervisor for approval.
+                // Only ApproveClosureAsync moves it to Settled and posts to the treasury.
+                custody.Status = "PendingApproval";
+            }
+
+            custody.UpdatedAt = DateTime.UtcNow;
+            await _context.SaveChangesAsync();
+            await _auditService.LogActionAsync(
+                "Create", "CustodySettlement", settlement.Id, null,
+                $"{custody.CustodyNumber}: {settlement.Amount:0.##}");
+            await transaction.CommitAsync();
+        }
+        catch
+        {
+            TryDeleteStoredReceipt(storedReceiptPath);
+            throw;
+        }
+
+        return (await GetByIdAsync(custody.Id))!;
+    }
+
+    public async Task DeleteSettlementAsync(int settlementId)
+    {
+        var settlement = await _context.CustodySettlements
+            .Include(s => s.Custody)
+            .FirstOrDefaultAsync(s => s.Id == settlementId)
+            ?? throw new InvalidOperationException("التسوية غير موجودة.");
+
+        var custody = settlement.Custody!;
+        if (string.Equals(custody.Status, "Settled", StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException("العهدة معتمدة ومقفلة؛ لا يمكن حذف تسوياتها بعد ترحيلها إلى الخزينة.");
+        }
+
+        await using var transaction = await _context.Database.BeginTransactionAsync();
+
+        _context.CustodySettlements.Remove(settlement);
+
+        if (string.Equals(custody.Status, "PendingApproval", StringComparison.OrdinalIgnoreCase))
+        {
+            custody.Status = "Active";
+        }
+
+        custody.UpdatedAt = DateTime.UtcNow;
+        await _context.SaveChangesAsync();
+        await _auditService.LogActionAsync(
+            "Delete", "CustodySettlement", settlement.Id,
+            $"{custody.CustodyNumber}: {settlement.Amount:0.##}", null);
+        await transaction.CommitAsync();
     }
 
     public async Task DeleteAsync(int id)
     {
-        var entity = await _context.Custodies.FirstOrDefaultAsync(c => c.Id == id)
+        var entity = await _context.Custodies
+            .Include(c => c.Settlements)
+            .FirstOrDefaultAsync(c => c.Id == id)
             ?? throw new InvalidOperationException("العهدة غير موجودة.");
+
+        if (entity.Settlements.Count > 0)
+        {
+            throw new InvalidOperationException("لا يمكن حذف عهدة عليها تسويات مسجلة؛ احذف التسويات أولًا.");
+        }
+
+        await using var transaction = await _context.Database.BeginTransactionAsync();
+
+        if (entity.TreasuryTransactionId.HasValue)
+        {
+            var treasury = await _context.TreasuryTransactions.FirstOrDefaultAsync(t => t.Id == entity.TreasuryTransactionId.Value);
+            if (treasury is not null)
+            {
+                _context.TreasuryTransactions.Remove(treasury);
+            }
+        }
 
         _context.Custodies.Remove(entity);
         await _context.SaveChangesAsync();
         await _auditService.LogActionAsync("Delete", "Custody", entity.Id, entity.CustodyNumber, null);
+        await transaction.CommitAsync();
+    }
+
+    private async Task ValidateCustodianAsync(int? driverId, int? employeeId)
+    {
+        if (driverId.HasValue == employeeId.HasValue)
+        {
+            throw new InvalidOperationException("العهدة تُسند إلى سائق أو موظف واحد بالضبط، ولا يمكن ربطها بمركبة.");
+        }
+
+        if (driverId.HasValue && !await _context.Drivers.AnyAsync(d => d.Id == driverId.Value))
+        {
+            throw new InvalidOperationException("السائق المحدد كأمين للعهدة غير موجود.");
+        }
+
+        if (employeeId.HasValue && !await _context.Employees.AnyAsync(e => e.Id == employeeId.Value))
+        {
+            throw new InvalidOperationException("الموظف المحدد كأمين للعهدة غير موجود.");
+        }
+    }
+
+    private async Task<string> ResolveCustodianNameAsync(int? driverId, int? employeeId)
+    {
+        if (driverId.HasValue)
+        {
+            return await _context.Drivers
+                .Where(d => d.Id == driverId.Value)
+                .Select(d => d.FullName)
+                .FirstOrDefaultAsync() ?? string.Empty;
+        }
+
+        return await _context.Employees
+            .Where(e => e.Id == employeeId!.Value)
+            .Select(e => e.FullName)
+            .FirstOrDefaultAsync() ?? string.Empty;
+    }
+
+    private async Task<decimal> GetTreasuryBalanceExcludingAsync(int? excludedTransactionId)
+    {
+        var entries = await _context.TreasuryTransactions
+            .Where(t => !excludedTransactionId.HasValue || t.Id != excludedTransactionId.Value)
+            .Select(t => new { t.TransactionType, t.Amount })
+            .ToListAsync();
+
+        return entries.Sum(x => ServiceHelpers.IsTreasuryIncome(x.TransactionType) ? x.Amount : -x.Amount);
+    }
+
+    private void TryDeleteStoredReceipt(string storedReceiptPath)
+    {
+        try
+        {
+            var absolutePath = _receiptFileService.ResolveAbsolutePath(storedReceiptPath);
+            if (File.Exists(absolutePath))
+            {
+                File.Delete(absolutePath);
+            }
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)
+        {
+            // The settlement itself was already rolled back; a leftover receipt file is harmless.
+        }
     }
 }
 

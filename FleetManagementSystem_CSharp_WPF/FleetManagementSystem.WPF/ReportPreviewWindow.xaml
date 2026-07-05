@@ -5,6 +5,8 @@
         Width="1280"
         Height="820"
         WindowStartupLocation="CenterOwner"
+        MaxHeight="{Binding Source={x:Static SystemParameters.WorkArea}, Path=Height}"
+        MaxWidth="{Binding Source={x:Static SystemParameters.WorkArea}, Path=Width}"
         FlowDirection="RightToLeft"
         Background="{StaticResource PageBackgroundBrush}">
     <DockPanel Margin="18">

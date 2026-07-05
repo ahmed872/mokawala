@@ -5,7 +5,9 @@
         Width="720"
         Height="560"
         WindowStartupLocation="CenterOwner"
-        ResizeMode="NoResize"
+        MaxHeight="{Binding Source={x:Static SystemParameters.WorkArea}, Path=Height}"
+        MaxWidth="{Binding Source={x:Static SystemParameters.WorkArea}, Path=Width}"
+        ResizeMode="CanResize"
         AutomationProperties.AutomationId="TreasuryEntryWindow"
         AutomationProperties.Name="نافذة حركة خزينة"
         FlowDirection="RightToLeft"
@@ -162,9 +164,11 @@
             </Grid>
         </Border>
 
-        <Border Grid.Row="1"
-                Margin="0,16,0,16"
-                Style="{StaticResource TreasuryPopupCardStyle}">
+        <ScrollViewer Grid.Row="1"
+                      Margin="0,16,0,16"
+                      VerticalScrollBarVisibility="Auto"
+                      HorizontalScrollBarVisibility="Disabled">
+        <Border Style="{StaticResource TreasuryPopupCardStyle}">
             <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>
@@ -254,6 +258,7 @@
                 </StackPanel>
             </Grid>
         </Border>
+        </ScrollViewer>
 
         <Border Grid.Row="2"
                 Style="{StaticResource TreasuryPopupCardStyle}"

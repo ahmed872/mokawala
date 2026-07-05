@@ -5019,6 +5019,8 @@
                                     <ColumnDefinition Width="*"/>
                                     <ColumnDefinition Width="1"/>
                                     <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="1"/>
+                                    <ColumnDefinition Width="*"/>
                                 </Grid.ColumnDefinitions>
                                 <StackPanel Grid.Column="0"
                                             HorizontalAlignment="Center">
@@ -5058,7 +5060,25 @@
                                         Margin="0,4"/>
                                 <StackPanel Grid.Column="4"
                                             HorizontalAlignment="Center">
-                                    <TextBlock Text="مسترجعة"
+                                    <TextBlock Text="بانتظار الاعتماد"
+                                               FontSize="12"
+                                               Foreground="#607D8B"
+                                               HorizontalAlignment="Center"
+                                               Margin="0,0,0,4"/>
+                                    <TextBlock x:Name="CustodyPendingCountTextBlock"
+                                               Text="0"
+                                               FontSize="20"
+                                               FontWeight="Bold"
+                                               Foreground="#B26A00"
+                                               HorizontalAlignment="Center"/>
+                                </StackPanel>
+                                <Border Grid.Column="5"
+                                        Background="#C5DBC8"
+                                        Width="1"
+                                        Margin="0,4"/>
+                                <StackPanel Grid.Column="6"
+                                            HorizontalAlignment="Center">
+                                    <TextBlock Text="مغلقة"
                                                FontSize="12"
                                                Foreground="#607D8B"
                                                HorizontalAlignment="Center"
@@ -5085,7 +5105,7 @@
                                   VerticalAlignment="Stretch">
                             <DataGrid.Columns>
                                 <DataGridTemplateColumn Header="إجراءات"
-                                                        Width="92"
+                                                        Width="170"
                                                         IsReadOnly="True">
                                     <DataGridTemplateColumn.CellTemplate>
                                         <DataTemplate>
@@ -5104,6 +5124,44 @@
                                                         ToolTip="حذف العهدة"
                                                         AutomationProperties.Name="حذف العهدة"
                                                         Click="DeleteCustodyButton_Click"/>
+                                                <Button Content="✔"
+                                                        ToolTip="اعتماد تصفية العهدة وترحيل مصاريفها إلى الخزينة"
+                                                        AutomationProperties.Name="اعتماد تصفية العهدة"
+                                                        Click="ApproveCustodyButton_Click">
+                                                    <Button.Style>
+                                                        <Style TargetType="Button"
+                                                               BasedOn="{StaticResource GridRowActionButtonStyle}">
+                                                            <Setter Property="Visibility"
+                                                                    Value="Collapsed"/>
+                                                            <Style.Triggers>
+                                                                <DataTrigger Binding="{Binding Status}"
+                                                                             Value="بانتظار الاعتماد">
+                                                                    <Setter Property="Visibility"
+                                                                            Value="Visible"/>
+                                                                </DataTrigger>
+                                                            </Style.Triggers>
+                                                        </Style>
+                                                    </Button.Style>
+                                                </Button>
+                                                <Button Content="✖"
+                                                        ToolTip="رفض التصفية وإعادة العهدة لأمينها"
+                                                        AutomationProperties.Name="رفض تصفية العهدة"
+                                                        Click="RejectCustodyButton_Click">
+                                                    <Button.Style>
+                                                        <Style TargetType="Button"
+                                                               BasedOn="{StaticResource GridRowDangerActionButtonStyle}">
+                                                            <Setter Property="Visibility"
+                                                                    Value="Collapsed"/>
+                                                            <Style.Triggers>
+                                                                <DataTrigger Binding="{Binding Status}"
+                                                                             Value="بانتظار الاعتماد">
+                                                                    <Setter Property="Visibility"
+                                                                            Value="Visible"/>
+                                                                </DataTrigger>
+                                                            </Style.Triggers>
+                                                        </Style>
+                                                    </Button.Style>
+                                                </Button>
                                             </StackPanel>
                                         </DataTemplate>
                                     </DataGridTemplateColumn.CellTemplate>
@@ -5126,17 +5184,17 @@
                                         </StackPanel>
                                     </DataGridTextColumn.Header>
                                 </DataGridTextColumn>
-                                <DataGridTextColumn Binding="{Binding VehiclePlateNumber}"
-                                                    Width="175">
+                                <DataGridTextColumn Binding="{Binding CustodianType}"
+                                                    Width="130">
                                     <DataGridTextColumn.Header>
                                         <StackPanel Orientation="Vertical"
                                                     HorizontalAlignment="Stretch">
-                                            <TextBlock Text="العربية"
+                                            <TextBlock Text="نوع الأمين"
                                                        HorizontalAlignment="Center"
                                                        FontWeight="Bold"
                                                        Margin="0,0,0,8"/>
-                                            <TextBox x:Name="CustodyFilterPlate"
-                                                     AutomationProperties.AutomationId="CustodyFilterPlate"
+                                            <TextBox x:Name="CustodyFilterCustodianType"
+                                                     AutomationProperties.AutomationId="CustodyFilterCustodianType"
                                                      HorizontalAlignment="Stretch"
                                                      Style="{StaticResource FilterTextBoxStyle}"
                                                      TextChanged="CustodyFilter_Changed"/>
@@ -5177,21 +5235,30 @@
                                         </StackPanel>
                                     </DataGridTextColumn.Header>
                                 </DataGridTextColumn>
-                                <DataGridTextColumn Binding="{Binding CustodianPosition}"
-                                                    Width="175">
+                                <DataGridTextColumn Binding="{Binding Amount, StringFormat=N2}"
+                                                    Width="150">
                                     <DataGridTextColumn.Header>
                                         <StackPanel Orientation="Vertical"
                                                     HorizontalAlignment="Stretch">
-                                            <TextBlock Text="الوظيفة"
+                                            <TextBlock Text="مبلغ العهدة"
                                                        HorizontalAlignment="Center"
                                                        FontWeight="Bold"
                                                        Margin="0,0,0,8"/>
-                                            <TextBox x:Name="CustodyFilterPosition"
-                                                     AutomationProperties.AutomationId="CustodyFilterPosition"
+                                            <TextBox x:Name="CustodyFilterAmount"
+                                                     AutomationProperties.AutomationId="CustodyFilterAmount"
                                                      HorizontalAlignment="Stretch"
                                                      Style="{StaticResource FilterTextBoxStyle}"
                                                      TextChanged="CustodyFilter_Changed"/>
                                         </StackPanel>
+                                    </DataGridTextColumn.Header>
+                                </DataGridTextColumn>
+                                <DataGridTextColumn Binding="{Binding SettledAmount, StringFormat=N2}"
+                                                    Width="140">
+                                    <DataGridTextColumn.Header>
+                                        <TextBlock Text="المنصرف منها"
+                                                   HorizontalAlignment="Center"
+                                                   FontWeight="Bold"
+                                                   Margin="0,0,0,8"/>
                                     </DataGridTextColumn.Header>
                                 </DataGridTextColumn>
                                 <DataGridTextColumn Binding="{Binding HandoverDate, StringFormat=yyyy-MM-dd}"
@@ -5245,17 +5312,17 @@
                                         </StackPanel>
                                     </DataGridTextColumn.Header>
                                 </DataGridTextColumn>
-                                <DataGridTextColumn Binding="{Binding VehicleConditionRating, StringFormat=0.##}"
-                                                    Width="145">
+                                <DataGridTextColumn Binding="{Binding RemainingBalance, StringFormat=N2}"
+                                                    Width="150">
                                     <DataGridTextColumn.Header>
                                         <StackPanel Orientation="Vertical"
                                                     HorizontalAlignment="Stretch">
-                                            <TextBlock Text="تقييم الحالة"
+                                            <TextBlock Text="الرصيد المتبقي"
                                                        HorizontalAlignment="Center"
                                                        FontWeight="Bold"
                                                        Margin="0,0,0,8"/>
-                                            <TextBox x:Name="CustodyFilterRating"
-                                                     AutomationProperties.AutomationId="CustodyFilterRating"
+                                            <TextBox x:Name="CustodyFilterRemaining"
+                                                     AutomationProperties.AutomationId="CustodyFilterRemaining"
                                                      HorizontalAlignment="Stretch"
                                                      Style="{StaticResource FilterTextBoxStyle}"
                                                      TextChanged="CustodyFilter_Changed"/>

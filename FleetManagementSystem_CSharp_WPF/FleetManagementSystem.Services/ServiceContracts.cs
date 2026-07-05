@@ -129,6 +129,47 @@ public interface ICustodyService
     Task<CustodyDto?> GetByIdAsync(int id);
     Task<CustodyDto> SaveAsync(CustodyFormDto dto);
     Task DeleteAsync(int id);
+
+    /// <summary>
+    /// "عهدتي" self-service query: active custodies held by the given custodian.
+    /// Exactly one of <paramref name="driverId"/>/<paramref name="employeeId"/> must be provided.
+    /// </summary>
+    Task<List<CustodyDto>> GetActiveForCustodianAsync(int? driverId, int? employeeId);
+
+    /// <summary>
+    /// Posts an expense settlement (تسوية عهدة) against a custody's remaining balance.
+    /// Requires a verified scanned receipt; rejects amounts exceeding the remaining balance.
+    /// </summary>
+    Task<CustodyDto> SettleAsync(CustodySettlementFormDto dto);
+
+    /// <summary>Removes an erroneous settlement and restores the settled amount to the custody balance.</summary>
+    Task DeleteSettlementAsync(int settlementId);
+
+    /// <summary>Custodies fully consumed by settlements, awaiting the treasury supervisor's decision.</summary>
+    Task<List<CustodyDto>> GetPendingApprovalAsync();
+
+    /// <summary>
+    /// Treasury supervisor approval: closes the custody as Settled and, for treasury-funded
+    /// custodies, posts the liquidation to the treasury — one reversal income plus one expense
+    /// entry per settlement attributed to the custodian — atomically.
+    /// </summary>
+    Task<CustodyDto> ApproveClosureAsync(int custodyId, string approvedBy);
+
+    /// <summary>Treasury supervisor rejection: reopens the custody with the reason recorded in its notes.</summary>
+    Task<CustodyDto> RejectClosureAsync(int custodyId, string rejectedBy, string reason);
+}
+
+/// <summary>
+/// Stores scanned financial documents (invoices/receipts) under the local Uploads/Receipts
+/// directory and returns the stored relative path. Validates type (PNG/JPEG/PDF by extension
+/// and file signature), non-empty content, and size before accepting the payload.
+/// </summary>
+public interface IReceiptFileService
+{
+    Task<string> SaveReceiptAsync(string sourceFilePath, CancellationToken cancellationToken = default);
+
+    /// <summary>Resolves a stored relative receipt path to an absolute path on disk.</summary>
+    string ResolveAbsolutePath(string storedReceiptPath);
 }
 
 public interface IMasterDataService

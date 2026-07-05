@@ -30,5 +30,6 @@ namespace FleetManagementSystem.Data.Entities
         public ICollection<Trip> Trips { get; set; } = new List<Trip>();
         public ICollection<License> Licenses { get; set; } = new List<License>();
         public ICollection<DriverAttendance> AttendanceRecords { get; set; } = new List<DriverAttendance>();
+        public ICollection<Custody> Custodies { get; set; } = new List<Custody>();
     }
 }

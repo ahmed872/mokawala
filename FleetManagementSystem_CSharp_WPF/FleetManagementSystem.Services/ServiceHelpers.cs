@@ -134,6 +134,8 @@ internal static class ServiceHelpers
             "inprogress" or "intrip" or "in trip" => "جاري",
             "maintenance" => "صيانة",
             "returned" => "مرتجع",
+            "settled" => "تمت التسوية",
+            "pendingapproval" => "بانتظار الاعتماد",
             _ => Clean(status)
         };
     }
@@ -179,7 +181,11 @@ internal static class ServiceHelpers
             },
             UserRole.TreasuryOfficer => new List<string>
             {
-                "Dashboard", "Treasury"
+                "Dashboard", "Treasury", "Custody"
+            },
+            UserRole.Custodian => new List<string>
+            {
+                "MyCustody"
             },
             UserRole.TripsLicensesOfficer => new List<string>
             {
@@ -560,23 +566,66 @@ internal static class ServiceHelpers
             Notes = entity.Notes
         };
 
-    public static CustodyDto ToDto(this Custody entity) =>
+    public static string CustodianTypeDisplay(int? driverId) => driverId.HasValue ? "سائق" : "موظف";
+
+    /// <summary>
+    /// Maps UI/display custody statuses (Arabic or English, any casing) back to the canonical
+    /// storage values the workflow filters on: Active, PendingApproval, Settled, Returned.
+    /// </summary>
+    public static string NormalizeCustodyStatus(string? status)
+    {
+        var normalized = Clean(status).ToLowerInvariant();
+        return normalized switch
+        {
+            "" or "active" or "نشط" or "نشطة" => "Active",
+            "pendingapproval" or "بانتظار الاعتماد" => "PendingApproval",
+            "settled" or "تمت التسوية" => "Settled",
+            "returned" or "مرتجع" or "مسترجعة" => "Returned",
+            _ => "Active"
+        };
+    }
+
+    public static CustodySettlementDto ToDto(this CustodySettlement entity) =>
         new()
         {
             Id = entity.Id,
-            VehicleId = entity.VehicleId,
-            VehiclePlateNumber = entity.Vehicle?.PlateNumber ?? string.Empty,
+            CustodyId = entity.CustodyId,
+            CustodyNumber = entity.Custody?.CustodyNumber ?? string.Empty,
+            Amount = entity.Amount,
+            SettlementDate = entity.SettlementDate,
+            Description = entity.Description,
+            ReceiptFilePath = entity.ReceiptFilePath,
+            Notes = entity.Notes
+        };
+
+    public static CustodyDto ToDto(this Custody entity)
+    {
+        var settledAmount = entity.Settlements.Sum(s => s.Amount);
+        return new()
+        {
+            Id = entity.Id,
+            DriverId = entity.DriverId,
+            EmployeeId = entity.EmployeeId,
+            CustodianName = entity.Driver?.FullName ?? entity.Employee?.FullName ?? string.Empty,
+            CustodianType = CustodianTypeDisplay(entity.DriverId),
             CustodyNumber = entity.CustodyNumber,
-            CustodianName = entity.CustodianName,
-            CustodianPosition = entity.CustodianPosition,
+            Amount = entity.Amount,
             HandoverDate = entity.HandoverDate,
             ReturnDate = entity.ReturnDate,
             Status = StatusDisplay(entity.Status),
-            VehicleConditionRating = entity.VehicleConditionRating,
+            PaidFromTreasury = entity.PaidFromTreasury,
+            TreasuryTransactionId = entity.TreasuryTransactionId,
+            SettledAmount = settledAmount,
+            RemainingBalance = entity.Amount - settledAmount,
             Notes = entity.Notes,
             DocumentUrl = entity.DocumentUrl,
-            Items = new List<CustodyItemDto>()
+            Settlements = entity.Settlements
+                .OrderByDescending(s => s.SettlementDate)
+                .ThenByDescending(s => s.Id)
+                .Select(s => s.ToDto())
+                .ToList()
         };
+    }
 
     public static VehicleTypeDto ToDto(this VehicleType entity) =>
         new()
@@ -656,6 +705,8 @@ internal static class ServiceHelpers
             FullName = entity.FullName,
             PhoneNumber = entity.PhoneNumber,
             Role = entity.Role.ToString(),
+            DriverId = entity.DriverId,
+            EmployeeId = entity.EmployeeId,
             IsActive = entity.IsActive,
             LastLoginAt = entity.LastLogin,
             AllowedModules = AllowedModulesForRole(entity.Role)

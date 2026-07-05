@@ -5,6 +5,9 @@
         Width="760"
         SizeToContent="Height"
         MinHeight="560"
+        MaxHeight="{Binding Source={x:Static SystemParameters.WorkArea}, Path=Height}"
+        MaxWidth="{Binding Source={x:Static SystemParameters.WorkArea}, Path=Width}"
+        ResizeMode="CanResize"
         WindowStartupLocation="CenterOwner"
         FlowDirection="RightToLeft"
         Background="{StaticResource SurfaceBrush}"
@@ -18,7 +21,7 @@
         <Grid>
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>
-                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
                 <RowDefinition Height="Auto"/>
             </Grid.RowDefinitions>
 
@@ -33,7 +36,10 @@
                            TextWrapping="Wrap"/>
             </StackPanel>
 
-            <Grid Grid.Row="1">
+            <ScrollViewer Grid.Row="1"
+                          VerticalScrollBarVisibility="Auto"
+                          HorizontalScrollBarVisibility="Disabled">
+            <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="*"/>
@@ -152,6 +158,7 @@
                              Text="{Binding Insurance.Notes, UpdateSourceTrigger=PropertyChanged}"/>
                 </StackPanel>
             </Grid>
+            </ScrollViewer>
 
             <StackPanel Grid.Row="2"
                         Orientation="Horizontal"
