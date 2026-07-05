@@ -1146,6 +1146,12 @@
                                                 Click="LogoutButton_Click">
                                             تسجيل الخروج
                                         </Button>
+                                        <Button Style="{StaticResource SecondaryButtonStyle}"
+                                                Margin="0,12,0,0"
+                                                AutomationProperties.AutomationId="ChangeMyPasswordButton"
+                                                Click="ChangeMyPasswordButton_Click">
+                                            تغيير كلمة المرور
+                                        </Button>
                                         <Button x:Name="AdminAddUserButton"
                                                 Style="{StaticResource SecondaryButtonStyle}"
                                                 Margin="0,12,0,0"
@@ -1861,7 +1867,10 @@
                         </TabItem>
 
                         <TabItem Header="حضور وغياب">
-                            <Grid>
+                            <ScrollViewer x:Name="AttendanceTabScrollViewer"
+                                          VerticalScrollBarVisibility="Auto"
+                                          HorizontalScrollBarVisibility="Disabled">
+                            <Grid MinHeight="860">
                                 <Grid.RowDefinitions>
                                     <RowDefinition Height="Auto"/>
                                     <RowDefinition Height="*"
@@ -1869,7 +1878,7 @@
                                     <RowDefinition Height="10"/>
                                     <RowDefinition Height="Auto"/>
                                     <RowDefinition Height="*"
-                                                   MinHeight="140"/>
+                                                   MinHeight="240"/>
                                     <RowDefinition Height="0"/>
                                 </Grid.RowDefinitions>
                                 <Border Style="{StaticResource TripPageCardStyle}"
@@ -2685,6 +2694,7 @@
                                     <TextBlock x:Name="DriverAttendanceWeekRangeTextBlock"/>
                                 </StackPanel>
                             </Grid>
+                            </ScrollViewer>
                         </TabItem>
 
                         <TabItem Header="تقرير السائقين">
@@ -4994,7 +5004,8 @@
                         <WrapPanel DockPanel.Dock="Top"
                                    Margin="0,0,0,10"
                                    VerticalAlignment="Center">
-                            <Button Style="{StaticResource TripRoundActionButtonStyle}"
+                            <Button x:Name="AddCustodyButton"
+                                    Style="{StaticResource TripRoundActionButtonStyle}"
                                     ToolTip="إضافة عهدة"
                                     AutomationProperties.AutomationId="AddCustodyButton"
                                     AutomationProperties.Name="إضافة عهدة"
@@ -5085,13 +5096,20 @@
                                   VerticalAlignment="Stretch">
                             <DataGrid.Columns>
                                 <DataGridTemplateColumn Header="إجراءات"
-                                                        Width="92"
+                                                        Width="150"
                                                         IsReadOnly="True">
                                     <DataGridTemplateColumn.CellTemplate>
                                         <DataTemplate>
                                             <StackPanel Orientation="Horizontal"
                                                         HorizontalAlignment="Center"
                                                         FlowDirection="LeftToRight">
+                                                <Button Style="{StaticResource SecondaryButtonStyle}"
+                                                        Padding="8,4"
+                                                        MinHeight="0"
+                                                        FontSize="12"
+                                                        ToolTip="تصفية العهدة"
+                                                        AutomationProperties.Name="تصفية العهدة"
+                                                        Click="SettleCustodyButton_Click">تصفية</Button>
                                                 <Button Style="{StaticResource GridRowActionButtonStyle}"
                                                         Content="{Binding}"
                                                         ContentTemplate="{StaticResource GridEditActionIconTemplate}"
@@ -5192,6 +5210,38 @@
                                                      Style="{StaticResource FilterTextBoxStyle}"
                                                      TextChanged="CustodyFilter_Changed"/>
                                         </StackPanel>
+                                    </DataGridTextColumn.Header>
+                                </DataGridTextColumn>
+                                <DataGridTextColumn Binding="{Binding Amount, StringFormat=N2}"
+                                                    Width="135">
+                                    <DataGridTextColumn.Header>
+                                        <TextBlock Text="قيمة العهدة"
+                                                   HorizontalAlignment="Center"
+                                                   FontWeight="Bold"/>
+                                    </DataGridTextColumn.Header>
+                                </DataGridTextColumn>
+                                <DataGridTextColumn Binding="{Binding SettledAmount, StringFormat=N2}"
+                                                    Width="135">
+                                    <DataGridTextColumn.Header>
+                                        <TextBlock Text="تم تسديده"
+                                                   HorizontalAlignment="Center"
+                                                   FontWeight="Bold"/>
+                                    </DataGridTextColumn.Header>
+                                </DataGridTextColumn>
+                                <DataGridTextColumn Binding="{Binding RemainingAmount, StringFormat=N2}"
+                                                    Width="135">
+                                    <DataGridTextColumn.Header>
+                                        <TextBlock Text="المتبقي"
+                                                   HorizontalAlignment="Center"
+                                                   FontWeight="Bold"/>
+                                    </DataGridTextColumn.Header>
+                                </DataGridTextColumn>
+                                <DataGridTextColumn Binding="{Binding CustodianUsername}"
+                                                    Width="160">
+                                    <DataGridTextColumn.Header>
+                                        <TextBlock Text="حساب الدخول"
+                                                   HorizontalAlignment="Center"
+                                                   FontWeight="Bold"/>
                                     </DataGridTextColumn.Header>
                                 </DataGridTextColumn>
                                 <DataGridTextColumn Binding="{Binding HandoverDate, StringFormat=yyyy-MM-dd}"
@@ -5527,9 +5577,8 @@
                     <DockPanel>
                         <WrapPanel DockPanel.Dock="Top">
                             <Button Style="{StaticResource PrimaryButtonStyle}"
+                                    AutomationProperties.AutomationId="AddUserButton"
                                     Click="AddUserButton_Click">إضافة مستخدم</Button>
-                            <Button Style="{StaticResource PrimaryButtonStyle}"
-                                    Click="SaveUserButton_Click">حفظ المحدد</Button>
                             <Button Style="{StaticResource PrimaryButtonStyle}"
                                     Click="RefreshUsersButton_Click">تحديث</Button>
                             <Button Style="{StaticResource DangerButtonStyle}"
@@ -5537,7 +5586,45 @@
                         </WrapPanel>
                         <DataGrid x:Name="UsersGrid"
                                   AutomationProperties.AutomationId="UsersGrid"
-                                  AutoGeneratingColumn="Grid_AutoGeneratingColumn"/>
+                                  AutoGenerateColumns="False"
+                                  IsReadOnly="True"
+                                  HeadersVisibility="Column"
+                                  MinRowHeight="38">
+                            <DataGrid.Columns>
+                                <DataGridTemplateColumn Header="إجراءات"
+                                                        Width="70"
+                                                        IsReadOnly="True">
+                                    <DataGridTemplateColumn.CellTemplate>
+                                        <DataTemplate>
+                                            <Button Style="{StaticResource GridRowActionButtonStyle}"
+                                                    Content="{Binding}"
+                                                    ContentTemplate="{StaticResource GridEditActionIconTemplate}"
+                                                    ToolTip="تعديل المستخدم"
+                                                    AutomationProperties.Name="تعديل المستخدم"
+                                                    Click="EditUserButton_Click"/>
+                                        </DataTemplate>
+                                    </DataGridTemplateColumn.CellTemplate>
+                                </DataGridTemplateColumn>
+                                <DataGridTextColumn Header="اسم المستخدم"
+                                                    Binding="{Binding Username}"
+                                                    Width="190"/>
+                                <DataGridTextColumn Header="الاسم الكامل"
+                                                    Binding="{Binding FullName}"
+                                                    Width="220"/>
+                                <DataGridTextColumn Header="البريد الإلكتروني"
+                                                    Binding="{Binding Email}"
+                                                    Width="220"/>
+                                <DataGridTextColumn Header="الدور"
+                                                    Binding="{Binding RoleDisplay}"
+                                                    Width="190"/>
+                                <DataGridTextColumn Header="الحالة"
+                                                    Binding="{Binding StatusDisplay}"
+                                                    Width="120"/>
+                                <DataGridTextColumn Header="آخر دخول"
+                                                    Binding="{Binding LastLoginAt, StringFormat=yyyy-MM-dd HH:mm}"
+                                                    Width="170"/>
+                            </DataGrid.Columns>
+                        </DataGrid>
                     </DockPanel>
                 </TabItem>
 

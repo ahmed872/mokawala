@@ -14,6 +14,7 @@ namespace FleetManagementSystem.Data.Entities
         public string FullName { get; set; } = string.Empty;
         public UserRole Role { get; set; } = UserRole.Staff;
         public bool IsActive { get; set; } = true;
+        public bool MustChangePassword { get; set; }
         public DateTime? LastLogin { get; set; }
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
         public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;

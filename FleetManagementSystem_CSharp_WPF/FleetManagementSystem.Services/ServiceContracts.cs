@@ -13,6 +13,7 @@ public interface IAuthenticationService
     Task<List<UserListItemDto>> GetUsersAsync();
     Task<UserDto> SaveUserAsync(UserFormDto dto);
     Task ToggleUserStatusAsync(int id, bool isActive);
+    Task ChangePasswordAsync(ChangePasswordDto dto);
 }
 
 public interface IVehicleService
@@ -125,9 +126,10 @@ public interface IInsuranceService
 
 public interface ICustodyService
 {
-    Task<List<CustodyDto>> GetAllAsync();
+    Task<List<CustodyDto>> GetAllAsync(int? userId = null);
     Task<CustodyDto?> GetByIdAsync(int id);
     Task<CustodyDto> SaveAsync(CustodyFormDto dto);
+    Task<CustodyDto> SettleAsync(CustodySettlementFormDto dto, int? settledByUserId = null);
     Task DeleteAsync(int id);
 }
 

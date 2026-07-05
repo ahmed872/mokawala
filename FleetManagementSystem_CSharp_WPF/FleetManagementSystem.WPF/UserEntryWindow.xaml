@@ -1,0 +1,171 @@
+<Window x:Class="FleetManagementSystem.WPF.UserEntryWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="إضافة مستخدم"
+        Width="520"
+        SizeToContent="Height"
+        ResizeMode="NoResize"
+        WindowStartupLocation="CenterOwner"
+        FlowDirection="RightToLeft"
+        Background="{StaticResource PageBackgroundBrush}"
+        FontFamily="Cairo, Segoe UI, Tahoma">
+    <Border Margin="18"
+            Padding="22"
+            Background="{StaticResource SurfaceBrush}"
+            BorderBrush="{StaticResource BorderBrush}"
+            BorderThickness="1"
+            CornerRadius="12">
+        <StackPanel>
+            <TextBlock x:Name="TitleTextBlock"
+                       Text="إضافة مستخدم جديد"
+                       FontSize="22"
+                       FontWeight="Bold"
+                       Foreground="{StaticResource TextBrush}"/>
+            <TextBlock Margin="0,6,0,18"
+                       FontSize="13"
+                       Foreground="{StaticResource MutedBrush}"
+                       TextWrapping="Wrap"
+                       Text="لو سيبت كلمة المرور فاضية، هتكون كلمة المرور الافتراضية هي نفس اسم المستخدم وهيُطلب منه تغييرها بعد أول دخول."/>
+
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="14"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+
+                <StackPanel Grid.Row="0" Grid.Column="0" Margin="0,0,0,12">
+                    <TextBlock Text="اسم المستخدم"
+                               FontSize="13"
+                               FontWeight="SemiBold"
+                               Foreground="{StaticResource TextBrush}"
+                               Margin="0,0,0,6"/>
+                    <TextBox x:Name="UsernameTextBox"
+                             AutomationProperties.AutomationId="UserEntryUsername"
+                             Style="{StaticResource AppTextBoxStyle}"/>
+                </StackPanel>
+
+                <StackPanel Grid.Row="0" Grid.Column="2" Margin="0,0,0,12">
+                    <TextBlock Text="الاسم الكامل"
+                               FontSize="13"
+                               FontWeight="SemiBold"
+                               Foreground="{StaticResource TextBrush}"
+                               Margin="0,0,0,6"/>
+                    <TextBox x:Name="FullNameTextBox"
+                             AutomationProperties.AutomationId="UserEntryFullName"
+                             Style="{StaticResource AppTextBoxStyle}"/>
+                </StackPanel>
+
+                <StackPanel Grid.Row="1" Grid.Column="0" Margin="0,0,0,12">
+                    <TextBlock Text="البريد الإلكتروني (اختياري)"
+                               FontSize="13"
+                               FontWeight="SemiBold"
+                               Foreground="{StaticResource TextBrush}"
+                               Margin="0,0,0,6"/>
+                    <TextBox x:Name="EmailTextBox"
+                             AutomationProperties.AutomationId="UserEntryEmail"
+                             Style="{StaticResource AppTextBoxStyle}"/>
+                </StackPanel>
+
+                <StackPanel Grid.Row="1" Grid.Column="2" Margin="0,0,0,12">
+                    <TextBlock Text="رقم الهاتف (اختياري)"
+                               FontSize="13"
+                               FontWeight="SemiBold"
+                               Foreground="{StaticResource TextBrush}"
+                               Margin="0,0,0,6"/>
+                    <TextBox x:Name="PhoneTextBox"
+                             AutomationProperties.AutomationId="UserEntryPhone"
+                             Style="{StaticResource AppTextBoxStyle}"/>
+                </StackPanel>
+
+                <StackPanel Grid.Row="2" Grid.Column="0" Margin="0,0,0,12">
+                    <TextBlock Text="الدور / الصلاحية"
+                               FontSize="13"
+                               FontWeight="SemiBold"
+                               Foreground="{StaticResource TextBrush}"
+                               Margin="0,0,0,6"/>
+                    <ComboBox x:Name="RoleComboBox"
+                              AutomationProperties.AutomationId="UserEntryRole"
+                              Height="42"
+                              Style="{StaticResource AppComboBoxStyle}"
+                              DisplayMemberPath="Display"
+                              SelectedValuePath="Value"/>
+                </StackPanel>
+
+                <StackPanel Grid.Row="2" Grid.Column="2" Margin="0,0,0,12"
+                            VerticalAlignment="Bottom">
+                    <CheckBox x:Name="IsActiveCheckBox"
+                              AutomationProperties.AutomationId="UserEntryIsActive"
+                              Content="الحساب مفعل"
+                              IsChecked="True"
+                              FontSize="13"
+                              Margin="0,0,0,10"
+                              Foreground="{StaticResource TextBrush}"/>
+                </StackPanel>
+
+                <StackPanel Grid.Row="3" Grid.Column="0" Margin="0,0,0,12">
+                    <TextBlock Text="كلمة المرور (اختياري)"
+                               FontSize="13"
+                               FontWeight="SemiBold"
+                               Foreground="{StaticResource TextBrush}"
+                               Margin="0,0,0,6"/>
+                    <PasswordBox x:Name="PasswordBox"
+                                 AutomationProperties.AutomationId="UserEntryPassword"
+                                 Height="42"
+                                 Padding="10,8"
+                                 FontSize="14"
+                                 VerticalContentAlignment="Center"/>
+                </StackPanel>
+
+                <StackPanel Grid.Row="3" Grid.Column="2" Margin="0,0,0,12">
+                    <TextBlock Text="تأكيد كلمة المرور"
+                               FontSize="13"
+                               FontWeight="SemiBold"
+                               Foreground="{StaticResource TextBrush}"
+                               Margin="0,0,0,6"/>
+                    <PasswordBox x:Name="ConfirmPasswordBox"
+                                 AutomationProperties.AutomationId="UserEntryConfirmPassword"
+                                 Height="42"
+                                 Padding="10,8"
+                                 FontSize="14"
+                                 VerticalContentAlignment="Center"/>
+                </StackPanel>
+            </Grid>
+
+            <TextBlock x:Name="ErrorTextBlock"
+                       Foreground="#C62828"
+                       FontSize="13"
+                       TextWrapping="Wrap"
+                       Margin="0,4,0,0"/>
+
+            <StackPanel Orientation="Horizontal"
+                        HorizontalAlignment="Left"
+                        FlowDirection="LeftToRight"
+                        Margin="0,18,0,0">
+                <Button Style="{StaticResource PrimaryButtonStyle}"
+                        AutomationProperties.AutomationId="UserEntrySaveButton"
+                        IsDefault="True"
+                        Click="SaveButton_Click">
+                    حفظ
+                </Button>
+                <Button Style="{StaticResource SecondaryButtonStyle}"
+                        AutomationProperties.AutomationId="UserEntryCancelButton"
+                        Margin="10,0,0,0"
+                        IsCancel="True"
+                        Click="CancelButton_Click">
+                    إلغاء
+                </Button>
+            </StackPanel>
+        </StackPanel>
+    </Border>
+</Window>

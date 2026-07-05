@@ -214,7 +214,7 @@ public partial class MainWindow : Window
     private readonly ObservableCollection<MaintenanceTypeDto> _maintenanceTypes = new();
     private readonly ObservableCollection<ServiceProviderDto> _serviceProviders = new();
     private readonly ObservableCollection<NotificationDto> _notifications = new();
-    private readonly ObservableCollection<UserFormDto> _users = new();
+    private readonly ObservableCollection<UserAccountRow> _users = new();
     private readonly IReadOnlyList<UserRoleOption> _userRoleOptions = new List<UserRoleOption>
     {
         new("Admin", "مدير النظام"),
@@ -225,7 +225,8 @@ public partial class MainWindow : Window
         new("TripsLicensesOfficer", "مسؤول التشغيلات والتراخيص"),
         new("InsuranceOfficer", "مسؤول التأمينات"),
         new("Viewer", "عرض فقط"),
-        new("Staff", "موظف")
+        new("Staff", "موظف"),
+        new("CustodyHolder", "صاحب عهدة")
     };
     private readonly List<DashboardAlertItem> _dashboardAlertItems = new();
 
@@ -560,8 +561,46 @@ public partial class MainWindow : Window
         ConnectionInfoTextBlock.Text = GetOperationalStatusText();
         DatabaseSettingsSummaryTextBlock.Text = GetConnectionSummaryText();
         ApplyRoleAccess(user);
+        AddCustodyButton.Visibility = IsCustodyHolder ? Visibility.Collapsed : Visibility.Visible;
         SelectTabByTag("Dashboard");
+        if (MainTabs.SelectedItem is not TabItem { Visibility: Visibility.Visible })
+        {
+            SelectFirstVisibleTab();
+        }
+
         UpdateShellForSelectedTab();
+
+        if (user.MustChangePassword)
+        {
+            Dispatcher.InvokeAsync(() =>
+            {
+                var result = MessageBox.Show(
+                    "أنت تستخدم كلمة المرور الافتراضية (نفس اسم المستخدم).\nهل تريد تغييرها الآن؟",
+                    "تغيير كلمة المرور",
+                    MessageBoxButton.YesNo,
+                    MessageBoxImage.Question);
+
+                if (result == MessageBoxResult.Yes)
+                {
+                    OpenChangePasswordWindow();
+                }
+            }, DispatcherPriority.Loaded);
+        }
+    }
+
+    private bool IsCustodyHolder =>
+        string.Equals(_currentUser?.Role, "CustodyHolder", StringComparison.OrdinalIgnoreCase);
+
+    private void SelectFirstVisibleTab()
+    {
+        var tab = MainTabs.Items
+            .OfType<TabItem>()
+            .FirstOrDefault(item => item.Visibility == Visibility.Visible);
+
+        if (tab is not null)
+        {
+            MainTabs.SelectedItem = tab;
+        }
     }
 
     private async void MainWindow_Loaded(object sender, RoutedEventArgs e)
@@ -1021,7 +1060,11 @@ public partial class MainWindow : Window
     private async Task LoadInsuranceAsync() => ReplaceCollection(_insurance, await _insuranceService.GetAllAsync());
     private async Task LoadCustodyAsync()
     {
-        ReplaceCollection(_custodies, await _custodyService.GetAllAsync());
+        // صاحب العهدة يرى عهدته هو فقط.
+        var custodies = IsCustodyHolder
+            ? await _custodyService.GetAllAsync(_currentUser!.Id)
+            : await _custodyService.GetAllAsync();
+        ReplaceCollection(_custodies, custodies);
         UpdateCustodySummary();
     }
     private Task LoadCustodyIfUnlockedAsync() =>
@@ -1061,14 +1104,17 @@ public partial class MainWindow : Window
     private async Task LoadUsersAsync()
     {
         var users = await _authenticationService.GetUsersAsync();
-        ReplaceCollection(_users, users.Select(user => new UserFormDto
+        ReplaceCollection(_users, users.Select(user => new UserAccountRow
         {
             Id = user.Id,
             Username = user.Username,
             FullName = user.FullName,
             Email = user.Email,
             Role = user.Role,
-            IsActive = user.IsActive
+            RoleDisplay = _userRoleOptions.FirstOrDefault(option =>
+                string.Equals(option.Value, user.Role, StringComparison.OrdinalIgnoreCase))?.DisplayName ?? user.Role,
+            IsActive = user.IsActive,
+            LastLoginAt = user.LastLoginAt
         }));
     }
 
@@ -2850,6 +2896,7 @@ public partial class MainWindow : Window
         ReturnDate = dto.ReturnDate,
         Status = dto.Status,
         VehicleConditionRating = dto.VehicleConditionRating,
+        Amount = dto.Amount,
         Notes = dto.Notes,
         DocumentUrl = dto.DocumentUrl
     };
@@ -3622,6 +3669,13 @@ public partial class MainWindow : Window
         var to = AbsenceHistoryToPicker.SelectedDate ?? DateTime.Today;
         var absences = await _driverAttendanceService.GetDriverAbsencesAsync(driverId, from, to);
         ReplaceCollection(_absenceHistoryRows, absences);
+
+        // نزّل الشاشة على جدول النتائج حتى لا يظن المستخدم أن السجل لا يظهر.
+        AbsenceHistoryGrid.BringIntoView();
+        if (absences.Count == 0)
+        {
+            MessageBox.Show("لا توجد غيابات مسجلة لهذا السائق في الفترة المختارة.", "سجل الغيابات", MessageBoxButton.OK, MessageBoxImage.Information);
+        }
     }
 
     private void DailyAttendanceInput_Changed(object sender, RoutedEventArgs e)
@@ -5045,7 +5099,7 @@ public partial class MainWindow : Window
 
         await RunSafeAsync(async () =>
         {
-            await _custodyService.SaveAsync(window.CustodyForm);
+            var saved = await _custodyService.SaveAsync(window.CustodyForm);
             if (window.CustodyForm.Amount > 0)
             {
                 var plate = _vehicles.FirstOrDefault(v => v.Id == window.CustodyForm.VehicleId)?.PlateNumber ?? string.Empty;
@@ -5063,6 +5117,15 @@ public partial class MainWindow : Window
             await LoadCustodyIfUnlockedAsync();
             await LoadDashboardAsync();
             await LoadNotificationsAsync();
+
+            if (!string.IsNullOrWhiteSpace(saved.CustodianUsername))
+            {
+                MessageBox.Show(
+                    $"تم حفظ العهدة وربطها بحساب دخول للمستلم.\n\nاسم المستخدم: {saved.CustodianUsername}\nكلمة المرور الافتراضية: نفس اسم المستخدم\n\nيستطيع المستلم تسجيل الدخول بنفسه لمتابعة عهدته وتصفيتها، وسيُطلب منه تغيير كلمة المرور بعد أول دخول.",
+                    "حساب المستلم",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Information);
+            }
         });
     }
 
@@ -5070,6 +5133,12 @@ public partial class MainWindow : Window
     {
         if (IsModuleTemporarilyLocked("Custody"))
         {
+            return;
+        }
+
+        if (IsCustodyHolder)
+        {
+            MessageBox.Show("تعديل بيانات العهدة متاح للإدارة فقط. يمكنك تصفية عهدتك بزر (تصفية).", "تنبيه", MessageBoxButton.OK, MessageBoxImage.Information);
             return;
         }
 
@@ -5093,16 +5162,20 @@ public partial class MainWindow : Window
         await RunSafeAsync(async () =>
         {
             EnsureVehicleExists(window.CustodyForm.VehicleId, "سجل العهدة");
+            var previousAmount = item.Amount;
             await _custodyService.SaveAsync(window.CustodyForm);
-            if (window.CustodyForm.Amount > 0)
+
+            // عند التعديل نسجل في الخزينة فرق قيمة العهدة فقط حتى لا يتكرر خصم كامل المبلغ في كل حفظ.
+            var amountDelta = window.CustodyForm.Amount - previousAmount;
+            if (amountDelta != 0)
             {
                 var plate = _vehicles.FirstOrDefault(v => v.Id == window.CustodyForm.VehicleId)?.PlateNumber ?? string.Empty;
                 await _treasuryService.SaveAsync(new TreasuryTransactionFormDto
                 {
-                    TransactionDate = window.CustodyForm.HandoverDate,
-                    TransactionType = "صرف",
-                    Amount = window.CustodyForm.Amount,
-                    Description = $"عهدة {window.CustodyForm.CustodyNumber} - {window.CustodyForm.CustodianName} ({plate})",
+                    TransactionDate = DateTime.Today,
+                    TransactionType = amountDelta > 0 ? "صرف" : "إيراد",
+                    Amount = Math.Abs(amountDelta),
+                    Description = $"تعديل قيمة عهدة {window.CustodyForm.CustodyNumber} - {window.CustodyForm.CustodianName} ({plate})",
                     RelatedEntityType = "عهدة",
                     PaymentMethod = "نقدي"
                 });
@@ -5114,10 +5187,62 @@ public partial class MainWindow : Window
         });
     }
 
+    private async void SettleCustodyButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (IsModuleTemporarilyLocked("Custody"))
+        {
+            return;
+        }
+
+        var item = SelectCustodyFromSender(sender);
+        if (item is null)
+        {
+            MessageBox.Show("اختر سجل عهدة أولًا.", "تنبيه", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        if (item.RemainingAmount <= 0)
+        {
+            MessageBox.Show("هذه العهدة تمت تصفيتها بالكامل بالفعل.", "تنبيه", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        var window = new CustodySettlementWindow(item)
+        {
+            Owner = this
+        };
+
+        if (window.ShowDialog() != true || window.SettlementForm is null)
+        {
+            return;
+        }
+
+        await RunSafeAsync(async () =>
+        {
+            var settledBy = IsCustodyHolder ? _currentUser!.Id : (int?)null;
+            var saved = await _custodyService.SettleAsync(window.SettlementForm, settledBy);
+            await LoadCustodyIfUnlockedAsync();
+            await LoadTreasuryIfUnlockedAsync();
+            await LoadDashboardAsync();
+            await LoadNotificationsAsync();
+
+            var message = saved.RemainingAmount <= 0
+                ? "تمت تصفية العهدة بالكامل وتم إرجاع المبلغ إلى الخزينة."
+                : $"تمت التصفية الجزئية. المتبقي على العهدة: {saved.RemainingAmount:N2}";
+            MessageBox.Show(message, "تمت التصفية", MessageBoxButton.OK, MessageBoxImage.Information);
+        });
+    }
+
     private async void DeleteCustodyButton_Click(object sender, RoutedEventArgs e) => await RunSafeAsync(() =>
     {
         if (IsModuleTemporarilyLocked("Custody"))
         {
+            return Task.CompletedTask;
+        }
+
+        if (IsCustodyHolder)
+        {
+            MessageBox.Show("حذف العهدة متاح للإدارة فقط.", "تنبيه", MessageBoxButton.OK, MessageBoxImage.Information);
             return Task.CompletedTask;
         }
 
@@ -5161,19 +5286,68 @@ public partial class MainWindow : Window
     private async void DeleteServiceProviderButton_Click(object sender, RoutedEventArgs e) => await RunSafeAsync(() => DeleteSelectedAsync(ServiceProvidersGrid, _serviceProviders, x => x.Id, _masterDataService.DeleteServiceProviderAsync, LoadMasterDataAsync));
 
     private async void RefreshUsersButton_Click(object sender, RoutedEventArgs e) => await RunSafeAsync(LoadUsersAsync);
-    private void AddUserButton_Click(object sender, RoutedEventArgs e) => AddNewItem(_users, UsersGrid, new UserFormDto { IsActive = true, Role = "OperationsDataEntry" });
-    private async void SaveUserButton_Click(object sender, RoutedEventArgs e) => await RunSafeAsync(async () =>
+
+    private async void AddUserButton_Click(object sender, RoutedEventArgs e) => await OpenUserEntryWindowAsync(null);
+
+    private async void EditUserButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is FrameworkElement { DataContext: UserAccountRow row })
+        {
+            UsersGrid.SelectedItem = row;
+            await OpenUserEntryWindowAsync(row);
+        }
+    }
+
+    private async Task OpenUserEntryWindowAsync(UserAccountRow? row)
     {
         if (!string.Equals(_currentUser?.Role, "Admin", StringComparison.OrdinalIgnoreCase))
         {
-            throw new InvalidOperationException("إدارة المستخدمين متاحة لمدير النظام فقط.");
+            MessageBox.Show("إدارة المستخدمين متاحة لمدير النظام فقط.", "تنبيه", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
         }
 
-        var item = Selected<UserFormDto>(UsersGrid) ?? throw new InvalidOperationException("اختر مستخدمًا أولًا.");
-        item.ConfirmPassword = item.Password;
-        await _authenticationService.SaveUserAsync(item);
-        await LoadUsersAsync();
-    });
+        var source = row is null
+            ? null
+            : new UserFormDto
+            {
+                Id = row.Id,
+                Username = row.Username,
+                FullName = row.FullName,
+                Email = row.Email,
+                Role = row.Role,
+                IsActive = row.IsActive
+            };
+
+        var window = new UserEntryWindow(
+            _userRoleOptions.Select(option => new UserEntryWindow.RoleOption(option.Value, option.DisplayName)),
+            source)
+        {
+            Owner = this
+        };
+
+        if (window.ShowDialog() != true || window.UserForm is null)
+        {
+            return;
+        }
+
+        await RunSafeAsync(async () =>
+        {
+            var isNew = window.UserForm.Id == 0;
+            var usedDefaultPassword = isNew && string.IsNullOrWhiteSpace(window.UserForm.Password);
+            var saved = await _authenticationService.SaveUserAsync(window.UserForm);
+            await LoadUsersAsync();
+
+            if (usedDefaultPassword)
+            {
+                MessageBox.Show(
+                    $"تم حفظ المستخدم \"{saved.Username}\".\n\nكلمة المرور الافتراضية هي نفس اسم المستخدم، وسيُطلب منه تغييرها بعد أول تسجيل دخول.",
+                    "تم الحفظ",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Information);
+            }
+        });
+    }
+
     private async void ToggleUserStatusButton_Click(object sender, RoutedEventArgs e) => await RunSafeAsync(async () =>
     {
         if (!string.Equals(_currentUser?.Role, "Admin", StringComparison.OrdinalIgnoreCase))
@@ -5181,15 +5355,30 @@ public partial class MainWindow : Window
             throw new InvalidOperationException("إدارة المستخدمين متاحة لمدير النظام فقط.");
         }
 
-        var item = Selected<UserFormDto>(UsersGrid) ?? throw new InvalidOperationException("اختر مستخدمًا أولًا.");
-        if (item.Id == 0)
-        {
-            throw new InvalidOperationException("احفظ المستخدم الجديد أولًا.");
-        }
-
+        var item = Selected<UserAccountRow>(UsersGrid) ?? throw new InvalidOperationException("اختر مستخدمًا أولًا.");
         await _authenticationService.ToggleUserStatusAsync(item.Id, !item.IsActive);
         await LoadUsersAsync();
     });
+
+    private void ChangeMyPasswordButton_Click(object sender, RoutedEventArgs e) => OpenChangePasswordWindow();
+
+    private void OpenChangePasswordWindow()
+    {
+        if (_currentUser is null)
+        {
+            return;
+        }
+
+        var window = new ChangePasswordWindow(_authenticationService, _currentUser.Id)
+        {
+            Owner = this
+        };
+
+        if (window.ShowDialog() == true)
+        {
+            _currentUser.MustChangePassword = false;
+        }
+    }
 
     private async void GenerateReportButton_Click(object sender, RoutedEventArgs e) => await RunSafeAsync(async () =>
     {
@@ -5535,4 +5724,17 @@ public partial class MainWindow : Window
     private async void RefreshNotificationsButton_Click(object sender, RoutedEventArgs e) => await RunSafeAsync(LoadNotificationsAsync);
 
     private sealed record UserRoleOption(string Value, string DisplayName);
+
+    public sealed class UserAccountRow
+    {
+        public int Id { get; set; }
+        public string Username { get; set; } = string.Empty;
+        public string FullName { get; set; } = string.Empty;
+        public string Email { get; set; } = string.Empty;
+        public string Role { get; set; } = string.Empty;
+        public string RoleDisplay { get; set; } = string.Empty;
+        public bool IsActive { get; set; }
+        public string StatusDisplay => IsActive ? "مفعل" : "موقوف";
+        public DateTime? LastLoginAt { get; set; }
+    }
 }

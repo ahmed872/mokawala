@@ -193,6 +193,10 @@ internal static class ServiceHelpers
             {
                 "Dashboard", "Reports", "Notifications"
             },
+            UserRole.CustodyHolder => new List<string>
+            {
+                "Custody"
+            },
             _ => new List<string> { "Dashboard", "Trips", "Vehicles" }
         };
     }
@@ -573,6 +577,13 @@ internal static class ServiceHelpers
             ReturnDate = entity.ReturnDate,
             Status = StatusDisplay(entity.Status),
             VehicleConditionRating = entity.VehicleConditionRating,
+            Amount = entity.Amount,
+            SettledAmount = entity.SettledAmount,
+            RemainingAmount = Math.Max(entity.Amount - entity.SettledAmount, 0),
+            SettlementDate = entity.SettlementDate,
+            SettlementNotes = entity.SettlementNotes,
+            UserId = entity.UserId,
+            CustodianUsername = entity.User?.Username ?? string.Empty,
             Notes = entity.Notes,
             DocumentUrl = entity.DocumentUrl,
             Items = new List<CustodyItemDto>()
@@ -657,6 +668,7 @@ internal static class ServiceHelpers
             PhoneNumber = entity.PhoneNumber,
             Role = entity.Role.ToString(),
             IsActive = entity.IsActive,
+            MustChangePassword = entity.MustChangePassword,
             LastLoginAt = entity.LastLogin,
             AllowedModules = AllowedModulesForRole(entity.Role)
         };

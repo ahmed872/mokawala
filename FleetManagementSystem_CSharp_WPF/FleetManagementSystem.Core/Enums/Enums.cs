@@ -10,7 +10,8 @@ public enum UserRole
     TripsLicensesOfficer,
     InsuranceOfficer,
     Viewer,
-    Staff
+    Staff,
+    CustodyHolder
 }
 
 public enum VehicleStatus

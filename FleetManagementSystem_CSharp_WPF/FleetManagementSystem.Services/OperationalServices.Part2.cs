@@ -1,4 +1,5 @@
 using FleetManagementSystem.Core.DTOs;
+using FleetManagementSystem.Core.Enums;
 using FleetManagementSystem.Data;
 using FleetManagementSystem.Data.Entities;
 using Microsoft.EntityFrameworkCore;
@@ -760,11 +761,20 @@ public sealed class CustodyService(FleetDbContext context, IAuditService auditSe
     private readonly FleetDbContext _context = context;
     private readonly IAuditService _auditService = auditService;
 
-    public async Task<List<CustodyDto>> GetAllAsync()
+    public async Task<List<CustodyDto>> GetAllAsync(int? userId = null)
     {
-        var items = await _context.Custodies
+        var query = _context.Custodies
             .Include(c => c.Vehicle)
             .Include(c => c.Employee)
+            .Include(c => c.User)
+            .AsQueryable();
+
+        if (userId.HasValue)
+        {
+            query = query.Where(c => c.UserId == userId.Value);
+        }
+
+        var items = await query
             .OrderByDescending(c => c.HandoverDate)
             .ToListAsync();
 
@@ -776,6 +786,7 @@ public sealed class CustodyService(FleetDbContext context, IAuditService auditSe
         var entity = await _context.Custodies
             .Include(c => c.Vehicle)
             .Include(c => c.Employee)
+            .Include(c => c.User)
             .FirstOrDefaultAsync(c => c.Id == id);
 
         return entity?.ToDto();
@@ -809,6 +820,7 @@ public sealed class CustodyService(FleetDbContext context, IAuditService auditSe
         entity.ReturnDate = ServiceHelpers.OrNull(dto.ReturnDate);
         entity.Status = string.IsNullOrWhiteSpace(dto.Status) ? "Active" : dto.Status;
         entity.VehicleConditionRating = dto.VehicleConditionRating <= 0 ? 5 : dto.VehicleConditionRating;
+        entity.Amount = dto.Amount < 0 ? 0 : dto.Amount;
         entity.Notes = ServiceHelpers.Clean(dto.Notes);
         entity.DocumentUrl = ServiceHelpers.Clean(dto.DocumentUrl);
         entity.UpdatedAt = DateTime.UtcNow;
@@ -817,9 +829,119 @@ public sealed class CustodyService(FleetDbContext context, IAuditService auditSe
             .FirstOrDefaultAsync(e => e.FullName == entity.CustodianName || e.EmployeeId == entity.CustodianName);
         entity.EmployeeId = employee?.Id;
 
+        // كل مستلم عهدة يحصل على حساب دخول تلقائي (اسم المستخدم = الاسم، وكلمة المرور = اسم المستخدم)
+        // حتى يستطيع الدخول بنفسه وتصفية عهدته.
+        entity.UserId = (await EnsureCustodianUserAsync(entity.CustodianName))?.Id ?? entity.UserId;
+
         await _context.SaveChangesAsync();
         await _auditService.LogActionAsync(action, "Custody", entity.Id, null, entity.CustodyNumber);
         return (await GetByIdAsync(entity.Id))!;
+    }
+
+    public async Task<CustodyDto> SettleAsync(CustodySettlementFormDto dto, int? settledByUserId = null)
+    {
+        var entity = await _context.Custodies
+            .Include(c => c.Vehicle)
+            .FirstOrDefaultAsync(c => c.Id == dto.CustodyId)
+            ?? throw new InvalidOperationException("العهدة غير موجودة.");
+
+        if (settledByUserId.HasValue && entity.UserId != settledByUserId.Value)
+        {
+            throw new InvalidOperationException("لا يمكنك تصفية عهدة غير مسجلة باسمك.");
+        }
+
+        if (dto.Amount <= 0)
+        {
+            throw new InvalidOperationException("أدخل مبلغ تصفية أكبر من صفر.");
+        }
+
+        var remaining = entity.Amount - entity.SettledAmount;
+        if (remaining <= 0)
+        {
+            throw new InvalidOperationException("هذه العهدة تمت تصفيتها بالكامل بالفعل.");
+        }
+
+        if (dto.Amount > remaining)
+        {
+            throw new InvalidOperationException($"مبلغ التصفية أكبر من المتبقي على العهدة ({remaining:0.##}).");
+        }
+
+        var settlementDate = ServiceHelpers.OrToday(dto.SettlementDate ?? DateTime.Today);
+        entity.SettledAmount += dto.Amount;
+        entity.SettlementDate = settlementDate;
+        var note = ServiceHelpers.Clean(dto.Notes);
+        if (!string.IsNullOrWhiteSpace(note))
+        {
+            entity.SettlementNotes = string.IsNullOrWhiteSpace(entity.SettlementNotes)
+                ? note
+                : $"{entity.SettlementNotes}\n{note}";
+        }
+
+        var fullySettled = entity.SettledAmount >= entity.Amount;
+        if (fullySettled)
+        {
+            entity.Status = "Returned";
+            entity.ReturnDate ??= settlementDate;
+        }
+
+        entity.UpdatedAt = DateTime.UtcNow;
+
+        // ترجع فلوس التصفية للخزينة كإيراد مقابل مصروف تسليم العهدة.
+        _context.TreasuryTransactions.Add(new TreasuryTransaction
+        {
+            TransactionDate = settlementDate,
+            TransactionType = "إيراد",
+            Amount = dto.Amount,
+            Description = $"تصفية عهدة {entity.CustodyNumber} - {entity.CustodianName} ({entity.Vehicle?.PlateNumber})",
+            RelatedEntityType = "عهدة",
+            RelatedEntityId = entity.Id,
+            PaymentMethod = "نقدي",
+            Notes = note,
+            CreatedAt = DateTime.UtcNow,
+            UpdatedAt = DateTime.UtcNow
+        });
+
+        await _context.SaveChangesAsync();
+        await _auditService.LogActionAsync("Settle", "Custody", entity.Id, null, $"{entity.CustodyNumber}: {dto.Amount:0.##}");
+        return (await GetByIdAsync(entity.Id))!;
+    }
+
+    private async Task<User?> EnsureCustodianUserAsync(string custodianName)
+    {
+        if (string.IsNullOrWhiteSpace(custodianName))
+        {
+            return null;
+        }
+
+        var user = await _context.Users.FirstOrDefaultAsync(u => u.Username == custodianName);
+        if (user is not null)
+        {
+            if (!user.IsActive)
+            {
+                user.IsActive = true;
+                user.UpdatedAt = DateTime.UtcNow;
+            }
+
+            return user;
+        }
+
+        user = new User
+        {
+            Username = custodianName,
+            FullName = custodianName,
+            Email = string.Empty,
+            PhoneNumber = string.Empty,
+            PasswordHash = BCrypt.Net.BCrypt.HashPassword(custodianName),
+            Role = UserRole.CustodyHolder,
+            IsActive = true,
+            MustChangePassword = true,
+            CreatedAt = DateTime.UtcNow,
+            UpdatedAt = DateTime.UtcNow
+        };
+
+        _context.Users.Add(user);
+        await _context.SaveChangesAsync();
+        return user;
     }
 
     public async Task DeleteAsync(int id)

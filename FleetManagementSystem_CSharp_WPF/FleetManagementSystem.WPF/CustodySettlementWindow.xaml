@@ -1,0 +1,151 @@
+<Window x:Class="FleetManagementSystem.WPF.CustodySettlementWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="تصفية العهدة"
+        Width="520"
+        SizeToContent="Height"
+        ResizeMode="NoResize"
+        WindowStartupLocation="CenterOwner"
+        FlowDirection="RightToLeft"
+        Background="{StaticResource PageBackgroundBrush}"
+        FontFamily="Cairo, Segoe UI, Tahoma">
+    <Border Margin="18"
+            Padding="22"
+            Background="{StaticResource SurfaceBrush}"
+            BorderBrush="{StaticResource BorderBrush}"
+            BorderThickness="1"
+            CornerRadius="12">
+        <StackPanel>
+            <TextBlock x:Name="TitleTextBlock"
+                       Text="تصفية العهدة"
+                       FontSize="22"
+                       FontWeight="Bold"
+                       Foreground="{StaticResource TextBrush}"/>
+            <TextBlock x:Name="CustodianTextBlock"
+                       Margin="0,6,0,16"
+                       FontSize="14"
+                       Foreground="{StaticResource MutedBrush}"
+                       TextWrapping="Wrap"/>
+
+            <Border Background="#F0FFF4"
+                    BorderBrush="#C5DBC8"
+                    BorderThickness="1"
+                    CornerRadius="12"
+                    Padding="16,12"
+                    Margin="0,0,0,16">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <StackPanel Grid.Column="0" HorizontalAlignment="Center">
+                        <TextBlock Text="قيمة العهدة"
+                                   FontSize="12"
+                                   Foreground="#607D8B"
+                                   HorizontalAlignment="Center"
+                                   Margin="0,0,0,4"/>
+                        <TextBlock x:Name="AmountTextBlock"
+                                   Text="0"
+                                   FontSize="18"
+                                   FontWeight="Bold"
+                                   Foreground="{StaticResource AccentBrush}"
+                                   HorizontalAlignment="Center"/>
+                    </StackPanel>
+                    <StackPanel Grid.Column="1" HorizontalAlignment="Center">
+                        <TextBlock Text="تم تسديده"
+                                   FontSize="12"
+                                   Foreground="#607D8B"
+                                   HorizontalAlignment="Center"
+                                   Margin="0,0,0,4"/>
+                        <TextBlock x:Name="SettledTextBlock"
+                                   Text="0"
+                                   FontSize="18"
+                                   FontWeight="Bold"
+                                   Foreground="#2E7D32"
+                                   HorizontalAlignment="Center"/>
+                    </StackPanel>
+                    <StackPanel Grid.Column="2" HorizontalAlignment="Center">
+                        <TextBlock Text="المتبقي"
+                                   FontSize="12"
+                                   Foreground="#607D8B"
+                                   HorizontalAlignment="Center"
+                                   Margin="0,0,0,4"/>
+                        <TextBlock x:Name="RemainingTextBlock"
+                                   Text="0"
+                                   FontSize="18"
+                                   FontWeight="Bold"
+                                   Foreground="#E65100"
+                                   HorizontalAlignment="Center"/>
+                    </StackPanel>
+                </Grid>
+            </Border>
+
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="14"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+                <StackPanel Grid.Column="0">
+                    <TextBlock Text="المبلغ المراد تصفيته"
+                               FontSize="13"
+                               FontWeight="SemiBold"
+                               Foreground="{StaticResource TextBrush}"
+                               Margin="0,0,0,6"/>
+                    <TextBox x:Name="SettleAmountTextBox"
+                             AutomationProperties.AutomationId="SettleAmountTextBox"
+                             Style="{StaticResource AppTextBoxStyle}"/>
+                </StackPanel>
+                <StackPanel Grid.Column="2">
+                    <TextBlock Text="تاريخ التصفية"
+                               FontSize="13"
+                               FontWeight="SemiBold"
+                               Foreground="{StaticResource TextBrush}"
+                               Margin="0,0,0,6"/>
+                    <DatePicker x:Name="SettlementDatePicker"
+                                Height="42"
+                                Language="ar-EG"
+                                Style="{StaticResource FilterDatePickerStyle}"/>
+                </StackPanel>
+            </Grid>
+
+            <TextBlock Text="ملاحظات (اختياري)"
+                       FontSize="13"
+                       FontWeight="SemiBold"
+                       Foreground="{StaticResource TextBrush}"
+                       Margin="0,12,0,6"/>
+            <TextBox x:Name="NotesTextBox"
+                     AutomationProperties.AutomationId="SettleNotesTextBox"
+                     Style="{StaticResource AppTextBoxStyle}"
+                     AcceptsReturn="True"
+                     TextWrapping="Wrap"
+                     MinHeight="60"/>
+
+            <TextBlock x:Name="ErrorTextBlock"
+                       Foreground="#C62828"
+                       FontSize="13"
+                       TextWrapping="Wrap"
+                       Margin="0,10,0,0"/>
+
+            <StackPanel Orientation="Horizontal"
+                        HorizontalAlignment="Left"
+                        FlowDirection="LeftToRight"
+                        Margin="0,18,0,0">
+                <Button Style="{StaticResource PrimaryButtonStyle}"
+                        AutomationProperties.AutomationId="SettleSaveButton"
+                        IsDefault="True"
+                        Click="SettleButton_Click">
+                    تصفية
+                </Button>
+                <Button Style="{StaticResource SecondaryButtonStyle}"
+                        AutomationProperties.AutomationId="SettleCancelButton"
+                        Margin="10,0,0,0"
+                        IsCancel="True"
+                        Click="CancelButton_Click">
+                    إلغاء
+                </Button>
+            </StackPanel>
+        </StackPanel>
+    </Border>
+</Window>

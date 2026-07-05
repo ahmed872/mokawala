@@ -74,8 +74,20 @@ namespace FleetManagementSystem.Core.DTOs
         public string PhoneNumber { get; set; } = string.Empty;
         public string Role { get; set; } = "Staff";
         public bool IsActive { get; set; }
+        public bool MustChangePassword { get; set; }
         public DateTime? LastLoginAt { get; set; }
         public List<string> AllowedModules { get; set; } = new List<string>();
+    }
+
+    /// <summary>
+    /// Change password request DTO.
+    /// </summary>
+    public class ChangePasswordDto
+    {
+        public int UserId { get; set; }
+        public string CurrentPassword { get; set; } = string.Empty;
+        public string NewPassword { get; set; } = string.Empty;
+        public string ConfirmPassword { get; set; } = string.Empty;
     }
 
     /// <summary>
@@ -1137,9 +1149,26 @@ namespace FleetManagementSystem.Core.DTOs
         public string Status { get; set; } = string.Empty;
         public decimal VehicleConditionRating { get; set; }
         public decimal Amount { get; set; }
+        public decimal SettledAmount { get; set; }
+        public decimal RemainingAmount { get; set; }
+        public DateTime? SettlementDate { get; set; }
+        public string SettlementNotes { get; set; } = string.Empty;
+        public int? UserId { get; set; }
+        public string CustodianUsername { get; set; } = string.Empty;
         public string Notes { get; set; } = string.Empty;
         public string DocumentUrl { get; set; } = string.Empty;
         public List<CustodyItemDto> Items { get; set; } = new List<CustodyItemDto>();
+    }
+
+    /// <summary>
+    /// Custody settlement (تصفية العهدة) form DTO.
+    /// </summary>
+    public class CustodySettlementFormDto
+    {
+        public int CustodyId { get; set; }
+        public decimal Amount { get; set; }
+        public DateTime? SettlementDate { get; set; }
+        public string Notes { get; set; } = string.Empty;
     }
 
     /// <summary>

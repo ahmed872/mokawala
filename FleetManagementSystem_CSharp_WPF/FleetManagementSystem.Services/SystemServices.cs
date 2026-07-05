@@ -186,6 +186,12 @@ public sealed class DataBootstrapService(FleetDbContext context) : IDataBootstra
         await EnsureColumnAsync("Drivers", "FullAddress", GetInsuranceDetailsColumnDefinition());
         await EnsureColumnAsync("Drivers", "TrafficUnit", GetShortTextColumnDefinition(defaultValue: string.Empty));
         await EnsureColumnAsync("Drivers", "WorkLocation", GetShortTextColumnDefinition(defaultValue: string.Empty));
+        await EnsureColumnAsync("Custody", "Amount", GetMoneyColumnDefinition());
+        await EnsureColumnAsync("Custody", "SettledAmount", GetMoneyColumnDefinition());
+        await EnsureColumnAsync("Custody", "SettlementDate", GetNullableDateColumnDefinition());
+        await EnsureColumnAsync("Custody", "SettlementNotes", GetShortTextColumnDefinition(defaultValue: string.Empty));
+        await EnsureColumnAsync("Custody", "UserId", GetNullableIntColumnDefinition());
+        await EnsureColumnAsync("Users", "MustChangePassword", GetBooleanColumnDefinition(defaultValue: false));
         await EnsureDriverAttendanceTableAsync();
 
         if (await HasColumnAsync("Vehicles", "RegistrationType"))
@@ -402,6 +408,9 @@ public sealed class DataBootstrapService(FleetDbContext context) : IDataBootstra
 
     private string GetNullableIntColumnDefinition() =>
         _context.Database.IsSqlite() ? "INTEGER NULL" : "INT NULL";
+
+    private string GetMoneyColumnDefinition() =>
+        _context.Database.IsSqlite() ? "TEXT NOT NULL DEFAULT '0'" : "DECIMAL(18,2) NOT NULL DEFAULT 0";
 
     private string GetNullableDecimalColumnDefinition() =>
         _context.Database.IsSqlite() ? "TEXT NULL" : "DECIMAL(18,2) NULL";
@@ -809,7 +818,7 @@ public sealed class AuthenticationService(FleetDbContext context, IAuditService 
 
         var duplicate = await _context.Users.FirstOrDefaultAsync(u =>
             u.Id != dto.Id &&
-            (u.Username == username || u.Email == email));
+            (u.Username == username || (email != string.Empty && u.Email == email)));
 
         if (duplicate is not null)
         {
@@ -820,11 +829,6 @@ public sealed class AuthenticationService(FleetDbContext context, IAuditService 
         var action = dto.Id == 0 ? "Create" : "Update";
         if (dto.Id == 0)
         {
-            if (string.IsNullOrWhiteSpace(dto.Password))
-            {
-                throw new InvalidOperationException("كلمة المرور مطلوبة عند إنشاء مستخدم جديد.");
-            }
-
             entity = new User();
             _context.Users.Add(entity);
         }
@@ -854,6 +858,13 @@ public sealed class AuthenticationService(FleetDbContext context, IAuditService 
         if (!string.IsNullOrWhiteSpace(dto.Password))
         {
             entity.PasswordHash = BCrypt.Net.BCrypt.HashPassword(dto.Password);
+            entity.MustChangePassword = false;
+        }
+        else if (dto.Id == 0)
+        {
+            // كلمة المرور الافتراضية للمستخدم الجديد = اسم المستخدم، ويُطلب منه تغييرها بعد الدخول.
+            entity.PasswordHash = BCrypt.Net.BCrypt.HashPassword(username);
+            entity.MustChangePassword = true;
         }
 
         await _context.SaveChangesAsync();
@@ -870,6 +881,26 @@ public sealed class AuthenticationService(FleetDbContext context, IAuditService 
         entity.UpdatedAt = DateTime.UtcNow;
         await _context.SaveChangesAsync();
         await _auditService.LogActionAsync("Status", "User", entity.Id, null, isActive.ToString(), entity.Id, entity.Username);
+    }
+
+    public async Task ChangePasswordAsync(ChangePasswordDto dto)
+    {
+        var entity = await _context.Users.FirstOrDefaultAsync(u => u.Id == dto.UserId)
+            ?? throw new InvalidOperationException("المستخدم غير موجود.");
+
+        if (string.IsNullOrWhiteSpace(dto.CurrentPassword) ||
+            !BCrypt.Net.BCrypt.Verify(dto.CurrentPassword, entity.PasswordHash))
+        {
+            throw new InvalidOperationException("كلمة المرور الحالية غير صحيحة.");
+        }
+
+        ValidatePasswordPolicy(dto.NewPassword, dto.ConfirmPassword, entity.Username);
+
+        entity.PasswordHash = BCrypt.Net.BCrypt.HashPassword(dto.NewPassword);
+        entity.MustChangePassword = false;
+        entity.UpdatedAt = DateTime.UtcNow;
+        await _context.SaveChangesAsync();
+        await _auditService.LogActionAsync("ChangePassword", "User", entity.Id, null, entity.Username, entity.Id, entity.Username);
     }
 
     private static void ThrowIfLoginLocked(string username)
