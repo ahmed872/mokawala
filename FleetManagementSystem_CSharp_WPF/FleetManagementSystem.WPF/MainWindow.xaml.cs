@@ -3179,6 +3179,7 @@ public partial class MainWindow : Window
         }
     }
     private void QuickOpenCustodyButton_Click(object sender, RoutedEventArgs e) => SelectTabByTag("Custody");
+    private void QuickOpenMyCustodyButton_Click(object sender, RoutedEventArgs e) => SelectTabByTag("MyCustody");
     private void QuickOpenTreasuryButton_Click(object sender, RoutedEventArgs e) => SelectTabByTag("Treasury");
     private void QuickOpenReportsButton_Click(object sender, RoutedEventArgs e) => SelectTabByTag("Reports");
     private void BackToTripsButton_Click(object sender, RoutedEventArgs e) => SelectTabByTag("Trips");

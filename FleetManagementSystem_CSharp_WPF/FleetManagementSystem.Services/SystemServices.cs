@@ -146,6 +146,18 @@ public sealed class DataBootstrapService(FleetDbContext context) : IDataBootstra
         await EnsureRequiredOperationalUserAsync("abdelrahman", "عبد الرحمن", "abdelrahman", UserRole.TripsLicensesOfficer);
         await EnsureRequiredOperationalUserAsync("osama", "أسامة", "osama", UserRole.InsuranceOfficer);
 
+        // إصلاح أي حساب سُجّل بكلمة مرور فارغة (كان يسبب "Invalid salt" عند الدخول):
+        // نعطيه كلمة المرور الافتراضية = اسم المستخدم ونطلب تغييرها بعد الدخول.
+        var brokenAccounts = await _context.Users
+            .Where(u => u.PasswordHash == null || u.PasswordHash == "")
+            .ToListAsync();
+        foreach (var brokenUser in brokenAccounts)
+        {
+            brokenUser.PasswordHash = BCrypt.Net.BCrypt.HashPassword(brokenUser.Username);
+            brokenUser.MustChangePassword = true;
+            brokenUser.UpdatedAt = DateTime.UtcNow;
+        }
+
         await _context.SaveChangesAsync();
         // Keep production/client databases clean; operational data must be entered by the user.
     }
@@ -967,7 +979,37 @@ public sealed class AuthenticationService(FleetDbContext context, IAuditService 
             return null;
         }
 
-        if (!BCrypt.Net.BCrypt.Verify(dto.Password, user.PasswordHash))
+        // حماية من حسابات بلا كلمة مرور صالحة (مثلاً حساب أُنشئ بهاش فارغ):
+        // نقبل الدخول بكلمة المرور الافتراضية (نفس اسم المستخدم) ونطلب تغييرها، بدل أن يرمي BCrypt استثناء "Invalid salt".
+        bool passwordOk;
+        if (string.IsNullOrWhiteSpace(user.PasswordHash))
+        {
+            passwordOk = string.Equals(dto.Password, user.Username, StringComparison.Ordinal);
+            if (passwordOk)
+            {
+                user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(user.Username);
+                user.MustChangePassword = true;
+            }
+        }
+        else
+        {
+            try
+            {
+                passwordOk = BCrypt.Net.BCrypt.Verify(dto.Password, user.PasswordHash);
+            }
+            catch
+            {
+                // هاش تالف/غير صالح — نعامله كحساب بلا كلمة مرور.
+                passwordOk = string.Equals(dto.Password, user.Username, StringComparison.Ordinal);
+                if (passwordOk)
+                {
+                    user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(user.Username);
+                    user.MustChangePassword = true;
+                }
+            }
+        }
+
+        if (!passwordOk)
         {
             RegisterFailedLogin(username);
             ThrowIfLoginLocked(username);

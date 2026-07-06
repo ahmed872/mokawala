@@ -1198,6 +1198,11 @@
                                                 Click="QuickOpenCustodyButton_Click">
                                             العهد
                                         </Button>
+                                        <Button x:Name="DashboardMyCustodyShortcutButton"
+                                                Style="{StaticResource DashboardNavButtonStyle}"
+                                                Click="QuickOpenMyCustodyButton_Click">
+                                            عهدتي
+                                        </Button>
                                         <Button x:Name="DashboardTreasuryShortcutButton"
                                                 Style="{StaticResource DashboardNavButtonStyle}"
                                                 Click="QuickOpenTreasuryButton_Click">
