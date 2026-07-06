@@ -59,6 +59,7 @@ python3 tools/wpf_check.py     # لازم تطبع STUB COMPILE PASSED
 
 ملاحظات بيئة مهمة:
 - حزمة أوبونتو للـ SDK **ناقصة WindowsDesktop targets** — بناء `FleetManagementSystem.WPF.csproj` مباشرة هيفشل حتى مع `EnableWindowsTargeting`. استخدم `tools/wpf_check.py` (بيولّد stubs لـ InitializeComponent/x:Name/الأحداث ويجمّع كل كود الواجهة ضد ref packs من nuget.org).
+- **قيد مهم في `wpf_check.py`:** الأداة بتفحص كود C# والأحداث و x:Name، لكنها **لا تكمبايل XAML markup** فمابتمسكش أخطاء XAML زي `MC3024` (خاصية اتعرّفت مرتين، مثلاً `Style="..."` مع `<Button.Style>` جوا نفس العنصر). قبل أي push فيه تعديل XAML شغّل الفحص اليدوي المضاف في `tools/xaml_lint.py` (بيمسك الخصائص المكررة + well-formedness). حصل غلط زي ده اتصلح 2026-07-06 في زرار اعتماد الخزينة.
 - `builds.dotnet.microsoft.com` و`dotnetcli.azureedge.net` محجوبين؛ `nuget.org` و`archive.ubuntu.com` شغالين.
 - عند إضافة نافذة WPF جديدة: **لازم تسجلها يدويًا في csproj** (Page + Compile) لأن `EnableDefaultItems=false`.
 

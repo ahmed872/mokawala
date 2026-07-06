@@ -4204,8 +4204,7 @@
                                             <StackPanel Orientation="Horizontal"
                                                         HorizontalAlignment="Center"
                                                         FlowDirection="LeftToRight">
-                                                <Button Style="{StaticResource SecondaryButtonStyle}"
-                                                        Padding="8,4"
+                                                <Button Padding="8,4"
                                                         MinWidth="0"
                                                         MinHeight="0"
                                                         FontSize="12"
