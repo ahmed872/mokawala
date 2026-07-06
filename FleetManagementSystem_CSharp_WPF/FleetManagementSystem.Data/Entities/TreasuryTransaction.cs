@@ -13,6 +13,8 @@ namespace FleetManagementSystem.Data.Entities
         public string RelatedEntityType { get; set; } = string.Empty;
         public int? RelatedEntityId { get; set; }
         public string PaymentMethod { get; set; } = "Cash";
+        /// <summary>حالة الحركة: "معتمد" تُحسب في الرصيد، "معلق" في انتظار اعتماد مسؤول الخزينة.</summary>
+        public string Status { get; set; } = "معتمد";
         public string Notes { get; set; } = string.Empty;
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
         public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;

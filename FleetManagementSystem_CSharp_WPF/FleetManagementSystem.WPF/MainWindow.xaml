@@ -4197,13 +4197,37 @@
                                   VerticalAlignment="Stretch">
                             <DataGrid.Columns>
                                 <DataGridTemplateColumn Header="إجراءات"
-                                                        Width="92"
+                                                        Width="150"
                                                         IsReadOnly="True">
                                     <DataGridTemplateColumn.CellTemplate>
                                         <DataTemplate>
                                             <StackPanel Orientation="Horizontal"
                                                         HorizontalAlignment="Center"
                                                         FlowDirection="LeftToRight">
+                                                <Button Style="{StaticResource SecondaryButtonStyle}"
+                                                        Padding="8,4"
+                                                        MinWidth="0"
+                                                        MinHeight="0"
+                                                        FontSize="12"
+                                                        ToolTip="اعتماد الحركة المعلقة"
+                                                        AutomationProperties.Name="اعتماد الحركة"
+                                                        Click="ApproveTreasuryButton_Click">
+                                                    <Button.Style>
+                                                        <Style TargetType="Button"
+                                                               BasedOn="{StaticResource SecondaryButtonStyle}">
+                                                            <Setter Property="Visibility"
+                                                                    Value="Collapsed"/>
+                                                            <Style.Triggers>
+                                                                <DataTrigger Binding="{Binding Status}"
+                                                                             Value="معلق">
+                                                                    <Setter Property="Visibility"
+                                                                            Value="Visible"/>
+                                                                </DataTrigger>
+                                                            </Style.Triggers>
+                                                        </Style>
+                                                    </Button.Style>
+                                                    اعتماد
+                                                </Button>
                                                 <Button Style="{StaticResource GridRowActionButtonStyle}"
                                                         Content="{Binding}"
                                                         ContentTemplate="{StaticResource GridEditActionIconTemplate}"
@@ -4220,6 +4244,29 @@
                                         </DataTemplate>
                                     </DataGridTemplateColumn.CellTemplate>
                                 </DataGridTemplateColumn>
+                                <DataGridTextColumn Binding="{Binding Status}"
+                                                    IsReadOnly="True"
+                                                    Width="130">
+                                    <DataGridTextColumn.Header>
+                                        <TextBlock Text="الحالة"
+                                                   HorizontalAlignment="Center"
+                                                   FontWeight="Bold"/>
+                                    </DataGridTextColumn.Header>
+                                    <DataGridTextColumn.CellStyle>
+                                        <Style TargetType="DataGridCell"
+                                               BasedOn="{StaticResource {x:Type DataGridCell}}">
+                                            <Setter Property="Foreground"
+                                                    Value="#2E7D32"/>
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding Status}"
+                                                             Value="معلق">
+                                                    <Setter Property="Foreground"
+                                                            Value="#E65100"/>
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </DataGridTextColumn.CellStyle>
+                                </DataGridTextColumn>
                                 <DataGridTextColumn Binding="{Binding Id}"
                                                     IsReadOnly="True"
                                                     Width="110">

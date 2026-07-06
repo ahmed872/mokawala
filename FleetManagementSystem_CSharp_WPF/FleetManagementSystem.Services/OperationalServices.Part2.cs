@@ -539,11 +539,29 @@ public sealed class TreasuryService(FleetDbContext context, IAuditService auditS
         entity.PaymentMethod = string.IsNullOrWhiteSpace(dto.PaymentMethod)
             ? "نقدي"
             : ServiceHelpers.PaymentMethodDisplay(dto.PaymentMethod);
+        entity.Status = string.IsNullOrWhiteSpace(dto.Status) ? "معتمد" : ServiceHelpers.Clean(dto.Status);
         entity.Notes = ServiceHelpers.Clean(dto.Notes);
         entity.UpdatedAt = DateTime.UtcNow;
 
         await _context.SaveChangesAsync();
         await _auditService.LogActionAsync(action, "Treasury", entity.Id, null, entity.TransactionType);
+        return (await GetByIdAsync(entity.Id))!;
+    }
+
+    public async Task<TreasuryTransactionDto> ApproveAsync(int id, string? approvedByUserName = null)
+    {
+        var entity = await _context.TreasuryTransactions.FirstOrDefaultAsync(x => x.Id == id)
+            ?? throw new InvalidOperationException("حركة الخزينة غير موجودة.");
+
+        if (!ServiceHelpers.IsTreasuryPending(entity.Status))
+        {
+            throw new InvalidOperationException("هذه الحركة معتمدة بالفعل.");
+        }
+
+        entity.Status = "معتمد";
+        entity.UpdatedAt = DateTime.UtcNow;
+        await _context.SaveChangesAsync();
+        await _auditService.LogActionAsync("Approve", "Treasury", entity.Id, "معلق", $"معتمد بواسطة {approvedByUserName}");
         return (await GetByIdAsync(entity.Id))!;
     }
 
@@ -566,11 +584,14 @@ public sealed class TreasuryService(FleetDbContext context, IAuditService auditS
 
     public async Task<decimal> GetCurrentBalanceAsync()
     {
+        // الحركات المعلقة (في انتظار اعتماد مسؤول الخزينة) لا تدخل في الرصيد.
         var entries = await _context.TreasuryTransactions
-            .Select(x => new { x.TransactionType, x.Amount })
+            .Select(x => new { x.TransactionType, x.Amount, x.Status })
             .ToListAsync();
 
-        return entries.Sum(x => ServiceHelpers.IsTreasuryIncome(x.TransactionType) ? x.Amount : -x.Amount);
+        return entries
+            .Where(x => !ServiceHelpers.IsTreasuryPending(x.Status))
+            .Sum(x => ServiceHelpers.IsTreasuryIncome(x.TransactionType) ? x.Amount : -x.Amount);
     }
 }
 
@@ -903,17 +924,18 @@ public sealed class CustodyService(FleetDbContext context, IAuditService auditSe
 
         entity.UpdatedAt = DateTime.UtcNow;
 
-        // ترجع فلوس التصفية للخزينة كإيراد مقابل مصروف تسليم العهدة.
+        // مرتجع التصفية يدخل الخزينة كإيراد "معلق" حتى يعتمده مسؤول الخزينة، وبعد الاعتماد يُحسب في الرصيد.
         var plateSuffix = string.IsNullOrWhiteSpace(entity.Vehicle?.PlateNumber) ? string.Empty : $" ({entity.Vehicle!.PlateNumber})";
         _context.TreasuryTransactions.Add(new TreasuryTransaction
         {
             TransactionDate = settlementDate,
             TransactionType = "إيراد",
             Amount = dto.Amount,
-            Description = $"تصفية عهدة {entity.CustodyNumber} - {entity.CustodianName}{plateSuffix}",
+            Description = $"مرتجع تصفية عهدة {entity.CustodyNumber} - {entity.CustodianName}{plateSuffix}",
             RelatedEntityType = "عهدة",
             RelatedEntityId = entity.Id,
             PaymentMethod = "نقدي",
+            Status = "معلق",
             Notes = note,
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow

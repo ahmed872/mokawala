@@ -972,6 +972,7 @@ namespace FleetManagementSystem.Core.DTOs
         public string RelatedEntityType { get; set; } = string.Empty;
         public int? RelatedEntityId { get; set; }
         public string PaymentMethod { get; set; } = string.Empty;
+        public string Status { get; set; } = "معتمد";
         public string Notes { get; set; } = string.Empty;
     }
 
@@ -985,6 +986,7 @@ namespace FleetManagementSystem.Core.DTOs
         public string RelatedEntityType { get; set; } = string.Empty;
         public int? RelatedEntityId { get; set; }
         public string PaymentMethod { get; set; } = "Cash";
+        public string Status { get; set; } = "معتمد";
         public string Notes { get; set; } = string.Empty;
     }
 

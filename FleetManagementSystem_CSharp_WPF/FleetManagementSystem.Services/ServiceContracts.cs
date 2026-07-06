@@ -104,6 +104,7 @@ public interface ITreasuryService
     Task<List<TreasuryTransactionDto>> GetAllAsync();
     Task<TreasuryTransactionDto?> GetByIdAsync(int id);
     Task<TreasuryTransactionDto> SaveAsync(TreasuryTransactionFormDto dto);
+    Task<TreasuryTransactionDto> ApproveAsync(int id, string? approvedByUserName = null);
     Task DeleteAsync(int id);
     Task<decimal> GetCurrentBalanceAsync();
 }

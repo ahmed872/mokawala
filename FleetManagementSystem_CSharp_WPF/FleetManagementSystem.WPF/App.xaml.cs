@@ -17,6 +17,17 @@ public partial class App : Application
     {
         base.OnStartup(e);
 
+        // شبكة أمان: أي خطأ غير متوقع في الواجهة يظهر كرسالة بدل ما يقفل البرنامج كله.
+        DispatcherUnhandledException += (_, args) =>
+        {
+            MessageBox.Show(
+                $"حدث خطأ غير متوقع:\n{args.Exception.Message}",
+                "خطأ",
+                MessageBoxButton.OK,
+                MessageBoxImage.Error);
+            args.Handled = true;
+        };
+
         try
         {
             var configuration = new ConfigurationBuilder()

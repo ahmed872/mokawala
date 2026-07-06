@@ -1116,12 +1116,17 @@ public partial class MainWindow : Window
     private Task LoadCustodyIfUnlockedAsync() =>
         IsModuleTemporarilyLocked("Custody") ? Task.CompletedTask : LoadCustodyAsync();
 
+    private static bool IsPendingTreasury(TreasuryTransactionDto t) =>
+        string.Equals(t.Status?.Trim(), "معلق", StringComparison.OrdinalIgnoreCase);
+
     private void UpdateTreasurySummary()
     {
-        var income = _treasuryTransactions
+        // الحركات المعلقة (بانتظار اعتماد مسؤول الخزينة) لا تدخل في الإجماليات ولا الرصيد.
+        var approved = _treasuryTransactions.Where(t => !IsPendingTreasury(t)).ToList();
+        var income = approved
             .Where(t => string.Equals(t.TransactionType, "إيراد", StringComparison.OrdinalIgnoreCase))
             .Sum(t => t.Amount);
-        var expense = _treasuryTransactions
+        var expense = approved
             .Where(t => string.Equals(t.TransactionType, "صرف", StringComparison.OrdinalIgnoreCase))
             .Sum(t => t.Amount);
         var balance = income - expense;
@@ -4890,6 +4895,8 @@ public partial class MainWindow : Window
 
         await RunSafeAsync(async () =>
         {
+            // تعديل حركة معلقة لا يعتمدها ضمنيًا — الاعتماد له زر مخصص.
+            window.TreasuryForm.Status = item.Status;
             await _treasuryService.SaveAsync(window.TreasuryForm);
             await LoadTreasuryIfUnlockedAsync();
             await LoadDashboardAsync();
@@ -4907,6 +4914,55 @@ public partial class MainWindow : Window
         SelectTreasuryFromSender(sender);
         return DeleteSelectedAsync(TreasuryGrid, _treasuryTransactions, x => x.Id, _treasuryService.DeleteAsync, LoadTreasuryIfUnlockedAsync);
     });
+
+    private async void ApproveTreasuryButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (IsModuleTemporarilyLocked("Treasury"))
+        {
+            return;
+        }
+
+        // اعتماد المرتجعات متاح لمسؤول الخزينة أو مدير النظام فقط.
+        var canApprove = string.Equals(_currentUser?.Role, "Admin", StringComparison.OrdinalIgnoreCase) ||
+                         string.Equals(_currentUser?.Role, "TreasuryOfficer", StringComparison.OrdinalIgnoreCase);
+        if (!canApprove)
+        {
+            MessageBox.Show("اعتماد حركات الخزينة متاح لمسؤول الخزينة أو مدير النظام فقط.", "تنبيه", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        var item = SelectTreasuryFromSender(sender);
+        if (item is null)
+        {
+            MessageBox.Show("اختر حركة خزينة أولًا.", "تنبيه", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        if (!IsPendingTreasury(item))
+        {
+            MessageBox.Show("هذه الحركة معتمدة بالفعل.", "تنبيه", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        var confirm = MessageBox.Show(
+            $"اعتماد الحركة:\n{item.Description}\nبمبلغ {item.Amount:N2}؟\n\nبعد الاعتماد سيدخل المبلغ في رصيد الخزينة.",
+            "اعتماد حركة خزينة",
+            MessageBoxButton.YesNo,
+            MessageBoxImage.Question);
+
+        if (confirm != MessageBoxResult.Yes)
+        {
+            return;
+        }
+
+        await RunSafeAsync(async () =>
+        {
+            await _treasuryService.ApproveAsync(item.Id, _currentUser?.Username);
+            await LoadTreasuryIfUnlockedAsync();
+            await LoadDashboardAsync();
+            MessageBox.Show("تم اعتماد الحركة وأصبح المبلغ ضمن رصيد الخزينة.", "تم", MessageBoxButton.OK, MessageBoxImage.Information);
+        });
+    }
 
     private async void RefreshLicensesButton_Click(object sender, RoutedEventArgs e) => await RunSafeAsync(async () =>
     {
@@ -5309,8 +5365,8 @@ public partial class MainWindow : Window
             await LoadNotificationsAsync();
 
             var message = saved.RemainingAmount <= 0
-                ? "تمت تصفية العهدة بالكامل وتم إرجاع المبلغ إلى الخزينة."
-                : $"تمت التصفية الجزئية. المتبقي على العهدة: {saved.RemainingAmount:N2}";
+                ? "تمت تصفية العهدة بالكامل. المرتجع مسجل في الخزينة كحركة معلقة حتى يعتمدها مسؤول الخزينة."
+                : $"تمت التصفية الجزئية. المتبقي على العهدة: {saved.RemainingAmount:N2}\nالمرتجع مسجل في الخزينة كحركة معلقة حتى يعتمدها مسؤول الخزينة.";
             MessageBox.Show(message, "تمت التصفية", MessageBoxButton.OK, MessageBoxImage.Information);
         });
     }
@@ -5366,8 +5422,8 @@ public partial class MainWindow : Window
             await LoadDashboardAsync();
 
             var message = saved.RemainingAmount <= 0
-                ? "تمت تصفية العهدة بالكامل وتم إرجاع المبلغ إلى الخزينة."
-                : $"تمت التصفية الجزئية. المتبقي عليك: {saved.RemainingAmount:N2}";
+                ? "تمت تصفية عهدتك بالكامل. المرتجع في انتظار اعتماد مسؤول الخزينة."
+                : $"تمت التصفية الجزئية. المتبقي عليك: {saved.RemainingAmount:N2}\nالمرتجع في انتظار اعتماد مسؤول الخزينة.";
             MessageBox.Show(message, "تمت التصفية", MessageBoxButton.OK, MessageBoxImage.Information);
         });
     }

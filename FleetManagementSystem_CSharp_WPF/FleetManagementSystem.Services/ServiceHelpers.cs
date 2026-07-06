@@ -521,8 +521,12 @@ internal static class ServiceHelpers
             RelatedEntityType = entity.RelatedEntityType,
             RelatedEntityId = entity.RelatedEntityId,
             PaymentMethod = PaymentMethodDisplay(entity.PaymentMethod),
+            Status = string.IsNullOrWhiteSpace(entity.Status) ? "معتمد" : entity.Status,
             Notes = entity.Notes
         };
+
+    public static bool IsTreasuryPending(string? status) =>
+        ServiceHelpers.Clean(status) == "معلق";
 
     public static LicenseDto ToDto(this License entity) =>
         new()

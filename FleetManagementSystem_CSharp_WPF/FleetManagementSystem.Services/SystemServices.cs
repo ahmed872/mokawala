@@ -214,6 +214,7 @@ public sealed class DataBootstrapService(FleetDbContext context) : IDataBootstra
         await EnsureColumnAsync("Custody", "SettlementNotes", GetShortTextColumnDefinition(defaultValue: string.Empty));
         await EnsureColumnAsync("Custody", "UserId", GetNullableIntColumnDefinition());
         await EnsureColumnAsync("Users", "MustChangePassword", GetBooleanColumnDefinition(defaultValue: false));
+        await EnsureColumnAsync("TreasuryTransactions", "Status", GetShortTextColumnDefinition(defaultValue: "معتمد"));
         await EnsureCustodyVehicleOptionalAsync();
         await EnsureDriverAttendanceTableAsync();
 
@@ -1287,8 +1288,9 @@ public sealed class ReportingService(FleetDbContext context) : IReportingService
         var totalExpenses = (await _context.Expenses.Select(x => x.Amount).ToListAsync()).Sum();
         var totalFuelCost = (await _context.FuelTransactions.Select(x => x.TotalCost).ToListAsync()).Sum();
         var treasuryBalance = (await _context.TreasuryTransactions
-            .Select(x => new { x.TransactionType, x.Amount })
+            .Select(x => new { x.TransactionType, x.Amount, x.Status })
             .ToListAsync())
+            .Where(x => !ServiceHelpers.IsTreasuryPending(x.Status))
             .Sum(x => ServiceHelpers.IsTreasuryIncome(x.TransactionType) ? x.Amount : -x.Amount);
         var today = DateTime.Today;
         var oilChangesDue = await CountOilAlertsAsync();

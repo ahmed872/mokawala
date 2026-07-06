@@ -106,7 +106,7 @@
                     <DatePicker x:Name="SettlementDatePicker"
                                 Height="42"
                                 Language="ar-EG"
-                                Style="{StaticResource FilterDatePickerStyle}"/>
+                                SelectedDateFormat="Short"/>
                 </StackPanel>
             </Grid>
 
