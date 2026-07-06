@@ -209,6 +209,7 @@ public partial class MainWindow : Window
     private readonly ObservableCollection<VehicleLicenseRow> _vehicleLicenses = new();
     private readonly ObservableCollection<InsuranceDto> _insurance = new();
     private readonly ObservableCollection<CustodyDto> _custodies = new();
+    private readonly ObservableCollection<CustodyDto> _myCustodies = new();
     private readonly ObservableCollection<VehicleTypeDto> _vehicleTypes = new();
     private readonly ObservableCollection<ContractStatusDto> _contractStatuses = new();
     private readonly ObservableCollection<MaintenanceTypeDto> _maintenanceTypes = new();
@@ -499,6 +500,7 @@ public partial class MainWindow : Window
         ServiceProvidersGrid.ItemsSource = _serviceProviders;
         NotificationsListBox.ItemsSource = _notifications;
         UsersGrid.ItemsSource = _users;
+        MyCustodyGrid.ItemsSource = _myCustodies;
         ReportVehicleComboBox.ItemsSource = _vehicles;
         DriverReportDriverComboBox.ItemsSource = _driverReportDriverOptions;
         DriverAttendanceWeekPicker.SelectedDate = StartOfDriverWeek(DateTime.Today);
@@ -643,6 +645,7 @@ public partial class MainWindow : Window
         await LoadSection("التراخيص", LoadLicensesAsync);
         await LoadSection("التأمينات", LoadInsuranceAsync);
         await LoadSection("العهد", LoadCustodyIfUnlockedAsync);
+        await LoadSection("عهدتي", LoadMyCustodyAsync);
         await LoadSection("البيانات الأساسية", LoadMasterDataAsync);
         await LoadSection("الإعدادات", LoadSettingsAsync);
         await LoadSection("الإشعارات", LoadNotificationsAsync);
@@ -1088,6 +1091,27 @@ public partial class MainWindow : Window
             : await _custodyService.GetAllAsync();
         ReplaceCollection(_custodies, custodies);
         UpdateCustodySummary();
+
+        // أي تغيير في العهد ينعكس على تبويب "عهدتي" مباشرة.
+        await LoadMyCustodyAsync();
+    }
+
+    // "عهدتي": العهد المسجلة باسم المستخدم الحالي أيًا كان دوره.
+    private async Task LoadMyCustodyAsync()
+    {
+        if (_currentUser is null)
+        {
+            return;
+        }
+
+        var custodies = await _custodyService.GetAllAsync(_currentUser.Id);
+        ReplaceCollection(_myCustodies, custodies);
+
+        MyCustodyTotalTextBlock.Text = custodies.Sum(c => c.Amount).ToString("N2");
+        MyCustodySettledTextBlock.Text = custodies.Sum(c => c.SettledAmount).ToString("N2");
+        MyCustodyRemainingTextBlock.Text = custodies.Sum(c => c.RemainingAmount).ToString("N2");
+        MyCustodyEmptyBorder.Visibility = custodies.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+        MyCustodyGrid.Visibility = custodies.Count == 0 ? Visibility.Collapsed : Visibility.Visible;
     }
     private Task LoadCustodyIfUnlockedAsync() =>
         IsModuleTemporarilyLocked("Custody") ? Task.CompletedTask : LoadCustodyAsync();
@@ -1260,6 +1284,9 @@ public partial class MainWindow : Window
                 : Visibility.Collapsed;
         }
 
+        // "عهدتي" متاح لكل مستخدم مسجل أيًا كان دوره — أي حد ممكن يستلم عهدة.
+        MyCustodyTab.Visibility = Visibility.Visible;
+
         DashboardTripsShortcutButton.Visibility = allowed.Contains("Trips") ? Visibility.Visible : Visibility.Collapsed;
         DashboardLicensesInsuranceShortcutButton.Visibility =
             allowed.Contains("Licenses") || allowed.Contains("Insurance") ? Visibility.Visible : Visibility.Collapsed;
@@ -1374,7 +1401,7 @@ public partial class MainWindow : Window
         yield return MaintenanceTypesGrid;
         yield return ServiceProvidersGrid;
         yield return ReportsGrid;
-        yield return UsersGrid;
+        // UsersGrid وMyCustodyGrid لهما أعمدة محسوبة يدويًا حتى لا تُقص الأعمدة خارج الشاشة.
     }
 
     private static string GetColumnWidthKey(DataGridColumn column)
@@ -5304,6 +5331,46 @@ public partial class MainWindow : Window
         SelectCustodyFromSender(sender);
         return DeleteSelectedAsync(CustodyGrid, _custodies, x => x.Id, _custodyService.DeleteAsync, LoadCustodyIfUnlockedAsync);
     });
+
+    private async void RefreshMyCustodyButton_Click(object sender, RoutedEventArgs e) => await RunSafeAsync(LoadMyCustodyAsync);
+
+    private async void SettleMyCustodyButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not FrameworkElement { DataContext: CustodyDto item } || _currentUser is null)
+        {
+            return;
+        }
+
+        if (item.RemainingAmount <= 0)
+        {
+            MessageBox.Show("هذه العهدة تمت تصفيتها بالكامل بالفعل.", "تنبيه", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        var window = new CustodySettlementWindow(item)
+        {
+            Owner = this
+        };
+
+        if (window.ShowDialog() != true || window.SettlementForm is null)
+        {
+            return;
+        }
+
+        await RunSafeAsync(async () =>
+        {
+            var saved = await _custodyService.SettleAsync(window.SettlementForm, _currentUser.Id);
+            await LoadMyCustodyAsync();
+            await LoadCustodyIfUnlockedAsync();
+            await LoadTreasuryIfUnlockedAsync();
+            await LoadDashboardAsync();
+
+            var message = saved.RemainingAmount <= 0
+                ? "تمت تصفية العهدة بالكامل وتم إرجاع المبلغ إلى الخزينة."
+                : $"تمت التصفية الجزئية. المتبقي عليك: {saved.RemainingAmount:N2}";
+            MessageBox.Show(message, "تمت التصفية", MessageBoxButton.OK, MessageBoxImage.Information);
+        });
+    }
 
     private async void AttachCustodyDocumentButton_Click(object sender, RoutedEventArgs e) => await RunSafeAsync(async () =>
     {

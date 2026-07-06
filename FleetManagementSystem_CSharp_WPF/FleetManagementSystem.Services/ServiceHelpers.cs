@@ -195,7 +195,7 @@ internal static class ServiceHelpers
             },
             UserRole.CustodyHolder => new List<string>
             {
-                "Custody"
+                "MyCustody"
             },
             _ => new List<string> { "Dashboard", "Trips", "Vehicles" }
         };

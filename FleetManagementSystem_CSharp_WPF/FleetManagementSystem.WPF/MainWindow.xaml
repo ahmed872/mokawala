@@ -5334,6 +5334,172 @@
                     </DockPanel>
                 </TabItem>
 
+                <TabItem x:Name="MyCustodyTab"
+                         Header="عهدتي"
+                         Tag="MyCustody">
+                    <DockPanel>
+                        <Border DockPanel.Dock="Top"
+                                Style="{StaticResource TripPageCardStyle}"
+                                Margin="0,0,0,14">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <StackPanel>
+                                    <TextBlock Style="{StaticResource PageTitleStyle}"
+                                               Text="عهدتي"/>
+                                    <TextBlock Margin="0,4,0,0"
+                                               FontSize="13"
+                                               Foreground="{StaticResource MutedBrush}"
+                                               TextWrapping="Wrap"
+                                               Text="العهد المسجلة باسمك: تابع قيمتها والمتبقي عليها وقم بتصفيتها من هنا."/>
+                                </StackPanel>
+                                <Button Grid.Column="1"
+                                        VerticalAlignment="Center"
+                                        Style="{StaticResource SecondaryButtonStyle}"
+                                        ToolTip="تحديث عهدتي"
+                                        Click="RefreshMyCustodyButton_Click">تحديث</Button>
+                            </Grid>
+                        </Border>
+
+                        <!-- ملخص عهدتي -->
+                        <Border DockPanel.Dock="Top"
+                                Background="#F0FFF4"
+                                BorderBrush="#C5DBC8"
+                                BorderThickness="1"
+                                CornerRadius="12"
+                                Padding="18,12"
+                                Margin="0,0,0,10">
+                            <Grid FlowDirection="RightToLeft">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="1"/>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="1"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0"
+                                            HorizontalAlignment="Center">
+                                    <TextBlock Text="إجمالي قيمة عهدي"
+                                               FontSize="12"
+                                               Foreground="#607D8B"
+                                               HorizontalAlignment="Center"
+                                               Margin="0,0,0,4"/>
+                                    <TextBlock x:Name="MyCustodyTotalTextBlock"
+                                               Text="0"
+                                               FontSize="20"
+                                               FontWeight="Bold"
+                                               Foreground="{StaticResource AccentBrush}"
+                                               HorizontalAlignment="Center"/>
+                                </StackPanel>
+                                <Border Grid.Column="1"
+                                        Background="#C5DBC8"
+                                        Width="1"
+                                        Margin="0,4"/>
+                                <StackPanel Grid.Column="2"
+                                            HorizontalAlignment="Center">
+                                    <TextBlock Text="تم تسديده"
+                                               FontSize="12"
+                                               Foreground="#607D8B"
+                                               HorizontalAlignment="Center"
+                                               Margin="0,0,0,4"/>
+                                    <TextBlock x:Name="MyCustodySettledTextBlock"
+                                               Text="0"
+                                               FontSize="20"
+                                               FontWeight="Bold"
+                                               Foreground="#2E7D32"
+                                               HorizontalAlignment="Center"/>
+                                </StackPanel>
+                                <Border Grid.Column="3"
+                                        Background="#C5DBC8"
+                                        Width="1"
+                                        Margin="0,4"/>
+                                <StackPanel Grid.Column="4"
+                                            HorizontalAlignment="Center">
+                                    <TextBlock Text="المتبقي عليّ"
+                                               FontSize="12"
+                                               Foreground="#607D8B"
+                                               HorizontalAlignment="Center"
+                                               Margin="0,0,0,4"/>
+                                    <TextBlock x:Name="MyCustodyRemainingTextBlock"
+                                               Text="0"
+                                               FontSize="20"
+                                               FontWeight="Bold"
+                                               Foreground="#E65100"
+                                               HorizontalAlignment="Center"/>
+                                </StackPanel>
+                            </Grid>
+                        </Border>
+
+                        <Border x:Name="MyCustodyEmptyBorder"
+                                DockPanel.Dock="Top"
+                                Background="{StaticResource SurfaceAltBrush}"
+                                BorderBrush="{StaticResource BorderBrush}"
+                                BorderThickness="1"
+                                CornerRadius="12"
+                                Padding="18"
+                                Margin="0,0,0,10"
+                                Visibility="Collapsed">
+                            <TextBlock Text="لا توجد عهد مسجلة باسمك حتى الآن."
+                                       FontSize="14"
+                                       Foreground="{StaticResource MutedBrush}"
+                                       HorizontalAlignment="Center"/>
+                        </Border>
+
+                        <DataGrid x:Name="MyCustodyGrid"
+                                  AutomationProperties.AutomationId="MyCustodyGrid"
+                                  AutoGenerateColumns="False"
+                                  IsReadOnly="True"
+                                  HeadersVisibility="Column"
+                                  MinRowHeight="38">
+                            <DataGrid.Columns>
+                                <DataGridTemplateColumn Header="إجراءات"
+                                                        Width="110"
+                                                        IsReadOnly="True">
+                                    <DataGridTemplateColumn.CellTemplate>
+                                        <DataTemplate>
+                                            <Button Style="{StaticResource SecondaryButtonStyle}"
+                                                    Padding="10,4"
+                                                    MinWidth="0"
+                                                    MinHeight="0"
+                                                    FontSize="12"
+                                                    HorizontalAlignment="Center"
+                                                    ToolTip="تصفية العهدة"
+                                                    AutomationProperties.Name="تصفية عهدتي"
+                                                    Click="SettleMyCustodyButton_Click">تصفية</Button>
+                                        </DataTemplate>
+                                    </DataGridTemplateColumn.CellTemplate>
+                                </DataGridTemplateColumn>
+                                <DataGridTextColumn Header="رقم العهدة"
+                                                    Binding="{Binding CustodyNumber}"
+                                                    Width="170"/>
+                                <DataGridTextColumn Header="قيمة العهدة"
+                                                    Binding="{Binding Amount, StringFormat=N2}"
+                                                    Width="140"/>
+                                <DataGridTextColumn Header="تم تسديده"
+                                                    Binding="{Binding SettledAmount, StringFormat=N2}"
+                                                    Width="140"/>
+                                <DataGridTextColumn Header="المتبقي"
+                                                    Binding="{Binding RemainingAmount, StringFormat=N2}"
+                                                    Width="140"/>
+                                <DataGridTextColumn Header="الحالة"
+                                                    Binding="{Binding Status}"
+                                                    Width="130"/>
+                                <DataGridTextColumn Header="العربية"
+                                                    Binding="{Binding VehiclePlateNumber}"
+                                                    Width="150"/>
+                                <DataGridTextColumn Header="تاريخ التسليم"
+                                                    Binding="{Binding HandoverDate, StringFormat=yyyy-MM-dd}"
+                                                    Width="150"/>
+                                <DataGridTextColumn Header="ملاحظات"
+                                                    Binding="{Binding Notes}"
+                                                    Width="*"/>
+                            </DataGrid.Columns>
+                        </DataGrid>
+                    </DockPanel>
+                </TabItem>
+
                 <TabItem Header="البيانات الأساسية"
                          Tag="MasterData">
                     <TabControl>
@@ -5613,16 +5779,17 @@
                                                     Width="220"/>
                                 <DataGridTextColumn Header="البريد الإلكتروني"
                                                     Binding="{Binding Email}"
-                                                    Width="220"/>
+                                                    Width="*"
+                                                    MinWidth="180"/>
                                 <DataGridTextColumn Header="الدور"
                                                     Binding="{Binding RoleDisplay}"
                                                     Width="190"/>
                                 <DataGridTextColumn Header="الحالة"
                                                     Binding="{Binding StatusDisplay}"
-                                                    Width="120"/>
+                                                    Width="110"/>
                                 <DataGridTextColumn Header="آخر دخول"
                                                     Binding="{Binding LastLoginAt, StringFormat=yyyy-MM-dd HH:mm}"
-                                                    Width="170"/>
+                                                    Width="160"/>
                             </DataGrid.Columns>
                         </DataGrid>
                     </DockPanel>
