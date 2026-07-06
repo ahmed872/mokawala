@@ -1178,6 +1178,8 @@ namespace FleetManagementSystem.Core.DTOs
     {
         public int Id { get; set; }
         public int VehicleId { get; set; }
+        /// <summary>حساب المستخدم المستلم للعهدة (0 = إنشاء/ربط تلقائي بالاسم).</summary>
+        public int UserId { get; set; }
         public string CustodyNumber { get; set; } = string.Empty;
         public string CustodianName { get; set; } = string.Empty;
         public string CustodianPosition { get; set; } = string.Empty;

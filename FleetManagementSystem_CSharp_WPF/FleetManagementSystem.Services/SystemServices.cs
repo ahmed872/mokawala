@@ -192,6 +192,22 @@ public sealed class DataBootstrapService(FleetDbContext context) : IDataBootstra
         await EnsureColumnAsync("Drivers", "FullAddress", GetInsuranceDetailsColumnDefinition());
         await EnsureColumnAsync("Drivers", "TrafficUnit", GetShortTextColumnDefinition(defaultValue: string.Empty));
         await EnsureColumnAsync("Drivers", "WorkLocation", GetShortTextColumnDefinition(defaultValue: string.Empty));
+        await EnsureCustodyTableAsync();
+        // بعض قواعد البيانات القديمة فيها جدول عهد ناقص أعمدة أساسية (مثل CustodianName) —
+        // نتحقق من كل الأعمدة عمودًا عمودًا قبل أي استخدام حتى لا يفشل التحميل أو الحفظ.
+        await EnsureColumnAsync("Custody", "VehicleId", GetNullableIntColumnDefinition());
+        await EnsureColumnAsync("Custody", "EmployeeId", GetNullableIntColumnDefinition());
+        await EnsureColumnAsync("Custody", "CustodyNumber", GetShortTextColumnDefinition(defaultValue: string.Empty));
+        await EnsureColumnAsync("Custody", "CustodianName", GetShortTextColumnDefinition(defaultValue: string.Empty));
+        await EnsureColumnAsync("Custody", "CustodianPosition", GetShortTextColumnDefinition(defaultValue: string.Empty));
+        await EnsureColumnAsync("Custody", "HandoverDate", GetDateTimeColumnDefinition());
+        await EnsureColumnAsync("Custody", "ReturnDate", GetNullableDateColumnDefinition());
+        await EnsureColumnAsync("Custody", "Status", GetShortTextColumnDefinition(defaultValue: "Active"));
+        await EnsureColumnAsync("Custody", "VehicleConditionRating", GetRatingColumnDefinition());
+        await EnsureColumnAsync("Custody", "Notes", GetShortTextColumnDefinition(defaultValue: string.Empty));
+        await EnsureColumnAsync("Custody", "DocumentUrl", GetShortTextColumnDefinition(defaultValue: string.Empty));
+        await EnsureColumnAsync("Custody", "CreatedAt", GetDateTimeColumnDefinition());
+        await EnsureColumnAsync("Custody", "UpdatedAt", GetDateTimeColumnDefinition());
         await EnsureColumnAsync("Custody", "Amount", GetMoneyColumnDefinition());
         await EnsureColumnAsync("Custody", "SettledAmount", GetMoneyColumnDefinition());
         await EnsureColumnAsync("Custody", "SettlementDate", GetNullableDateColumnDefinition());
@@ -278,6 +294,73 @@ public sealed class DataBootstrapService(FleetDbContext context) : IDataBootstra
 #pragma warning restore EF1002
     }
 
+    private async Task EnsureCustodyTableAsync()
+    {
+        if (await HasTableAsync("Custody"))
+        {
+            return;
+        }
+
+#pragma warning disable EF1002
+        if (_context.Database.IsSqlite())
+        {
+            await _context.Database.ExecuteSqlRawAsync(SqliteCustodyTableDdl);
+            return;
+        }
+
+        if (_context.Database.IsMySql())
+        {
+            await _context.Database.ExecuteSqlRawAsync("""
+                CREATE TABLE IF NOT EXISTS Custody (
+                    Id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+                    VehicleId INT NULL,
+                    EmployeeId INT NULL,
+                    UserId INT NULL,
+                    CustodyNumber VARCHAR(255) NOT NULL DEFAULT '',
+                    CustodianName VARCHAR(255) NOT NULL DEFAULT '',
+                    CustodianPosition VARCHAR(255) NOT NULL DEFAULT '',
+                    HandoverDate DATETIME NOT NULL DEFAULT '2000-01-01 00:00:00',
+                    ReturnDate DATETIME NULL,
+                    Status VARCHAR(255) NOT NULL DEFAULT 'Active',
+                    VehicleConditionRating DECIMAL(18,2) NOT NULL DEFAULT 5,
+                    Amount DECIMAL(18,2) NOT NULL DEFAULT 0,
+                    SettledAmount DECIMAL(18,2) NOT NULL DEFAULT 0,
+                    SettlementDate DATETIME NULL,
+                    SettlementNotes VARCHAR(500) NOT NULL DEFAULT '',
+                    Notes VARCHAR(500) NOT NULL DEFAULT '',
+                    DocumentUrl VARCHAR(500) NOT NULL DEFAULT '',
+                    CreatedAt DATETIME NOT NULL DEFAULT '2000-01-01 00:00:00',
+                    UpdatedAt DATETIME NOT NULL DEFAULT '2000-01-01 00:00:00'
+                );
+                """);
+        }
+#pragma warning restore EF1002
+    }
+
+    private const string SqliteCustodyTableDdl = """
+        CREATE TABLE Custody (
+            Id INTEGER NOT NULL CONSTRAINT PK_Custody PRIMARY KEY AUTOINCREMENT,
+            VehicleId INTEGER NULL,
+            EmployeeId INTEGER NULL,
+            UserId INTEGER NULL,
+            CustodyNumber TEXT NOT NULL DEFAULT '',
+            CustodianName TEXT NOT NULL DEFAULT '',
+            CustodianPosition TEXT NOT NULL DEFAULT '',
+            HandoverDate TEXT NOT NULL DEFAULT '2000-01-01 00:00:00',
+            ReturnDate TEXT NULL,
+            Status TEXT NOT NULL DEFAULT 'Active',
+            VehicleConditionRating TEXT NOT NULL DEFAULT '5.0',
+            Amount TEXT NOT NULL DEFAULT '0',
+            SettledAmount TEXT NOT NULL DEFAULT '0',
+            SettlementDate TEXT NULL,
+            SettlementNotes TEXT NOT NULL DEFAULT '',
+            Notes TEXT NOT NULL DEFAULT '',
+            DocumentUrl TEXT NOT NULL DEFAULT '',
+            CreatedAt TEXT NOT NULL DEFAULT '2000-01-01 00:00:00',
+            UpdatedAt TEXT NOT NULL DEFAULT '2000-01-01 00:00:00'
+        )
+        """;
+
     /// <summary>
     /// العهدة كانت مربوطة إجباريًا بمركبة؛ الآن الربط اختياري، فنعدّل قواعد البيانات القديمة
     /// حتى يقبل عمود VehicleId قيمة فارغة.
@@ -340,29 +423,7 @@ public sealed class DataBootstrapService(FleetDbContext context) : IDataBootstra
             {
                 "PRAGMA foreign_keys = OFF",
                 "ALTER TABLE Custody RENAME TO __Custody_old",
-                """
-                CREATE TABLE Custody (
-                    Id INTEGER NOT NULL CONSTRAINT PK_Custody PRIMARY KEY AUTOINCREMENT,
-                    VehicleId INTEGER NULL,
-                    EmployeeId INTEGER NULL,
-                    UserId INTEGER NULL,
-                    CustodyNumber TEXT NOT NULL DEFAULT '',
-                    CustodianName TEXT NOT NULL DEFAULT '',
-                    CustodianPosition TEXT NOT NULL DEFAULT '',
-                    HandoverDate TEXT NOT NULL,
-                    ReturnDate TEXT NULL,
-                    Status TEXT NOT NULL DEFAULT 'Active',
-                    VehicleConditionRating TEXT NOT NULL DEFAULT '5.0',
-                    Amount TEXT NOT NULL DEFAULT '0',
-                    SettledAmount TEXT NOT NULL DEFAULT '0',
-                    SettlementDate TEXT NULL,
-                    SettlementNotes TEXT NOT NULL DEFAULT '',
-                    Notes TEXT NOT NULL DEFAULT '',
-                    DocumentUrl TEXT NOT NULL DEFAULT '',
-                    CreatedAt TEXT NOT NULL,
-                    UpdatedAt TEXT NOT NULL
-                )
-                """,
+                SqliteCustodyTableDdl,
                 $"INSERT INTO Custody ({columns}) SELECT {columns} FROM __Custody_old",
                 "DROP TABLE __Custody_old",
                 "PRAGMA foreign_keys = ON"
@@ -525,6 +586,14 @@ public sealed class DataBootstrapService(FleetDbContext context) : IDataBootstra
 
     private string GetMoneyColumnDefinition() =>
         _context.Database.IsSqlite() ? "TEXT NOT NULL DEFAULT '0'" : "DECIMAL(18,2) NOT NULL DEFAULT 0";
+
+    private string GetRatingColumnDefinition() =>
+        _context.Database.IsSqlite() ? "TEXT NOT NULL DEFAULT '5.0'" : "DECIMAL(18,2) NOT NULL DEFAULT 5";
+
+    private string GetDateTimeColumnDefinition() =>
+        _context.Database.IsSqlite()
+            ? "TEXT NOT NULL DEFAULT '2000-01-01 00:00:00'"
+            : "DATETIME NOT NULL DEFAULT '2000-01-01 00:00:00'";
 
     private string GetNullableDecimalColumnDefinition() =>
         _context.Database.IsSqlite() ? "TEXT NULL" : "DECIMAL(18,2) NULL";

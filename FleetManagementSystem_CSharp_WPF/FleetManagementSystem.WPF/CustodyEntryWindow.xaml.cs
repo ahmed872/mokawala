@@ -7,6 +7,9 @@ namespace FleetManagementSystem.WPF;
 
 public partial class CustodyEntryWindow : Window
 {
+    /// <summary>مستخدم من مستخدمي النظام يمكن تسليمه عهدة.</summary>
+    public sealed record CustodianOption(int UserId, string Display, string Username);
+
     private readonly IReadOnlyList<VehicleDto> _vehicles;
     private readonly CustodyDto? _source;
 
@@ -14,7 +17,7 @@ public partial class CustodyEntryWindow : Window
 
     public CustodyEntryWindow(
         IEnumerable<VehicleDto> vehicles,
-        IEnumerable<EmployeeDto> employees,
+        IEnumerable<CustodianOption> custodianOptions,
         int? preselectedVehicleId = null,
         CustodyDto? source = null)
     {
@@ -26,10 +29,9 @@ public partial class CustodyEntryWindow : Window
             .ToList();
 
         VehicleComboBox.ItemsSource = _vehicles;
-        CustodianNameComboBox.ItemsSource = employees
-            .OrderBy(employee => employee.FullName)
+        CustodianNameComboBox.ItemsSource = custodianOptions
+            .OrderBy(option => option.Display)
             .ToList();
-        CustodianNameComboBox.SelectionChanged += CustodianNameComboBox_SelectionChanged;
 
         if (source is not null)
         {
@@ -67,16 +69,6 @@ public partial class CustodyEntryWindow : Window
         Loaded += (_, _) => CustodianNameComboBox.Focus();
     }
 
-    private void CustodianNameComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
-    {
-        // عند اختيار موظف من القائمة نكمل وظيفته تلقائيًا.
-        if (CustodianNameComboBox.SelectedItem is EmployeeDto employee &&
-            string.IsNullOrWhiteSpace(CustodianPositionTextBox.Text))
-        {
-            CustodianPositionTextBox.Text = employee.Position;
-        }
-    }
-
     private void VehicleComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e) => UpdateVehicleSummary();
 
     private void ClearVehicleButton_Click(object sender, RoutedEventArgs e)
@@ -87,13 +79,12 @@ public partial class CustodyEntryWindow : Window
 
     private void SaveButton_Click(object sender, RoutedEventArgs e)
     {
-        var custodianName = CustodianNameComboBox.SelectedItem is EmployeeDto employee
-            ? employee.FullName
-            : CustodianNameComboBox.Text?.Trim() ?? string.Empty;
+        var selectedUser = CustodianNameComboBox.SelectedItem as CustodianOption;
+        var custodianName = selectedUser?.Display ?? CustodianNameComboBox.Text?.Trim() ?? string.Empty;
 
         if (string.IsNullOrWhiteSpace(custodianName))
         {
-            ShowValidation("اكتب اسم المستلم أولًا.");
+            ShowValidation("اختر المستلم من مستخدمي النظام أو اكتب اسمه أولًا.");
             return;
         }
 
@@ -142,6 +133,7 @@ public partial class CustodyEntryWindow : Window
         {
             Id = _source?.Id ?? 0,
             VehicleId = vehicle?.Id ?? 0,
+            UserId = selectedUser?.UserId ?? 0,
             CustodyNumber = CustodyNumberTextBox.Text.Trim(),
             CustodianName = custodianName,
             CustodianPosition = CustodianPositionTextBox.Text.Trim(),

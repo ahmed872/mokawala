@@ -611,26 +611,48 @@ public partial class MainWindow : Window
 
     private async Task RefreshAllAsync()
     {
-        await LoadDashboardAsync();
-        await LoadVehiclesAsync();
-        await LoadContractsAsync();
-        await LoadMaintenanceAsync();
-        await LoadDriversAsync();
-        await LoadDailyAttendanceAsync();
-        await LoadDriverAttendanceWeekAsync();
-        await LoadEmployeesAsync();
-        await LoadTripsAsync();
-        await LoadFuelAsync();
-        await LoadExpensesAsync();
-        await LoadOilChangesAsync();
-        await LoadTreasuryIfUnlockedAsync();
-        await LoadLicensesAsync();
-        await LoadInsuranceAsync();
-        await LoadCustodyIfUnlockedAsync();
-        await LoadMasterDataAsync();
-        await LoadSettingsAsync();
-        await LoadNotificationsAsync();
-        await LoadUsersAsync();
+        // فشل قسم واحد (مثلاً جدول قديم في قاعدة البيانات) يجب ألا يوقف تحميل باقي الأقسام
+        // — كان ده سبب اختفاء اللوجو والإعدادات لما كان تحميل العهد بيفشل قبلهم.
+        var failures = new List<string>();
+
+        async Task LoadSection(string sectionName, Func<Task> loader)
+        {
+            try
+            {
+                await loader();
+            }
+            catch (Exception ex)
+            {
+                failures.Add($"{sectionName}: {ex.Message}");
+            }
+        }
+
+        await LoadSection("لوحة التحكم", LoadDashboardAsync);
+        await LoadSection("المركبات", LoadVehiclesAsync);
+        await LoadSection("العقود", LoadContractsAsync);
+        await LoadSection("الصيانة", LoadMaintenanceAsync);
+        await LoadSection("السائقون", LoadDriversAsync);
+        await LoadSection("حضور اليوم", LoadDailyAttendanceAsync);
+        await LoadSection("حضور الأسبوع", LoadDriverAttendanceWeekAsync);
+        await LoadSection("الموظفون", LoadEmployeesAsync);
+        await LoadSection("التشغيلات", LoadTripsAsync);
+        await LoadSection("البنزين", LoadFuelAsync);
+        await LoadSection("المصروفات", LoadExpensesAsync);
+        await LoadSection("الزيوت", LoadOilChangesAsync);
+        await LoadSection("الخزينة", LoadTreasuryIfUnlockedAsync);
+        await LoadSection("التراخيص", LoadLicensesAsync);
+        await LoadSection("التأمينات", LoadInsuranceAsync);
+        await LoadSection("العهد", LoadCustodyIfUnlockedAsync);
+        await LoadSection("البيانات الأساسية", LoadMasterDataAsync);
+        await LoadSection("الإعدادات", LoadSettingsAsync);
+        await LoadSection("الإشعارات", LoadNotificationsAsync);
+        await LoadSection("المستخدمون", LoadUsersAsync);
+
+        if (failures.Count > 0)
+        {
+            throw new InvalidOperationException(
+                "تعذر تحميل بعض الأقسام:\n" + string.Join("\n", failures.Take(4)));
+        }
     }
 
     private async Task LoadDashboardAsync()
@@ -2885,6 +2907,16 @@ public partial class MainWindow : Window
         Notes = dto.Notes
     };
 
+    // المستلمون المتاحون للعهدة هم مستخدمو النظام المفعّلون (صفحة المستخدمين والصلاحيات).
+    private IReadOnlyList<CustodyEntryWindow.CustodianOption> BuildCustodianOptions() =>
+        _users
+            .Where(user => user.IsActive)
+            .Select(user => new CustodyEntryWindow.CustodianOption(
+                user.Id,
+                string.IsNullOrWhiteSpace(user.FullName) ? user.Username : user.FullName,
+                user.Username))
+            .ToList();
+
     private string BuildCustodyTreasuryDescription(string prefix, CustodyFormDto form)
     {
         var plate = form.VehicleId > 0
@@ -5109,7 +5141,7 @@ public partial class MainWindow : Window
         }
 
         var selectedVehicleId = Selected<CustodyDto>(CustodyGrid)?.VehicleId;
-        var window = new CustodyEntryWindow(_vehicles, _employees, selectedVehicleId > 0 ? selectedVehicleId : null)
+        var window = new CustodyEntryWindow(_vehicles, BuildCustodianOptions(), selectedVehicleId > 0 ? selectedVehicleId : null)
         {
             Owner = this
         };
@@ -5141,11 +5173,10 @@ public partial class MainWindow : Window
 
             if (!string.IsNullOrWhiteSpace(saved.CustodianUsername))
             {
-                MessageBox.Show(
-                    $"تم حفظ العهدة وربطها بحساب دخول للمستلم.\n\nاسم المستخدم: {saved.CustodianUsername}\nكلمة المرور الافتراضية: نفس اسم المستخدم\n\nيستطيع المستلم تسجيل الدخول بنفسه لمتابعة عهدته وتصفيتها، وسيُطلب منه تغيير كلمة المرور بعد أول دخول.",
-                    "حساب المستلم",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Information);
+                var message = window.CustodyForm.UserId > 0
+                    ? $"تم حفظ العهدة وربطها بحساب المستخدم \"{saved.CustodianUsername}\".\nيستطيع الدخول بحسابه لمتابعة عهدته وتصفيتها."
+                    : $"تم حفظ العهدة وإنشاء حساب دخول للمستلم.\n\nاسم المستخدم: {saved.CustodianUsername}\nكلمة المرور الافتراضية: نفس اسم المستخدم\n\nيستطيع المستلم تسجيل الدخول بنفسه لمتابعة عهدته وتصفيتها، وسيُطلب منه تغيير كلمة المرور بعد أول دخول.";
+                MessageBox.Show(message, "حساب المستلم", MessageBoxButton.OK, MessageBoxImage.Information);
             }
         });
     }
@@ -5170,7 +5201,7 @@ public partial class MainWindow : Window
             return;
         }
 
-        var window = new CustodyEntryWindow(_vehicles, _employees, item.VehicleId > 0 ? item.VehicleId : null, item)
+        var window = new CustodyEntryWindow(_vehicles, BuildCustodianOptions(), item.VehicleId > 0 ? item.VehicleId : null, item)
         {
             Owner = this
         };

@@ -835,9 +835,20 @@ public sealed class CustodyService(FleetDbContext context, IAuditService auditSe
             .FirstOrDefaultAsync(e => e.FullName == entity.CustodianName || e.EmployeeId == entity.CustodianName);
         entity.EmployeeId = employee?.Id;
 
-        // كل مستلم عهدة يحصل على حساب دخول تلقائي (اسم المستخدم = الاسم، وكلمة المرور = اسم المستخدم)
-        // حتى يستطيع الدخول بنفسه وتصفية عهدته.
-        entity.UserId = (await EnsureCustodianUserAsync(entity.CustodianName))?.Id ?? entity.UserId;
+        // المستلم إما مستخدم موجود بالفعل في النظام (اختير من القائمة)،
+        // أو اسم جديد فيُنشأ له حساب دخول تلقائي (كلمة المرور = اسم المستخدم).
+        // الحساب والعهدة يُحفظان في عملية واحدة.
+        User? custodianUser = null;
+        if (dto.UserId > 0)
+        {
+            custodianUser = await _context.Users.FirstOrDefaultAsync(u => u.Id == dto.UserId);
+        }
+
+        custodianUser ??= await EnsureCustodianUserAsync(entity.CustodianName);
+        if (custodianUser is not null)
+        {
+            entity.User = custodianUser;
+        }
 
         await _context.SaveChangesAsync();
         await _auditService.LogActionAsync(action, "Custody", entity.Id, null, entity.CustodyNumber);
@@ -920,7 +931,7 @@ public sealed class CustodyService(FleetDbContext context, IAuditService auditSe
             return null;
         }
 
-        var user = await _context.Users.FirstOrDefaultAsync(u => u.Username == custodianName);
+        var user = await _context.Users.FirstOrDefaultAsync(u => u.Username == custodianName || u.FullName == custodianName);
         if (user is not null)
         {
             if (!user.IsActive)
@@ -946,8 +957,8 @@ public sealed class CustodyService(FleetDbContext context, IAuditService auditSe
             UpdatedAt = DateTime.UtcNow
         };
 
+        // لا نحفظ هنا؛ الحفظ يتم مع العهدة في SaveChangesAsync واحدة حتى لا يُنشأ حساب لعهدة فشل حفظها.
         _context.Users.Add(user);
-        await _context.SaveChangesAsync();
         return user;
     }
 

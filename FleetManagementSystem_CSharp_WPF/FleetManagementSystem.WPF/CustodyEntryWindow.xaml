@@ -286,9 +286,9 @@
                                                                   Margin="0,8,0,0"
                                                                   Style="{StaticResource AppComboBoxStyle}"
                                                                   IsEditable="True"
-                                                                  DisplayMemberPath="FullName"
-                                                                  TextSearch.TextPath="FullName"
-                                                                  ToolTip="اختر موظفًا من القائمة أو اكتب اسم المستلم مباشرة"/>
+                                                                  DisplayMemberPath="Display"
+                                                                  TextSearch.TextPath="Display"
+                                                                  ToolTip="اختر مستخدمًا من مستخدمي النظام أو اكتب اسم مستلم جديد وسيُنشأ له حساب"/>
                                                 </StackPanel>
 
                                                 <StackPanel Grid.Column="1"

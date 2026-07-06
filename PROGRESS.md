@@ -10,7 +10,7 @@
 - **الأساس:** المشروع كله تحت `FleetManagementSystem_CSharp_WPF/` (سوليوشن .NET 8: Core / Data / Services / WPF / Tests).
 - ادفع دايمًا بـ `git push -u origin claude/awesome-pasteur-66v84o`.
 
-## الحالة الحالية (آخر تحديث: 2026-07-05)
+## الحالة الحالية (آخر تحديث: 2026-07-06)
 
 ### مُنجَز ومرفوع
 
@@ -24,6 +24,9 @@
 7. **تعديل قيمة العهدة يسجل الفرق فقط في الخزينة** (مش خصم كامل المبلغ في كل حفظ).
 8. **اللوجو:** fallback دائم للوجو المدمج `pack://application:,,,/Resources/gomix-logo.png` لو مسار الإعدادات فاضي/بايظ (`UpdateCompanyLogo` + تصحيح تلقائي في `DataBootstrapService`).
 9. **ترقية مخطط قاعدة البيانات تلقائيًا** أول تشغيل عبر `EnsureOperationalSchemaAsync` (أعمدة: Custody.Amount/SettledAmount/SettlementDate/SettlementNotes/UserId، Users.MustChangePassword + جعل Custody.VehicleId اختياري) — تعمل مع MySQL وSQLite.
+10. **إصلاح قواعد البيانات القديمة (2026-07-06):** جهاز أحمد فيه SQLite بجدول عهد قديم ناقص أعمدة أساسية (كان بيدي `no such column: c.CustodianName` عند الدخول و`error while saving` عند الحفظ). الحل: `EnsureCustodyTableAsync` ينشئ الجدول لو مش موجود + فحص كل أعمدة العهد عمودًا عمودًا + إعادة بناء جدول SQLite لو VehicleId كان NOT NULL. اتعملت محاكاة كاملة للسيناريو ونجحت.
+11. **تحميل الأقسام أصبح مرنًا:** `RefreshAllAsync` في `MainWindow.xaml.cs` بيكمل باقي الأقسام لو قسم فشل ويعرض رسالة واحدة بأسماء الأقسام الفاشلة — ده كان سبب اختفاء اللوجو (فشل العهد كان بيوقف تحميل الإعدادات واللوجو اللي بعده).
+12. **مستلم العهدة بقى من مستخدمي النظام:** قائمة "المستلم" في نافذة العهدة بتعرض المستخدمين المفعّلين (مش الموظفين) — `BuildCustodianOptions` في MainWindow + `CustodyFormDto.UserId`. اختيار مستخدم موجود يربط العهدة بحسابه مباشرة؛ كتابة اسم جديد تنشئ حساب تلقائي. حفظ الحساب والعهدة في SaveChanges واحدة.
 
 ### معلَّق / أفكار لم تُطلب بعد
 
